@@ -364,7 +364,7 @@ typedef struct _pcap_queue_element {
         struct pcap_pkthdr  phdr;
         pcapng_block_header_t  bh;
     } u;
-    u_char             *pd;
+    uint8_t             *pd;
 } pcap_queue_element;
 
 /*
@@ -423,12 +423,12 @@ static gboolean really_quiet;
 static gboolean use_threads;
 static guint64 start_time;
 
-static void capture_loop_write_packet_cb(u_char *pcap_src_p, const struct pcap_pkthdr *phdr,
-                                         const u_char *pd);
-static void capture_loop_queue_packet_cb(u_char *pcap_src_p, const struct pcap_pkthdr *phdr,
-                                         const u_char *pd);
-static void capture_loop_write_pcapng_cb(capture_src *pcap_src, const pcapng_block_header_t *bh, u_char *pd);
-static void capture_loop_queue_pcapng_cb(capture_src *pcap_src, const pcapng_block_header_t *bh, u_char *pd);
+static void capture_loop_write_packet_cb(uint8_t *pcap_src_p, const struct pcap_pkthdr *phdr,
+                                         const uint8_t *pd);
+static void capture_loop_queue_packet_cb(uint8_t *pcap_src_p, const struct pcap_pkthdr *phdr,
+                                         const uint8_t *pd);
+static void capture_loop_write_pcapng_cb(capture_src *pcap_src, const pcapng_block_header_t *bh, uint8_t *pd);
+static void capture_loop_queue_pcapng_cb(capture_src *pcap_src, const pcapng_block_header_t *bh, uint8_t *pd);
 static void capture_loop_get_errmsg(char *errmsg, size_t errmsglen,
                                     char *secondary_errmsg,
                                     size_t secondary_errmsglen,
@@ -598,20 +598,19 @@ dumpcap_cmdarg_err_cont(const char *fmt, va_list ap)
 
 #ifdef HAVE_LIBCAP
 static void
-#if 0 /* Set to enable capability debugging */
 /* see 'man cap_to_text()' for explanation of output                         */
 /* '='   means 'all= '  ie: no capabilities                                  */
 /* '=ip' means 'all=ip' ie: all capabilities are permissible and inheritable */
 /* ....                                                                      */
 print_caps(const char *pfx) {
-    cap_t caps = cap_get_proc();
-    ws_debug("%s: EUID: %d  Capabilities: %s", pfx, geteuid(), cap_to_text(caps, NULL));
-    cap_free(caps);
+    if (ws_log_msg_is_active(WS_LOG_DOMAIN, LOG_LEVEL_NOISY)) {
+        cap_t caps = cap_get_proc();
+        char *caps_text = cap_to_text(caps, NULL);
+        ws_noisy("%s: EUID: %d  Capabilities: %s", pfx, geteuid(), caps_text);
+        cap_free(caps_text);
+        cap_free(caps);
+    }
 }
-#else
-print_caps(const char *pfx _U_) {
-}
-#endif
 
 static void
 relinquish_all_capabilities(void)
@@ -1205,46 +1204,95 @@ exit_main(int status)
 static void
 relinquish_privs_except_capture(void)
 {
-    /* If 'started_with_special_privs' (ie: suid) then enable for
-     *  ourself the  NET_ADMIN and NET_RAW capabilities and then
-     *  drop our suid privileges.
+    /*
+     * Drop any capabilities other than NET_ADMIN and NET_RAW:
      *
      * CAP_NET_ADMIN: Promiscuous mode and a truckload of other
      *                stuff we don't need (and shouldn't have).
      * CAP_NET_RAW:   Packet capture (raw sockets).
+     *
+     * If 'started_with_special_privs' (ie: suid) then drop our
+     * suid privileges.
      */
 
-    if (started_with_special_privs()) {
-        cap_value_t cap_list[2] = { CAP_NET_ADMIN, CAP_NET_RAW };
-        int cl_len = array_length(cap_list);
+    cap_t current_caps = cap_get_proc();
+    print_caps("Pre set");
 
-        cap_t caps = cap_init();    /* all capabilities initialized to off */
+    cap_t caps = cap_init();    /* all capabilities initialized to off */
 
-        print_caps("Pre drop, pre set");
-
-        if (prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0) == -1) {
-            cmdarg_err("prctl() fail return: %s", g_strerror(errno));
-        }
-
-        cap_set_flag(caps, CAP_PERMITTED,   cl_len, cap_list, CAP_SET);
-        cap_set_flag(caps, CAP_INHERITABLE, cl_len, cap_list, CAP_SET);
-
-        if (cap_set_proc(caps)) {
-            cmdarg_err("cap_set_proc() fail return: %s", g_strerror(errno));
-        }
-        print_caps("Pre drop, post set");
-
-        relinquish_special_privs_perm();
-
-        print_caps("Post drop, pre set");
-        cap_set_flag(caps, CAP_EFFECTIVE,   cl_len, cap_list, CAP_SET);
-        if (cap_set_proc(caps)) {
-            cmdarg_err("cap_set_proc() fail return: %s", g_strerror(errno));
-        }
-        print_caps("Post drop, post set");
-
-        cap_free(caps);
+    /*
+     * We can only set capabilities that are in the permitted set.
+     * If the real or effective user ID is 0 (root), then the file
+     * inherited and permitted sets are ignored, and our permitted
+     * set should be all ones - unless the effective ID is 0, the
+     * real ID is not zero, and the binary has file capabilities,
+     * in which case the permitted set is only that of the file.
+     * (E.g., set-user-ID-root + file capabilities.)
+     *
+     * If one or more of the euid, ruid, and saved set user ID are
+     * all zero and all change to nonzero, then all capabilities are
+     * cleared from the permitted, effective, and ambient sets.
+     * PR_SET_KEEPCAPS causes the permitted set to be retained, so
+     * we can relinquish our changed user ID.
+     *
+     * All capabilities are always cleared from the effective set
+     * when the euid is changed from 0 to nonzero.
+     *
+     * See capabilities(7).
+     */
+    if (prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0) == -1) {
+        cmdarg_err("prctl() fail return: %s", g_strerror(errno));
     }
+
+    if (started_with_special_privs()) {
+        relinquish_special_privs_perm();
+    }
+
+    /*
+     * If cap_set_proc() fails, it leaves the capabilities unchanged.
+     * So the only way to guarantee that we've dropped all other
+     * capabilities is to ensure that cap_set_proc() succeeds.
+     * One option might be to exit if cap_set_proc() fails - but some
+     * captures will work with CAP_NET_RAW but not CAP_NET_ADMIN.
+     */
+
+    cap_value_t cap_list[1] = { CAP_NET_ADMIN };
+    int cl_len = array_length(cap_list);
+    cap_flag_value_t value;
+
+    cap_get_flag(current_caps, cap_list[0], CAP_PERMITTED, &value);
+
+    if (value != CAP_SET) {
+        // XXX - Should we warn here? Some captures will still work.
+    }
+    cap_set_flag(caps, CAP_PERMITTED, cl_len, cap_list, value);
+    // XXX - Do we really need CAP_INHERITABLE?
+    cap_set_flag(caps, CAP_INHERITABLE, cl_len, cap_list, value);
+    cap_set_flag(caps, CAP_EFFECTIVE, cl_len, cap_list, value);
+
+    cap_list[0] = CAP_NET_RAW;
+    cap_get_flag(current_caps, cap_list[0], CAP_PERMITTED, &value);
+
+    if (value != CAP_SET) {
+        // XXX - Should we warn here?
+    }
+    cap_set_flag(caps, CAP_PERMITTED, cl_len, cap_list, value);
+    // XXX - Do we really need CAP_INHERITABLE?
+    cap_set_flag(caps, CAP_INHERITABLE, cl_len, cap_list, value);
+    cap_set_flag(caps, CAP_EFFECTIVE, cl_len, cap_list, value);
+
+    if (cap_set_proc(caps)) {
+        /*
+         * This shouldn't happen, we're only trying to set capabilities
+         * already in the permitted set.
+         */
+        cmdarg_err("cap_set_proc() fail return: %s", g_strerror(errno));
+    }
+
+    print_caps("Post set");
+
+    cap_free(current_caps);
+    cap_free(caps);
 }
 
 #endif /* HAVE_LIBCAP */
@@ -2341,7 +2389,7 @@ pcapng_read_shb(capture_src *pcap_src,
  * Rewrite EPB and ISB interface IDs.
  */
 static gboolean
-pcapng_adjust_block(capture_src *pcap_src, const pcapng_block_header_t *bh, u_char *pd)
+pcapng_adjust_block(capture_src *pcap_src, const pcapng_block_header_t *bh, uint8_t *pd)
 {
     switch(bh->block_type) {
     case BLOCK_TYPE_SHB:
@@ -2754,9 +2802,9 @@ pcap_pipe_dispatch(loop_data *ld, capture_src *pcap_src, char *errmsg, size_t er
         phdr.len = pcap_info->rechdr.hdr.orig_len;
 
         if (use_threads) {
-            capture_loop_queue_packet_cb((u_char *)pcap_src, &phdr, pcap_src->cap_pipe_databuf);
+            capture_loop_queue_packet_cb((uint8_t *)pcap_src, &phdr, pcap_src->cap_pipe_databuf);
         } else {
-            capture_loop_write_packet_cb((u_char *)pcap_src, &phdr, pcap_src->cap_pipe_databuf);
+            capture_loop_write_packet_cb((uint8_t *)pcap_src, &phdr, pcap_src->cap_pipe_databuf);
         }
 
         /*
@@ -3674,9 +3722,9 @@ capture_loop_dispatch(loop_data *ld,
                  * in a batch before quitting.
                  */
                 if (use_threads) {
-                    inpkts = pcap_dispatch(pcap_src->pcap_h, 1, capture_loop_queue_packet_cb, (u_char *)pcap_src);
+                    inpkts = pcap_dispatch(pcap_src->pcap_h, 1, capture_loop_queue_packet_cb, (uint8_t *)pcap_src);
                 } else {
-                    inpkts = pcap_dispatch(pcap_src->pcap_h, 1, capture_loop_write_packet_cb, (u_char *)pcap_src);
+                    inpkts = pcap_dispatch(pcap_src->pcap_h, 1, capture_loop_write_packet_cb, (uint8_t *)pcap_src);
                 }
                 if (inpkts < 0) {
                     if (inpkts == -1) {
@@ -3710,15 +3758,15 @@ capture_loop_dispatch(loop_data *ld,
              * at a time, so that we can check the pipe after every packet.
              */
             if (use_threads) {
-                inpkts = pcap_dispatch(pcap_src->pcap_h, 1, capture_loop_queue_packet_cb, (u_char *)pcap_src);
+                inpkts = pcap_dispatch(pcap_src->pcap_h, 1, capture_loop_queue_packet_cb, (uint8_t *)pcap_src);
             } else {
-                inpkts = pcap_dispatch(pcap_src->pcap_h, 1, capture_loop_write_packet_cb, (u_char *)pcap_src);
+                inpkts = pcap_dispatch(pcap_src->pcap_h, 1, capture_loop_write_packet_cb, (uint8_t *)pcap_src);
             }
 #else
             if (use_threads) {
-                inpkts = pcap_dispatch(pcap_src->pcap_h, -1, capture_loop_queue_packet_cb, (u_char *)pcap_src);
+                inpkts = pcap_dispatch(pcap_src->pcap_h, -1, capture_loop_queue_packet_cb, (uint8_t *)pcap_src);
             } else {
-                inpkts = pcap_dispatch(pcap_src->pcap_h, -1, capture_loop_write_packet_cb, (u_char *)pcap_src);
+                inpkts = pcap_dispatch(pcap_src->pcap_h, -1, capture_loop_write_packet_cb, (uint8_t *)pcap_src);
             }
 #endif
             if (inpkts < 0) {
@@ -3747,15 +3795,15 @@ capture_loop_dispatch(loop_data *ld,
             {
                 int in;
                 struct pcap_pkthdr *pkt_header;
-                u_char *pkt_data;
+                uint8_t *pkt_data;
 
                 in = 0;
                 while(ld->go &&
                       (in = pcap_next_ex(pcap_src->pcap_h, &pkt_header, &pkt_data)) == 1) {
                     if (use_threads) {
-                        capture_loop_queue_packet_cb((u_char *)pcap_src, pkt_header, pkt_data);
+                        capture_loop_queue_packet_cb((uint8_t *)pcap_src, pkt_header, pkt_data);
                     } else {
-                        capture_loop_write_packet_cb((u_char *)pcap_src, pkt_header, pkt_data);
+                        capture_loop_write_packet_cb((uint8_t *)pcap_src, pkt_header, pkt_data);
                     }
                 }
 
@@ -4108,7 +4156,7 @@ capture_loop_dequeue_packet(void) {
             ws_info("Dequeued a packet of length %d captured on interface %d.",
                 queue_element->u.phdr.caplen, queue_element->pcap_src->interface_id);
 
-            capture_loop_write_packet_cb((u_char *) queue_element->pcap_src,
+            capture_loop_write_packet_cb((uint8_t *) queue_element->pcap_src,
                                         &queue_element->u.phdr,
                                         queue_element->pd);
         }
@@ -4779,7 +4827,7 @@ capture_loop_wrote_one_packet(capture_src *pcap_src) {
 
 /* one pcapng block was captured, process it */
 static void
-capture_loop_write_pcapng_cb(capture_src *pcap_src, const pcapng_block_header_t *bh, u_char *pd)
+capture_loop_write_pcapng_cb(capture_src *pcap_src, const pcapng_block_header_t *bh, uint8_t *pd)
 {
     int          err;
 
@@ -4843,8 +4891,8 @@ capture_loop_write_pcapng_cb(capture_src *pcap_src, const pcapng_block_header_t 
 
 /* one pcap packet was captured, process it */
 static void
-capture_loop_write_packet_cb(u_char *pcap_src_p, const struct pcap_pkthdr *phdr,
-                             const u_char *pd)
+capture_loop_write_packet_cb(uint8_t *pcap_src_p, const struct pcap_pkthdr *phdr,
+                             const uint8_t *pd)
 {
     capture_src *pcap_src = (capture_src *) (void *) pcap_src_p;
     int          err;
@@ -4896,8 +4944,8 @@ capture_loop_write_packet_cb(u_char *pcap_src_p, const struct pcap_pkthdr *phdr,
 
 /* one packet was captured, queue it */
 static void
-capture_loop_queue_packet_cb(u_char *pcap_src_p, const struct pcap_pkthdr *phdr,
-                             const u_char *pd)
+capture_loop_queue_packet_cb(uint8_t *pcap_src_p, const struct pcap_pkthdr *phdr,
+                             const uint8_t *pd)
 {
     capture_src        *pcap_src = (capture_src *) (void *) pcap_src_p;
     pcap_queue_element *queue_element;
@@ -4918,7 +4966,7 @@ capture_loop_queue_packet_cb(u_char *pcap_src_p, const struct pcap_pkthdr *phdr,
     }
     queue_element->pcap_src = pcap_src;
     queue_element->u.phdr = *phdr;
-    queue_element->pd = (u_char *)g_malloc(phdr->caplen);
+    queue_element->pd = (uint8_t *)g_malloc(phdr->caplen);
     if (queue_element->pd == NULL) {
         pcap_src->dropped++;
         g_free(queue_element);
@@ -4955,7 +5003,7 @@ capture_loop_queue_packet_cb(u_char *pcap_src_p, const struct pcap_pkthdr *phdr,
 
 /* one pcapng block was captured, queue it */
 static void
-capture_loop_queue_pcapng_cb(capture_src *pcap_src, const pcapng_block_header_t *bh, u_char *pd)
+capture_loop_queue_pcapng_cb(capture_src *pcap_src, const pcapng_block_header_t *bh, uint8_t *pd)
 {
     pcap_queue_element *queue_element;
     gboolean            limit_reached;
@@ -4975,7 +5023,7 @@ capture_loop_queue_pcapng_cb(capture_src *pcap_src, const pcapng_block_header_t 
     }
     queue_element->pcap_src = pcap_src;
     queue_element->u.bh = *bh;
-    queue_element->pd = (u_char *)g_malloc(bh->block_total_length);
+    queue_element->pd = (uint8_t *)g_malloc(bh->block_total_length);
     if (queue_element->pd == NULL) {
         pcap_src->dropped++;
         g_free(queue_element);

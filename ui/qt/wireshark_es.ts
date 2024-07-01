@@ -4031,28 +4031,27 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
 &lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
-        <source>Remove this graph.</source>
-        <oldsource>Remove this dissection behavior.</oldsource>
-        <translation>Elimina esta gráfica.</translation>
-    </message>
-    <message>
         <source>Add a new graph.</source>
         <translation>Añade una nueva gráfica.</translation>
-    </message>
-    <message>
-        <source>Duplicate this graph.</source>
-        <translation>Duplica esta gráfica.</translation>
     </message>
     <message>
         <source>Clear all graphs.</source>
         <translation>Vacía todas las gráficas.</translation>
     </message>
     <message>
-        <source>Move this graph upwards.</source>
+        <source>Remove the selected graph(s).</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move this graph downwards.</source>
+        <source>Duplicate the selected graph(s).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the selected graph(s) upwards.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the selected graph(s) downwards.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6707,6 +6706,13 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
             <numerusform>%Ln bytes</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln bit(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
     <message>
         <source>Byte %1</source>
         <translation>Byte %1</translation>
@@ -7332,6 +7338,13 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation type="unfinished">
             <numerusform>%Ln byte</numerusform>
             <numerusform>%Ln bytes</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln bit(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
         </translation>
     </message>
 </context>
@@ -11387,12 +11400,21 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation type="unfinished">Guardar como…</translation>
     </message>
     <message>
+        <source>Decoded as %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Save Selected Packet Bytes As…</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>compressed %1</source>
+        <translation type="unfinished"></translation>
+    </message>
     <message numerus="yes">
-        <source>Displaying %Ln byte(s).</source>
-        <translation>
+        <source>Using %Ln byte(s).</source>
+        <oldsource>Displaying %Ln byte(s).</oldsource>
+        <translation type="unfinished">
             <numerusform>Mostrando %Ln byte.</numerusform>
             <numerusform>Mostrando %Ln bytes.</numerusform>
         </translation>
@@ -12428,22 +12450,20 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation>Crea una nueva entrada.</translation>
     </message>
     <message>
-        <source>Remove this entry.</source>
-        <oldsource>Remove this profile.</oldsource>
-        <translation>Elimina esta entrada.</translation>
+        <source>Remove the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Copy this entry.</source>
-        <oldsource>Copy this profile.</oldsource>
-        <translation>Copia esta entrada.</translation>
+        <source>Copy the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry up.</source>
-        <translation>Mueve entrada hacia arriba.</translation>
+        <source>Move the selected entry(ies) up.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry down.</source>
-        <translation>Mueve entrada hacia abajo.</translation>
+        <source>Move the selected entry(ies) down.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Clear all entries.</source>
@@ -12469,20 +12489,20 @@ Por ejemplo, use 1 hora para tener creado un nuevo archivo cada hora en punto.</
         <translation>Crea una nueva entrada.</translation>
     </message>
     <message>
-        <source>Remove this entry.</source>
-        <translation>Elimina esta entrada.</translation>
+        <source>Remove the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Copy this entry.</source>
-        <translation>Copia esta entrada.</translation>
+        <source>Copy the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry up.</source>
-        <translation>Mueve entrada hacia arriba.</translation>
+        <source>Move the selected entry(ies) up.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry down.</source>
-        <translation>Mueve entrada hacia abajo.</translation>
+        <source>Move the selected entry(ies) down.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Clear all entries.</source>

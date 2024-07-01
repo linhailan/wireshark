@@ -2695,9 +2695,9 @@ dissect_e2ap_T_e2nodeComponentRequestPart(tvbuff_t *tvb _U_, int offset _U_, asn
   if (e2ap_data->component_configuration_dissector) {
     col_append_str(actx->pinfo->cinfo, COL_PROTOCOL, "|");
     col_set_fence(actx->pinfo->cinfo, COL_PROTOCOL);
-    col_set_writable(actx->pinfo->cinfo, COL_INFO, FALSE);
+    col_set_writable(actx->pinfo->cinfo, COL_INFO, false);
     call_dissector(e2ap_data->component_configuration_dissector, value_tvb, actx->pinfo, tree);
-    col_set_writable(actx->pinfo->cinfo, COL_INFO, TRUE);
+    col_set_writable(actx->pinfo->cinfo, COL_INFO, true);
   }
 
 
@@ -2714,9 +2714,9 @@ dissect_e2ap_T_e2nodeComponentResponsePart(tvbuff_t *tvb _U_, int offset _U_, as
 
   struct e2ap_private_data *e2ap_data = e2ap_get_private_data(actx->pinfo);
   if (e2ap_data->component_configuration_dissector) {
-    col_set_writable(actx->pinfo->cinfo, COL_INFO, FALSE);
+    col_set_writable(actx->pinfo->cinfo, COL_INFO, false);
     call_dissector(e2ap_data->component_configuration_dissector, value_tvb, actx->pinfo, tree);
-    col_set_writable(actx->pinfo->cinfo, COL_INFO, TRUE);
+    col_set_writable(actx->pinfo->cinfo, COL_INFO, true);
   }
 
 
@@ -14580,7 +14580,7 @@ static void set_stats_message_type(packet_info *pinfo, int type)
 static void
 e2ap_stats_tree_init(stats_tree *st)
 {
-    st_node_packets =      stats_tree_create_node(st, st_str_packets, 0, STAT_DT_INT, TRUE);
+    st_node_packets =      stats_tree_create_node(st, st_str_packets, 0, STAT_DT_INT, true);
     st_node_packet_types = stats_tree_create_pivot(st, st_str_packet_types, st_node_packets);
 }
 
@@ -14590,7 +14590,7 @@ e2ap_stats_tree_packet(stats_tree* st, packet_info* pinfo _U_,
 {
     const struct e2ap_tap_t *pi = (const struct e2ap_tap_t *)p;
 
-    tick_stat_node(st, st_str_packets, 0, FALSE);
+    tick_stat_node(st, st_str_packets, 0, false);
     stats_tree_tick_pivot(st, st_node_packet_types,
                           val_to_str(pi->e2ap_mtype, mtype_names,
                                      "Unknown packet type (%d)"));

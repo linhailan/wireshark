@@ -4055,29 +4055,28 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 &lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
-        <source>Remove this graph.</source>
-        <oldsource>Remove this dissection behavior.</oldsource>
-        <translation>Bu grafiği kaldırın.</translation>
-    </message>
-    <message>
         <source>Add a new graph.</source>
         <translation>Yeni bir grafik ekleyin.</translation>
-    </message>
-    <message>
-        <source>Duplicate this graph.</source>
-        <translation>Bu grafiği çoğaltın.</translation>
     </message>
     <message>
         <source>Clear all graphs.</source>
         <translation>Tüm grafikleri temizle.</translation>
     </message>
     <message>
-        <source>Move this graph upwards.</source>
-        <translation>Bu grafiği yukarı doğru götür.</translation>
+        <source>Remove the selected graph(s).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move this graph downwards.</source>
-        <translation>Bu grafiği aşağı doğru götür.</translation>
+        <source>Duplicate the selected graph(s).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the selected graph(s) upwards.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the selected graph(s) downwards.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Mouse</source>
@@ -6753,6 +6752,12 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
             <numerusform>%Ln bayt</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln bit(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+        </translation>
+    </message>
     <message>
         <source>Byte %1</source>
         <translation>Bayt %1</translation>
@@ -7376,6 +7381,12 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <source>%Ln byte(s)</source>
         <translation type="unfinished">
             <numerusform>%Ln bayt</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln bit(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
 </context>
@@ -11457,12 +11468,21 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Farklı kaydet…</translation>
     </message>
     <message>
+        <source>Decoded as %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Save Selected Packet Bytes As…</source>
         <translation>Seçili Paket Baytlarını Farklı Kaydet…</translation>
     </message>
+    <message>
+        <source>compressed %1</source>
+        <translation type="unfinished"></translation>
+    </message>
     <message numerus="yes">
-        <source>Displaying %Ln byte(s).</source>
-        <translation>
+        <source>Using %Ln byte(s).</source>
+        <oldsource>Displaying %Ln byte(s).</oldsource>
+        <translation type="unfinished">
             <numerusform>%Ln bayt gösteriliyor.</numerusform>
         </translation>
     </message>
@@ -12536,22 +12556,20 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Yeni bir giriş oluşturun.</translation>
     </message>
     <message>
-        <source>Remove this entry.</source>
-        <oldsource>Remove this profile.</oldsource>
-        <translation>Bu girişi kaldırın.</translation>
+        <source>Remove the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Copy this entry.</source>
-        <oldsource>Copy this profile.</oldsource>
-        <translation>Bu girişi kopyalayın.</translation>
+        <source>Copy the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry up.</source>
-        <translation>Girişi yukarı taşı.</translation>
+        <source>Move the selected entry(ies) up.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry down.</source>
-        <translation>Girişi aşağı taşı.</translation>
+        <source>Move the selected entry(ies) down.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Clear all entries.</source>
@@ -12577,20 +12595,20 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Yeni bir giriş oluşturun.</translation>
     </message>
     <message>
-        <source>Remove this entry.</source>
-        <translation>Bu girişi kaldırın.</translation>
+        <source>Remove the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Copy this entry.</source>
-        <translation>Bu girişi kopyalayın.</translation>
+        <source>Copy the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry up.</source>
-        <translation>Girişi yukarı taşı.</translation>
+        <source>Move the selected entry(ies) up.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry down.</source>
-        <translation>Girişi aşağı taşı.</translation>
+        <source>Move the selected entry(ies) down.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Clear all entries.</source>

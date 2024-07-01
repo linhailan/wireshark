@@ -155,7 +155,7 @@ void capture_process_finished(capture_session *cap_session)
     unsigned i;
 
     if (!extcap_session_stop(cap_session)) {
-        /* Atleast one extcap process did not fully finish yet, wait for it */
+        /* At least one extcap process did not fully finish yet, wait for it */
         return;
     }
 
@@ -1640,7 +1640,9 @@ sync_interface_stats_open(int *data_read_fd, ws_process_id *fork_child, char **d
              */
 
             /* convert primary message */
-            *data = g_strdup(buffer);
+            if (data) {
+                *data = g_strdup(buffer);
+            }
             break;
 
         case SP_SUCCESS:

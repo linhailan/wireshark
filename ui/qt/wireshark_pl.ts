@@ -4079,29 +4079,28 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 &lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
-        <source>Remove this graph.</source>
-        <oldsource>Remove this dissection behavior.</oldsource>
-        <translation>Usuń ten wykres.</translation>
-    </message>
-    <message>
         <source>Add a new graph.</source>
         <translation>Utwórz nowy wykres.</translation>
-    </message>
-    <message>
-        <source>Duplicate this graph.</source>
-        <translation>Duplikuj ten wykres.</translation>
     </message>
     <message>
         <source>Clear all graphs.</source>
         <translation>Wyczyść wszystkie wykresy.</translation>
     </message>
     <message>
-        <source>Move this graph upwards.</source>
-        <translation>Przesuń ten wykres w górę.</translation>
+        <source>Remove the selected graph(s).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move this graph downwards.</source>
-        <translation>Przesuń ten wykres w dół.</translation>
+        <source>Duplicate the selected graph(s).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the selected graph(s) upwards.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the selected graph(s) downwards.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Mouse</source>
@@ -4479,10 +4478,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>All Execs</source>
         <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Access Denied</source>
-        <translation type="vanished">Brak dostępu</translation>
     </message>
     <message>
         <source>Hover over the graph for details.</source>
@@ -6788,6 +6783,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
             <numerusform>%Ln bajtów</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln bit(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
     <message>
         <source>Byte %1</source>
         <translation>Bajt %1</translation>
@@ -7415,6 +7418,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
             <numerusform>%Ln bajt</numerusform>
             <numerusform>%Ln bajty</numerusform>
             <numerusform>%Ln bajtów</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln bit(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+            <numerusform></numerusform>
         </translation>
     </message>
 </context>
@@ -11515,12 +11526,21 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Zapisz jako…</translation>
     </message>
     <message>
+        <source>Decoded as %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Save Selected Packet Bytes As…</source>
         <translation>Zapisz zaznaczone bajty pakietu jako</translation>
     </message>
+    <message>
+        <source>compressed %1</source>
+        <translation type="unfinished"></translation>
+    </message>
     <message numerus="yes">
-        <source>Displaying %Ln byte(s).</source>
-        <translation>
+        <source>Using %Ln byte(s).</source>
+        <oldsource>Displaying %Ln byte(s).</oldsource>
+        <translation type="unfinished">
             <numerusform>Wyświetl %Ln bajt.</numerusform>
             <numerusform>Wyświetl %Ln bajtów.</numerusform>
             <numerusform>Wyświetl %Ln bajtów.</numerusform>
@@ -12591,22 +12611,20 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Stwórz nowy wpis.</translation>
     </message>
     <message>
-        <source>Remove this entry.</source>
-        <oldsource>Remove this profile.</oldsource>
-        <translation>Usuń wpis.</translation>
+        <source>Remove the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Copy this entry.</source>
-        <oldsource>Copy this profile.</oldsource>
-        <translation>Kopiuj wpis.</translation>
+        <source>Copy the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry up.</source>
-        <translation>Przesuń wpis w górę.</translation>
+        <source>Move the selected entry(ies) up.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry down.</source>
-        <translation>Przesuń wpis w dół.</translation>
+        <source>Move the selected entry(ies) down.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Clear all entries.</source>
@@ -12632,20 +12650,20 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Stwórz nowy wpis.</translation>
     </message>
     <message>
-        <source>Remove this entry.</source>
-        <translation>Usuń wpis.</translation>
+        <source>Remove the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Copy this entry.</source>
-        <translation>Kopiuj wpis.</translation>
+        <source>Copy the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry up.</source>
-        <translation>Przesuń wpis w górę.</translation>
+        <source>Move the selected entry(ies) up.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry down.</source>
-        <translation>Przesuń wpis w dół.</translation>
+        <source>Move the selected entry(ies) down.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Clear all entries.</source>

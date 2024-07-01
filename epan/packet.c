@@ -763,8 +763,12 @@ enum dissector_e {
 struct dissector_handle {
 	const char	*name;		/* dissector name */
 	const char	*description;	/* dissector description */
+	char            *pref_suffix;
 	enum dissector_e dissector_type;
-	void		*dissector_func;
+	union {
+		dissector_t	dissector_type_simple;
+		dissector_cb_t	dissector_type_callback;
+	} dissector_func;
 	void		*dissector_data;
 	protocol_t	*protocol;
 };
@@ -831,14 +835,13 @@ remove_last_layer(packet_info *pinfo, gboolean reduce_count)
 
 
 /* This function will return
- * old style dissector :
- *   length of the payload or 1 of the payload is empty
- * new dissector :
  *   >0  this protocol was successfully dissected and this was this protocol.
  *   0   this packet did not match this protocol.
  *
- * The only time this function will return 0 is if it is a new style dissector
- * and if the dissector rejected the packet.
+ * XXX - if the dissector only dissects metadata passed through the data
+ * pointer, and dissects none of the packet data, that's indistinguishable
+ * from "packet did not match this protocol".  See issues #12366 and
+ * #12368.
  */
 static int
 call_dissector_through_handle(dissector_handle_t handle, tvbuff_t *tvb,
@@ -854,13 +857,17 @@ call_dissector_through_handle(dissector_handle_t handle, tvbuff_t *tvb,
 			proto_get_protocol_short_name(handle->protocol);
 	}
 
-	if (handle->dissector_type == DISSECTOR_TYPE_SIMPLE) {
-		len = ((dissector_t)handle->dissector_func)(tvb, pinfo, tree, data);
-	}
-	else if (handle->dissector_type == DISSECTOR_TYPE_CALLBACK) {
-		len = ((dissector_cb_t)handle->dissector_func)(tvb, pinfo, tree, data, handle->dissector_data);
-	}
-	else {
+	switch (handle->dissector_type) {
+
+	case DISSECTOR_TYPE_SIMPLE:
+		len = (handle->dissector_func.dissector_type_simple)(tvb, pinfo, tree, data);
+		break;
+
+	case DISSECTOR_TYPE_CALLBACK:
+		len = (handle->dissector_func.dissector_type_callback)(tvb, pinfo, tree, data, handle->dissector_data);
+		break;
+
+	default:
 		ws_assert_not_reached();
 	}
 	pinfo->current_proto = saved_proto;
@@ -1290,24 +1297,29 @@ dissector_add_range_preference(const char *name, dissector_handle_t handle, cons
 	 */
 	range = wmem_new0(wmem_epan_scope(), range_t*);
 
-	/* If the dissector already has a preference module, use it */
-	module = prefs_find_module(proto_get_protocol_filter_name(proto_id));
+	/* If the dissector's protocol already has a preference module, use it */
+	const char* module_name = proto_get_protocol_filter_name(proto_id);
+	module = prefs_find_module(module_name);
 	if (module == NULL) {
 		/* Otherwise create a new one */
 		module = prefs_register_protocol(proto_id, NULL);
 	}
+
+	const char *fullname = wmem_strdup_printf(wmem_epan_scope(), "%s%s", name, dissector_handle_get_pref_suffix(handle));
+
 	/* Some preference callback functions use the proto_reg_handoff_
 		routine to apply preferences, which could duplicate the
 		registration of a preference.  Check for that here */
-	if (prefs_find_preference(module, name) == NULL) {
+	if (prefs_find_preference(module, fullname) == NULL) {
+		const char *handle_desc = dissector_handle_get_description(handle);
 		if (g_strcmp0(range_str, "") > 0) {
 			description = wmem_strdup_printf(wmem_epan_scope(), "%s %s(s) (default: %s)",
-									    proto_get_protocol_short_name(handle->protocol), pref_dissector_table->ui_name, range_str);
+									    handle_desc, pref_dissector_table->ui_name, range_str);
 		} else {
 			description = wmem_strdup_printf(wmem_epan_scope(), "%s %s(s)",
-									    proto_get_protocol_short_name(handle->protocol), pref_dissector_table->ui_name);
+									    handle_desc, pref_dissector_table->ui_name);
 		}
-		title = wmem_strdup_printf(wmem_epan_scope(), "%s(s)", pref_dissector_table->ui_name);
+		title = wmem_strdup_printf(wmem_epan_scope(), "%s %s(s)", handle_desc, pref_dissector_table->ui_name);
 
 		/* Max value is based on datatype of dissector table */
 		switch (pref_dissector_table->type) {
@@ -1331,7 +1343,7 @@ dissector_add_range_preference(const char *name, dissector_handle_t handle, cons
 		}
 
 		range_convert_str(wmem_epan_scope(), range, range_str, max_value);
-		prefs_register_decode_as_range_preference(module, name, title, description, range, max_value);
+		prefs_register_decode_as_range_preference(module, fullname, title, description, range, max_value, name, handle_desc);
 	}
 
 	return *range;
@@ -1556,7 +1568,7 @@ dissector_reset_uint(const char *name, const guint32 pattern)
  * Decode As, prefs registered via dissector_add_uint_[range_]with_preference),
  * etc.), otherwise return FALSE.
  */
-gboolean
+bool
 dissector_is_uint_changed(dissector_table_t const sub_dissectors, const guint32 uint_val)
 {
 	if (sub_dissectors != NULL) {
@@ -1888,7 +1900,7 @@ dissector_reset_string(const char *name, const gchar *pattern)
  * Decode As, prefs registered via dissector_add_uint_[range_]with_preference),
  * etc.), otherwise return FALSE.
  */
-gboolean
+bool
 dissector_is_string_changed(dissector_table_t const sub_dissectors, const gchar *string)
 {
 	if (sub_dissectors != NULL) {
@@ -2303,7 +2315,15 @@ dissector_add_for_decode_as(const char *name, dissector_handle_t handle)
 	   with the same descriptions.
 
 	   FT_STRING can at least show the string value in the dialog,
-	   so we don't do the check for them. */
+	   so we don't do the check for them. XXX - ? It can show the
+	   string value the dissector is being set to, but can't distinguish
+	   the dissectors. See the Decode As table for Internet media types
+	   (which packet-obex.c adds.)
+
+	 */
+	const char *dissector_name;
+	dissector_name = dissector_handle_get_dissector_name(handle);
+
 	if (sub_dissectors->type != FT_STRING)
 	{
 		for (entry = sub_dissectors->dissector_handles; entry != NULL; entry = g_slist_next(entry))
@@ -2312,17 +2332,46 @@ dissector_add_for_decode_as(const char *name, dissector_handle_t handle)
 			if (dup_handle->description != NULL &&
 			    strcmp(dup_handle->description, handle->description) == 0)
 			{
-				const char *dissector_name, *dup_dissector_name;
+				const char *dup_dissector_name;
 
-				dissector_name = dissector_handle_get_dissector_name(handle);
-				if (dissector_name == NULL)
-					dissector_name = "(anonymous)";
 				dup_dissector_name = dissector_handle_get_dissector_name(dup_handle);
 				if (dup_dissector_name == NULL)
 					dup_dissector_name = "(anonymous)";
-				fprintf(stderr, "Dissectors %s and %s in dissector table %s have same dissector name %s\n",
-				    dissector_name, dup_dissector_name,
+				fprintf(stderr, "Dissectors %s and %s in dissector table %s have the same description %s\n",
+				    dissector_name ? dissector_name : "(anonymous)",
+				    dup_dissector_name,
 				    name, handle->description);
+				if (wireshark_abort_on_dissector_bug)
+					abort();
+			}
+		}
+	}
+
+	/* We support adding automatic Decode As preferences on 32-bit
+	 * integer tables. Make sure that the preference we would generate has
+	 * a unique name. That means that for a given table's entries, each
+	 * dissector handle for the same protocol must have a unique pref suffix.
+	 */
+	if (FT_IS_UINT32(sub_dissectors->type)) {
+		const char* pref_suffix = dissector_handle_get_pref_suffix(handle);
+		for (entry = sub_dissectors->dissector_handles; entry != NULL; entry = g_slist_next(entry))
+		{
+			dup_handle = (dissector_handle_t)entry->data;
+			if (handle->protocol != dup_handle->protocol) {
+				continue;
+			}
+			if (g_strcmp0(pref_suffix, dissector_handle_get_pref_suffix(dup_handle)) == 0)
+			{
+				const char *dup_dissector_name;
+				dup_dissector_name = dissector_handle_get_dissector_name(dup_handle);
+				if (dup_dissector_name == NULL) {
+					dup_dissector_name = "(anonymous)";
+					fprintf(stderr, "Dissector for %s is anonymous", proto_get_protocol_short_name(dup_handle->protocol));
+				}
+				fprintf(stderr, "Dissectors %s and %s in dissector table %s would have the same Decode As preference\n",
+				    dissector_name ? dissector_name : "(anonymous)",
+				    dup_dissector_name,
+				    name);
 				if (wireshark_abort_on_dissector_bug)
 					abort();
 			}
@@ -2406,7 +2455,7 @@ dissector_table_allow_decode_as(dissector_table_t dissector_table)
 	dissector_table->supports_decode_as = TRUE;
 }
 
-gboolean
+bool
 dissector_table_supports_decode_as(dissector_table_t dissector_table)
 {
 	return dissector_table->supports_decode_as;
@@ -2850,7 +2899,7 @@ find_heur_dissector_list(const char *name)
 	return (heur_dissector_list_t)g_hash_table_lookup(heur_dissector_lists, name);
 }
 
-gboolean
+bool
 has_heur_dissector_list(const gchar *name) {
 	return (find_heur_dissector_list(name) != NULL);
 }
@@ -2976,7 +3025,7 @@ heur_dissector_delete(const char *name, heur_dissector_t dissector, const int pr
 	}
 }
 
-gboolean
+bool
 dissector_try_heuristic(heur_dissector_list_t sub_dissectors, tvbuff_t *tvb,
 			packet_info *pinfo, proto_tree *tree, heur_dtbl_entry_t **heur_dtbl_entry, void *data)
 {
@@ -3312,6 +3361,9 @@ dissector_handle_get_short_name(const dissector_handle_t handle)
 const char *
 dissector_handle_get_description(const dissector_handle_t handle)
 {
+	if (handle == NULL) {
+		return NULL;
+	}
 	return handle->description;
 }
 
@@ -3374,18 +3426,46 @@ dissector_handle_get_dissector_name(const dissector_handle_t handle)
 	return handle->name;
 }
 
+const char *
+dissector_handle_get_pref_suffix(const dissector_handle_t handle)
+{
+	if (handle == NULL) {
+		return "";
+	}
+	return handle->pref_suffix ? handle->pref_suffix : "";
+}
+
+static void
+check_valid_dissector_name_or_fail(const char *name)
+{
+	if (proto_check_field_name(name)) {
+		ws_error("Dissector name \"%s\" has one or more invalid characters."
+			" Allowed are letters, digits, '-', '_' and non-repeating '.'."
+			" This might be caused by an inappropriate plugin or a development error.", name);
+	}
+}
+
 static dissector_handle_t
-new_dissector_handle(enum dissector_e type, void *dissector, const int proto, const char *name, const char *description, void *cb_data)
+new_dissector_handle(const int proto, const char *name, const char *description)
 {
 	struct dissector_handle *handle;
+
+	/* Make sure name is "parsing friendly" - descriptions should be
+	 * used for complicated phrases. NULL for anonymous unregistered
+	 * dissectors is allowed; we check for that in various places.
+	 *
+	 * (It might be safer to have a default name used for anonymous
+	 * dissectors rather than NULL checks scattered in the code.)
+	 */
+	if (name) {
+		check_valid_dissector_name_or_fail(name);
+	}
 
 	handle			= wmem_new(wmem_epan_scope(), struct dissector_handle);
 	handle->name		= name;
 	handle->description	= description;
-	handle->dissector_type	= type;
-	handle->dissector_func	= dissector;
-	handle->dissector_data	= cb_data;
 	handle->protocol	= find_protocol_by_id(proto);
+	handle->pref_suffix     = NULL;
 
 	if (handle->description == NULL) {
 		/*
@@ -3400,22 +3480,16 @@ new_dissector_handle(enum dissector_e type, void *dissector, const int proto, co
 		 */
 		if (handle->protocol != NULL)
 			handle->description = proto_get_protocol_short_name(handle->protocol);
+	} else {
+		if (name && g_strcmp0(name, proto_get_protocol_filter_name(proto)) != 0) {
+			handle->pref_suffix = ascii_strdown_inplace(wmem_strdup_printf(wmem_epan_scope(), ".%s", name));
+			char *pos = handle->pref_suffix;
+			while ((pos = strchr(pos, '-')) != NULL) {
+				*pos++ = '_';
+			}
+		}
 	}
 	return handle;
-}
-
-/* Create an anonymous handle for a new dissector. */
-dissector_handle_t
-create_dissector_handle(dissector_t dissector, const int proto)
-{
-	return new_dissector_handle(DISSECTOR_TYPE_SIMPLE, dissector, proto, NULL, NULL, NULL);
-}
-
-dissector_handle_t
-create_dissector_handle_with_name(dissector_t dissector,
-				const int proto, const char* name)
-{
-	return new_dissector_handle(DISSECTOR_TYPE_SIMPLE, dissector, proto, name, NULL, NULL);
 }
 
 dissector_handle_t
@@ -3424,13 +3498,45 @@ create_dissector_handle_with_name_and_description(dissector_t dissector,
 						const char* name,
 						const char* description)
 {
-	return new_dissector_handle(DISSECTOR_TYPE_SIMPLE, dissector, proto, name, description, NULL);
+	dissector_handle_t handle;
+
+	handle = new_dissector_handle(proto, name, description);
+	handle->dissector_type = DISSECTOR_TYPE_SIMPLE;
+	handle->dissector_func.dissector_type_simple = dissector;
+	handle->dissector_data = NULL;
+	return handle;
+}
+
+dissector_handle_t
+create_dissector_handle_with_name(dissector_t dissector,
+				const int proto, const char* name)
+{
+	return create_dissector_handle_with_name_and_description(dissector, proto, name, NULL);
+}
+
+/* Create an anonymous handle for a new dissector. */
+dissector_handle_t
+create_dissector_handle(dissector_t dissector, const int proto)
+{
+	return create_dissector_handle_with_name_and_description(dissector, proto, NULL, NULL);
+}
+
+static dissector_handle_t
+create_dissector_handle_with_name_and_data(dissector_cb_t dissector, const int proto, const char *name, void* cb_data)
+{
+	dissector_handle_t handle;
+
+	handle = new_dissector_handle(proto, name, NULL);
+	handle->dissector_type = DISSECTOR_TYPE_CALLBACK;
+	handle->dissector_func.dissector_type_callback = dissector;
+	handle->dissector_data = cb_data;
+	return handle;
 }
 
 dissector_handle_t
 create_dissector_handle_with_data(dissector_cb_t dissector, const int proto, void* cb_data)
 {
-	return new_dissector_handle(DISSECTOR_TYPE_CALLBACK, dissector, proto, NULL, NULL, cb_data);
+	return create_dissector_handle_with_name_and_data(dissector, proto, NULL, cb_data);
 }
 
 /* Destroy an anonymous handle for a dissector. */
@@ -3441,17 +3547,10 @@ destroy_dissector_handle(dissector_handle_t handle)
 
 	dissector_delete_from_all_tables(handle);
 	deregister_postdissector(handle);
-	wmem_free(wmem_epan_scope(), handle);
-}
-
-static void
-check_valid_dissector_name_or_fail(const char *name)
-{
-	if (proto_check_field_name(name)) {
-		ws_error("Dissector name \"%s\" has one or more invalid characters."
-			" Allowed are letters, digits, '-', '_' and non-repeating '.'."
-			" This might be caused by an inappropriate plugin or a development error.", name);
+	if (handle->pref_suffix) {
+		wmem_free(wmem_epan_scope(), handle->pref_suffix);
 	}
+	wmem_free(wmem_epan_scope(), handle);
 }
 
 static dissector_handle_t
@@ -3459,9 +3558,12 @@ register_dissector_handle(const char *name, dissector_handle_t handle)
 {
 	gboolean new_entry;
 
-	/* Make sure name is "parsing friendly" - descriptions should be
-	 * used for complicated phrases. */
-	check_valid_dissector_name_or_fail(name);
+	/* A registered dissector should have a name. */
+	if (name == NULL || name[0] == '\0') {
+		ws_error("A registered dissector name cannot be NULL or the empty string."
+			" Anonymous dissector handles can be created with create_dissector_handle()."
+			" This might be caused by an inappropriate plugin or a development error.");
+	}
 
 	new_entry = g_hash_table_insert(registered_dissectors, (gpointer)name, handle);
 	if (!new_entry) {
@@ -3476,9 +3578,9 @@ register_dissector_handle(const char *name, dissector_handle_t handle)
 dissector_handle_t
 register_dissector(const char *name, dissector_t dissector, const int proto)
 {
-	struct dissector_handle *handle;
+	dissector_handle_t handle;
 
-	handle = new_dissector_handle(DISSECTOR_TYPE_SIMPLE, dissector, proto, name, NULL, NULL);
+	handle = create_dissector_handle_with_name(dissector, proto, name);
 
 	return register_dissector_handle(name, handle);
 }
@@ -3486,9 +3588,9 @@ register_dissector(const char *name, dissector_t dissector, const int proto)
 dissector_handle_t
 register_dissector_with_description(const char *name, const char *description, dissector_t dissector, const int proto)
 {
-	struct dissector_handle *handle;
+	dissector_handle_t handle;
 
-	handle = new_dissector_handle(DISSECTOR_TYPE_SIMPLE, dissector, proto, name, description, NULL);
+	handle = create_dissector_handle_with_name_and_description(dissector, proto, name, description);
 
 	return register_dissector_handle(name, handle);
 }
@@ -3496,9 +3598,9 @@ register_dissector_with_description(const char *name, const char *description, d
 dissector_handle_t
 register_dissector_with_data(const char *name, dissector_cb_t dissector, const int proto, void *cb_data)
 {
-	struct dissector_handle *handle;
+	dissector_handle_t handle;
 
-	handle = new_dissector_handle(DISSECTOR_TYPE_CALLBACK, dissector, proto, name, NULL, cb_data);
+	handle = create_dissector_handle_with_name_and_data(dissector, proto, name, cb_data);
 
 	return register_dissector_handle(name, handle);
 }
@@ -3674,7 +3776,7 @@ find_matching_proto_name(gconstpointer arg1, gconstpointer arg2)
 	return strcmp(protocol_name, name);
 }
 
-gboolean register_depend_dissector(const char* parent, const char* dependent)
+bool register_depend_dissector(const char* parent, const char* dependent)
 {
 	GSList                *list_entry;
 	depend_dissector_list_t sub_dissectors;
@@ -3702,7 +3804,7 @@ gboolean register_depend_dissector(const char* parent, const char* dependent)
 	return TRUE;
 }
 
-gboolean deregister_depend_dissector(const char* parent, const char* dependent)
+bool deregister_depend_dissector(const char* parent, const char* dependent)
 {
 	depend_dissector_list_t  sub_dissectors = find_depend_dissector_list(parent);
 
@@ -3992,7 +4094,7 @@ deregister_postdissector(dissector_handle_t handle)
 	}
 }
 
-gboolean
+bool
 have_postdissector(void)
 {
 	guint i;
@@ -4021,7 +4123,7 @@ call_all_postdissectors(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	}
 }
 
-gboolean
+bool
 postdissectors_want_hfids(void)
 {
 	guint i;

@@ -28,6 +28,7 @@ struct pref_module {
     const char *name;           /**< name of module */
     const char *title;          /**< title of module (displayed in preferences list) */
     const char *description;    /**< Description of module (displayed in preferences notebook) */
+    const char *help;           /**< Module help page (passed to user_guide_url() to generate a URL) */
     void (*apply_cb)(void);     /**< routine to call when preferences applied */
     GList *prefs;               /**< list of its preferences */
     struct pref_module *parent; /**< parent module */
@@ -291,8 +292,7 @@ unsigned pref_stash(pref_t *pref, void *unused);
 typedef struct pref_unstash_data
 {
     /* Used to set prefs_changed member to true if the preference
-       differs from its stashed values. Also used by "decode as" types
-       to look up dissector short name */
+       differs from its stashed values. */
     module_t *module;
     /* Qt uses stashed values to then "applies" them
       during unstash.  Use this flag for that behavior */

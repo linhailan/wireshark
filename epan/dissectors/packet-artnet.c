@@ -5142,7 +5142,7 @@ dissect_artnet_output(tvbuff_t *tvb, guint offset, proto_tree *tree, packet_info
   tvbuff_t *next_tvb;
   guint16   length;
   guint     size;
-  gboolean  save_info;
+  bool      save_info;
 
   proto_tree_add_item(tree, hf_artnet_output_sequence, tvb,
                       offset, 1, ENC_BIG_ENDIAN);
@@ -5167,7 +5167,7 @@ dissect_artnet_output(tvbuff_t *tvb, guint offset, proto_tree *tree, packet_info
   size = tvb_reported_length_remaining(tvb, offset);
 
   save_info = col_get_writable(pinfo->cinfo, COL_INFO);
-  col_set_writable(pinfo->cinfo, COL_INFO, FALSE);
+  col_set_writable(pinfo->cinfo, COL_INFO, false);
 
   next_tvb = tvb_new_subset_length(tvb, offset, length);
 
@@ -5311,7 +5311,7 @@ dissect_artnet_nzs(tvbuff_t *tvb, guint offset, proto_tree *tree, packet_info *p
     /* Nzs -> DMX data */
 
     save_info = col_get_writable(pinfo->cinfo, COL_INFO);
-    col_set_writable(pinfo->cinfo, COL_INFO, FALSE);
+    col_set_writable(pinfo->cinfo, COL_INFO, false);
 
     next_tvb = tvb_new_subset_length(tvb, offset, length);
 
@@ -5830,7 +5830,7 @@ dissect_artnet_rdm(tvbuff_t *tvb, guint offset, proto_tree *tree,  packet_info *
   size = tvb_reported_length_remaining(tvb, offset);
 
   save_info = col_get_writable(pinfo->cinfo, COL_INFO);
-  col_set_writable(pinfo->cinfo, COL_INFO, FALSE);
+  col_set_writable(pinfo->cinfo, COL_INFO, false);
 
   next_tvb = tvb_new_subset_remaining(tvb, offset);
 
@@ -7088,24 +7088,24 @@ dissect_artnet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _
 }
 
 /* Heuristic dissector */
-static gboolean
+static bool
 dissect_artnet_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
   guint64     qword;
 
   /* check if we atleast have the 8 byte header */
   if (tvb_captured_length(tvb) < 8)
-    return FALSE;
+    return false;
 
   /* Check the 8 byte header "Art-Net\0" = 0x4172742d4e657400*/
   qword = tvb_get_ntoh64(tvb,0);
   if(qword != G_GUINT64_CONSTANT (0x4172742d4e657400))
-    return FALSE;
+    return false;
 
   /* if the header matches, dissect it */
   dissect_artnet(tvb, pinfo, tree, data);
 
-  return TRUE;
+  return true;
 }
 
 void

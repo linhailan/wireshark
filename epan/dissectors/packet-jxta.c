@@ -270,7 +270,7 @@ static int dissect_media( const gchar* fullmediatype, tvbuff_t * tvb, packet_inf
 *   @param  tree The protocol tree.
 *   @return TRUE if the tvb contained JXTA data which was dissected otherwise FALSE
 **/
-static gboolean dissect_jxta_UDP_heur(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void * data _U_)
+static bool dissect_jxta_UDP_heur(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void * data _U_)
 {
     /* This is a heuristic dissector, which means we get all the UDP
      * traffic not sent to a known dissector and not claimed by
@@ -282,7 +282,7 @@ static gboolean dissect_jxta_UDP_heur(tvbuff_t * tvb, packet_info * pinfo, proto
 
     if (tvb_strneql(tvb, 0, JXTA_UDP_SIG, sizeof (JXTA_UDP_SIG)) != 0) {
         /* Not a JXTA UDP packet (or not enough bytes to check for the sig) */
-        return FALSE;
+        return false;
     }
 
     save_desegment_offset = pinfo->desegment_offset;
@@ -301,19 +301,19 @@ static gboolean dissect_jxta_UDP_heur(tvbuff_t * tvb, packet_info * pinfo, proto
          */
         pinfo->desegment_offset = save_desegment_offset;
         pinfo->desegment_len = save_desegment_len;
-        return FALSE;
+        return false;
     } else if (ret == 0) {
         /*
          * A clear rejection.
          */
         pinfo->desegment_offset = save_desegment_offset;
         pinfo->desegment_len = save_desegment_len;
-        return FALSE;
+        return false;
     } else {
         /*
          * A clear acceptance.
          */
-        return TRUE;
+        return true;
     }
 }
 
@@ -325,7 +325,7 @@ static gboolean dissect_jxta_UDP_heur(tvbuff_t * tvb, packet_info * pinfo, proto
 *   @param  tree The protocol tree.
 *   @return TRUE if the tvb contained JXTA data which was dissected otherwise FALSE
 **/
-static gboolean dissect_jxta_TCP_heur(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void * data _U_)
+static bool dissect_jxta_TCP_heur(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void * data _U_)
 {
     /* This is a heuristic dissector, which means we get all the TCP
      * traffic not sent to a known dissector and not claimed by
@@ -361,19 +361,19 @@ static gboolean dissect_jxta_TCP_heur(tvbuff_t * tvb, packet_info * pinfo, proto
          */
         pinfo->desegment_offset = save_desegment_offset;
         pinfo->desegment_len = save_desegment_len;
-        return FALSE;
+        return false;
     } else if (ret == 0) {
         /*
          * A clear rejection.
          */
         pinfo->desegment_offset = save_desegment_offset;
         pinfo->desegment_len = save_desegment_len;
-        return FALSE;
+        return false;
     } else {
         /*
          * A clear acceptance.
          */
-        return TRUE;
+        return true;
     }
 }
 
@@ -383,9 +383,9 @@ static gboolean dissect_jxta_TCP_heur(tvbuff_t * tvb, packet_info * pinfo, proto
 *   @param  tvb The buffer to dissect.
 *   @param  pinfo Packet Info.
 *   @param  tree The protocol tree.
-*   @return TRUE if the tvb contained JXTA data which was dissected otherwise FALSE
+*   @return true if the tvb contained JXTA data which was dissected otherwise FALSE
 **/
-static gboolean dissect_jxta_SCTP_heur(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void * data _U_)
+static bool dissect_jxta_SCTP_heur(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void * data _U_)
 {
     /* This is a heuristic dissector, which means we get all the SCTP
      * traffic not sent to a known dissector and not claimed by
@@ -417,19 +417,19 @@ static gboolean dissect_jxta_SCTP_heur(tvbuff_t * tvb, packet_info * pinfo, prot
          */
         pinfo->desegment_offset = save_desegment_offset;
         pinfo->desegment_len = save_desegment_len;
-        return FALSE;
+        return false;
     } else if (ret == 0) {
         /*
          * A clear rejection.
          */
         pinfo->desegment_offset = save_desegment_offset;
         pinfo->desegment_len = save_desegment_len;
-        return FALSE;
+        return false;
     } else {
         /*
          * A clear acceptance.
          */
-        return TRUE;
+        return true;
     }
 }
 
@@ -975,7 +975,7 @@ static int dissect_jxta_welcome(tvbuff_t * tvb, packet_info * pinfo, proto_tree 
     }
 
 Common_Exit:
-    col_set_writable(pinfo->cinfo, -1, FALSE);
+    col_set_writable(pinfo->cinfo, -1, false);
 
     return afterwelcome;
 }
@@ -1329,7 +1329,7 @@ static int dissect_jxta_message(tvbuff_t * tvb, packet_info * pinfo, proto_tree 
                      wmem_strbuf_get_str(src_addr), wmem_strbuf_get_str(dst_addr));
     }
 
-    col_set_writable(pinfo->cinfo, -1, FALSE);
+    col_set_writable(pinfo->cinfo, -1, false);
 
     while( tree && (complete_messages > 0) ) {
         proto_item *jxta_msg_tree_item = NULL;

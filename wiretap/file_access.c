@@ -141,7 +141,7 @@ add_extensions(GSList *extensions, const char *extension,
  */
 static const struct file_extension_info file_type_extensions_base[] = {
 	{ "Wireshark/tcpdump/... - pcap", true, "pcap;cap;dmp" },
-	{ "Wireshark/... - pcapng", true, "pcapng;ntar;scap" },
+	{ "Wireshark/... - pcapng", true, "pcapng;scap;ntar" },
 	{ "Network Monitor, Surveyor, NetScaler", true, "cap" },
 	{ "Sun snoop", true, "snoop" },
 	{ "InfoVista 5View capture", true, "5vw" },
@@ -165,7 +165,7 @@ static const struct file_extension_info file_type_extensions_base[] = {
 	{ "Daintree SNA", true, "dcf" },
 	{ "IPFIX File Format", true, "pfx;ipfix" },
 	{ "Aethra .aps file", true, "aps" },
-	{ "MPEG2 transport stream", true, "mp2t;ts;mpg" },
+	{ "MPEG2 transport stream", true, "mp2t;ts;m2ts;mpg" },
 	{ "Ixia IxVeriWave .vwr Raw 802.11 Capture", true, "vwr" },
 	{ "CAM Inspector file", true, "camins" },
 	{ "BLF file", true, "blf" },

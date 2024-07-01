@@ -1039,7 +1039,7 @@
     </message>
     <message>
         <source>First event</source>
-        <translation type="unfinished"></translation>
+        <translation>Primo evento</translation>
     </message>
     <message>
         <source>Last packet</source>
@@ -1047,7 +1047,7 @@
     </message>
     <message>
         <source>Last event</source>
-        <translation type="unfinished"></translation>
+        <translation>Ultimo evento</translation>
     </message>
     <message>
         <source>Elapsed</source>
@@ -1087,7 +1087,7 @@
     </message>
     <message>
         <source>Dropped events</source>
-        <translation type="unfinished"></translation>
+        <translation>Eventi scartati</translation>
     </message>
     <message>
         <source>Capture filter</source>
@@ -1103,7 +1103,7 @@
     </message>
     <message>
         <source>Event size limit (snaplen)</source>
-        <translation type="unfinished"></translation>
+        <translation>Limite dimensione degli eventi (snaplen)</translation>
     </message>
     <message>
         <source>none</source>
@@ -1159,7 +1159,7 @@
     </message>
     <message>
         <source>Events</source>
-        <translation type="unfinished">Eventi</translation>
+        <translation>Eventi</translation>
     </message>
     <message>
         <source>Time span, s</source>
@@ -1175,7 +1175,7 @@
     </message>
     <message>
         <source>Average event size, B</source>
-        <translation type="unfinished"></translation>
+        <translation>Dimensione media degli eventi, B</translation>
     </message>
     <message>
         <source>Bytes</source>
@@ -1195,7 +1195,7 @@
     </message>
     <message>
         <source>Event Comments</source>
-        <translation type="unfinished"></translation>
+        <translation>Commenti evento</translation>
     </message>
     <message>
         <source>&lt;p&gt;Frame %1: </source>
@@ -4072,28 +4072,27 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
 &lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
-        <source>Remove this graph.</source>
-        <oldsource>Remove this dissection behavior.</oldsource>
-        <translation>Rimuovi questo grafico.</translation>
-    </message>
-    <message>
         <source>Add a new graph.</source>
         <translation>Aggiungi un nuovo grafico.</translation>
-    </message>
-    <message>
-        <source>Duplicate this graph.</source>
-        <translation>Duplica questo grafico.</translation>
     </message>
     <message>
         <source>Clear all graphs.</source>
         <translation>Cancella tutti i grafici.</translation>
     </message>
     <message>
-        <source>Move this graph upwards.</source>
-        <translation>Sposta questo grafico verso l&apos;alto.</translation>
+        <source>Remove the selected graph(s).</source>
+        <translation>Rimuovi i grafici selezionati.</translation>
     </message>
     <message>
-        <source>Move this graph downwards.</source>
+        <source>Duplicate the selected graph(s).</source>
+        <translation>Duplica i grafici selezionati.</translation>
+    </message>
+    <message>
+        <source>Move the selected graph(s) upwards.</source>
+        <translation>Sposta i grafici selezionati in alto.</translation>
+    </message>
+    <message>
+        <source>Move the selected graph(s) downwards.</source>
         <translation>Sposta questo grafico verso il basso.</translation>
     </message>
     <message>
@@ -4471,11 +4470,7 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>All Execs</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Access Denied</source>
-        <translation type="vanished">Accesso negato</translation>
+        <translation>Tutti gli eseguibili</translation>
     </message>
     <message>
         <source>Hover over the graph for details.</source>
@@ -5281,7 +5276,7 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <name>InterfaceTreeDelegate</name>
     <message>
         <source>default</source>
-        <translation type="unfinished">predefinito</translation>
+        <translation>predefinito</translation>
     </message>
 </context>
 <context>
@@ -6777,6 +6772,13 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
             <numerusform>%Ln byte</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln bit(s)</source>
+        <translation>
+            <numerusform>%Ln bit</numerusform>
+            <numerusform>%Ln bit</numerusform>
+        </translation>
+    </message>
     <message>
         <source>Byte %1</source>
         <translation>Byte %1</translation>
@@ -7402,6 +7404,13 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>
             <numerusform>%Ln byte</numerusform>
             <numerusform>%Ln byte</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln bit(s)</source>
+        <translation>
+            <numerusform>%Ln bit</numerusform>
+            <numerusform>%Ln bit</numerusform>
         </translation>
     </message>
 </context>
@@ -8849,7 +8858,7 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>EVENTS</source>
-        <translation type="unfinished"></translation>
+        <translation>EVENTI</translation>
     </message>
     <message>
         <source>BYTES</source>
@@ -10936,19 +10945,19 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>Event List</source>
-        <translation type="unfinished"></translation>
+        <translation>Elenco eventi</translation>
     </message>
     <message>
         <source>Event Details</source>
-        <translation type="unfinished"></translation>
+        <translation>Dettagli evento</translation>
     </message>
     <message>
         <source>Event Bytes</source>
-        <translation type="unfinished"></translation>
+        <translation>Byte evento</translation>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Search the Info column of the event list (summary pane), decoded event display labels (tree view pane) or the ASCII-converted event data (hex view pane).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation type="unfinished"></translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt; Cerca nella colonna Info dell&apos;elenco degli eventi (pannello di riepilogo), etichette di visualizzazione degli eventi decodificati (pannello della vista ad albero) o i dati dell&apos;evento convertiti in ASCII (pannello della vista esadecimale).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>That filter doesn&apos;t test anything.</source>
@@ -11493,12 +11502,21 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Salva come...</translation>
     </message>
     <message>
+        <source>Decoded as %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Save Selected Packet Bytes As…</source>
         <translation>Salva byte del pacchetto selezionato come...</translation>
     </message>
+    <message>
+        <source>compressed %1</source>
+        <translation type="unfinished"></translation>
+    </message>
     <message numerus="yes">
-        <source>Displaying %Ln byte(s).</source>
-        <translation>
+        <source>Using %Ln byte(s).</source>
+        <oldsource>Displaying %Ln byte(s).</oldsource>
+        <translation type="unfinished">
             <numerusform>Visualizzazione di %Ln byte.</numerusform>
             <numerusform>Visualizzazione di %Ln byte.</numerusform>
         </translation>
@@ -12568,22 +12586,20 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Crea una nuova voce.</translation>
     </message>
     <message>
-        <source>Remove this entry.</source>
-        <oldsource>Remove this profile.</oldsource>
-        <translation>Rimuovi questa voce.</translation>
+        <source>Remove the selected entry(ies).</source>
+        <translation>Rimuovi le voci selezionate.</translation>
     </message>
     <message>
-        <source>Copy this entry.</source>
-        <oldsource>Copy this profile.</oldsource>
-        <translation>Copia questa voce.</translation>
+        <source>Copy the selected entry(ies).</source>
+        <translation>Copia le voci selezionate.</translation>
     </message>
     <message>
-        <source>Move entry up.</source>
-        <translation>Sposta su la voce.</translation>
+        <source>Move the selected entry(ies) up.</source>
+        <translation>Sposta le voci selezionate in alto.</translation>
     </message>
     <message>
-        <source>Move entry down.</source>
-        <translation>Sposta giù la voce.</translation>
+        <source>Move the selected entry(ies) down.</source>
+        <translation>Sposta le voci selezionate in basso.</translation>
     </message>
     <message>
         <source>Clear all entries.</source>
@@ -12609,20 +12625,20 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Crea una nuova voce.</translation>
     </message>
     <message>
-        <source>Remove this entry.</source>
-        <translation>Rimuovi questa voce.</translation>
+        <source>Remove the selected entry(ies).</source>
+        <translation>Rimuovi le voci selezionate.</translation>
     </message>
     <message>
-        <source>Copy this entry.</source>
-        <translation>Copia questa voce.</translation>
+        <source>Copy the selected entry(ies).</source>
+        <translation>Copia le voci selezionate.</translation>
     </message>
     <message>
-        <source>Move entry up.</source>
-        <translation>Sposta su la voce.</translation>
+        <source>Move the selected entry(ies) up.</source>
+        <translation>Sposta le voci selezionate in alto.</translation>
     </message>
     <message>
-        <source>Move entry down.</source>
-        <translation>Sposta giù la voce.</translation>
+        <source>Move the selected entry(ies) down.</source>
+        <translation>Sposta le voci selezionate in basso.</translation>
     </message>
     <message>
         <source>Clear all entries.</source>

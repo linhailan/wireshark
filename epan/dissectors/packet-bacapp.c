@@ -6860,8 +6860,8 @@ static void
 bacapp_packet_stats_tree_init(stats_tree* st)
 {
     st_node_packets_by_ip = stats_tree_create_pivot(st, st_str_packets_by_ip, 0);
-    st_node_packets_by_ip_src = stats_tree_create_node(st, st_str_packets_by_ip_src, st_node_packets_by_ip, STAT_DT_INT, TRUE);
-    st_node_packets_by_ip_dst = stats_tree_create_node(st, st_str_packets_by_ip_dst, st_node_packets_by_ip, STAT_DT_INT, TRUE);
+    st_node_packets_by_ip_src = stats_tree_create_node(st, st_str_packets_by_ip_src, st_node_packets_by_ip, STAT_DT_INT, true);
+    st_node_packets_by_ip_dst = stats_tree_create_node(st, st_str_packets_by_ip_dst, st_node_packets_by_ip, STAT_DT_INT, true);
 }
 
 static gchar *
@@ -6895,21 +6895,21 @@ bacapp_stats_tree_packet(stats_tree* st, packet_info* pinfo, epan_dissect_t* edt
     srcstr = bacapp_get_address_label("Src: ", &pinfo->src);
     dststr = bacapp_get_address_label("Dst: ", &pinfo->dst);
 
-    tick_stat_node(st, st_str_packets_by_ip, 0, TRUE);
-    packets_for_this_dst = tick_stat_node(st, st_str_packets_by_ip_dst, st_node_packets_by_ip, TRUE);
-    packets_for_this_src = tick_stat_node(st, st_str_packets_by_ip_src, st_node_packets_by_ip, TRUE);
-    src_for_this_dst     = tick_stat_node(st, dststr, packets_for_this_dst, TRUE);
-    dst_for_this_src     = tick_stat_node(st, srcstr, packets_for_this_src, TRUE);
-    service_for_this_src = tick_stat_node(st, dststr, dst_for_this_src, TRUE);
-    service_for_this_dst = tick_stat_node(st, srcstr, src_for_this_dst, TRUE);
+    tick_stat_node(st, st_str_packets_by_ip, 0, true);
+    packets_for_this_dst = tick_stat_node(st, st_str_packets_by_ip_dst, st_node_packets_by_ip, true);
+    packets_for_this_src = tick_stat_node(st, st_str_packets_by_ip_src, st_node_packets_by_ip, true);
+    src_for_this_dst     = tick_stat_node(st, dststr, packets_for_this_dst, true);
+    dst_for_this_src     = tick_stat_node(st, srcstr, packets_for_this_src, true);
+    service_for_this_src = tick_stat_node(st, dststr, dst_for_this_src, true);
+    service_for_this_dst = tick_stat_node(st, srcstr, src_for_this_dst, true);
     if (binfo->service_type) {
-        objectid_for_this_dst = tick_stat_node(st, binfo->service_type, service_for_this_dst, TRUE);
-        objectid_for_this_src = tick_stat_node(st, binfo->service_type, service_for_this_src, TRUE);
+        objectid_for_this_dst = tick_stat_node(st, binfo->service_type, service_for_this_dst, true);
+        objectid_for_this_src = tick_stat_node(st, binfo->service_type, service_for_this_src, true);
         if (binfo->object_ident) {
-            instanceid_for_this_dst = tick_stat_node(st, binfo->object_ident, objectid_for_this_dst, TRUE);
-            tick_stat_node(st, binfo->instance_ident, instanceid_for_this_dst, FALSE);
-            instanceid_for_this_src = tick_stat_node(st, binfo->object_ident, objectid_for_this_src, TRUE);
-            tick_stat_node(st, binfo->instance_ident, instanceid_for_this_src, FALSE);
+            instanceid_for_this_dst = tick_stat_node(st, binfo->object_ident, objectid_for_this_dst, true);
+            tick_stat_node(st, binfo->instance_ident, instanceid_for_this_dst, false);
+            instanceid_for_this_src = tick_stat_node(st, binfo->object_ident, objectid_for_this_src, true);
+            tick_stat_node(st, binfo->instance_ident, instanceid_for_this_src, false);
         }
     }
 
@@ -6944,14 +6944,14 @@ bacapp_stats_tree_service(stats_tree* st, packet_info* pinfo, epan_dissect_t* ed
     srcstr = bacapp_get_address_label("Src: ", &pinfo->src);
     dststr = bacapp_get_address_label("Dst: ", &pinfo->dst);
 
-    tick_stat_node(st, st_str_packets_by_service, 0, TRUE);
+    tick_stat_node(st, st_str_packets_by_service, 0, true);
     if (binfo->service_type) {
-        servicetype = tick_stat_node(st, binfo->service_type, st_node_packets_by_service, TRUE);
-        src         = tick_stat_node(st, srcstr, servicetype, TRUE);
-        dst         = tick_stat_node(st, dststr, src, TRUE);
+        servicetype = tick_stat_node(st, binfo->service_type, st_node_packets_by_service, true);
+        src         = tick_stat_node(st, srcstr, servicetype, true);
+        dst         = tick_stat_node(st, dststr, src, true);
         if (binfo->object_ident) {
-            objectid = tick_stat_node(st, binfo->object_ident, dst, TRUE);
-            tick_stat_node(st, binfo->instance_ident, objectid, FALSE);
+            objectid = tick_stat_node(st, binfo->object_ident, dst, true);
+            tick_stat_node(st, binfo->instance_ident, objectid, false);
         }
     }
 
@@ -6985,14 +6985,14 @@ bacapp_stats_tree_objectid(stats_tree* st, packet_info* pinfo, epan_dissect_t* e
     srcstr = bacapp_get_address_label("Src: ", &pinfo->src);
     dststr = bacapp_get_address_label("Dst: ", &pinfo->dst);
 
-    tick_stat_node(st, st_str_packets_by_objectid, 0, TRUE);
+    tick_stat_node(st, st_str_packets_by_objectid, 0, true);
     if (binfo->object_ident) {
-        objectid = tick_stat_node(st, binfo->object_ident, st_node_packets_by_objectid, TRUE);
-        src = tick_stat_node(st, srcstr, objectid, TRUE);
-        dst = tick_stat_node(st, dststr, src, TRUE);
+        objectid = tick_stat_node(st, binfo->object_ident, st_node_packets_by_objectid, true);
+        src = tick_stat_node(st, srcstr, objectid, true);
+        dst = tick_stat_node(st, dststr, src, true);
         if (binfo->service_type) {
-            servicetype = tick_stat_node(st, binfo->service_type, dst, TRUE);
-            tick_stat_node(st, binfo->instance_ident, servicetype, FALSE);
+            servicetype = tick_stat_node(st, binfo->service_type, dst, true);
+            tick_stat_node(st, binfo->instance_ident, servicetype, false);
         }
     }
 
@@ -7026,14 +7026,14 @@ bacapp_stats_tree_instanceid(stats_tree* st, packet_info* pinfo, epan_dissect_t*
     srcstr = bacapp_get_address_label("Src: ", &pinfo->src);
     dststr = bacapp_get_address_label("Dst: ", &pinfo->dst);
 
-    tick_stat_node(st, st_str_packets_by_instanceid, 0, TRUE);
+    tick_stat_node(st, st_str_packets_by_instanceid, 0, true);
     if (binfo->object_ident) {
-        instanceid = tick_stat_node(st, binfo->instance_ident, st_node_packets_by_instanceid, TRUE);
-        src = tick_stat_node(st, srcstr, instanceid, TRUE);
-        dst = tick_stat_node(st, dststr, src, TRUE);
+        instanceid = tick_stat_node(st, binfo->instance_ident, st_node_packets_by_instanceid, true);
+        src = tick_stat_node(st, srcstr, instanceid, true);
+        dst = tick_stat_node(st, dststr, src, true);
         if (binfo->service_type) {
-            servicetype = tick_stat_node(st, binfo->service_type, dst, TRUE);
-            tick_stat_node(st, binfo->object_ident, servicetype, FALSE);
+            servicetype = tick_stat_node(st, binfo->service_type, dst, true);
+            tick_stat_node(st, binfo->object_ident, servicetype, false);
         }
     }
 
@@ -14100,7 +14100,7 @@ fLOPR(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset)
     guint8  tag_no, tag_info;
     guint32 lvt;
 
-    col_set_writable(pinfo->cinfo, COL_INFO, FALSE); /* don't set all infos into INFO column */
+    col_set_writable(pinfo->cinfo, COL_INFO, false); /* don't set all infos into INFO column */
     while (tvb_reported_length_remaining(tvb, offset) > 0) {  /* exit loop if nothing happens inside */
         lastoffset = offset;
         fTagHeader(tvb, pinfo, offset, &tag_no, &tag_info, &lvt);
@@ -14148,7 +14148,7 @@ fAddListElementRequest(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guin
     guint32     lvt;
     proto_tree *subtree    = tree;
 
-    col_set_writable(pinfo->cinfo, COL_INFO, FALSE); /* don't set all infos into INFO column */
+    col_set_writable(pinfo->cinfo, COL_INFO, false); /* don't set all infos into INFO column */
 
     while (tvb_reported_length_remaining(tvb, offset) > 0) {  /* exit loop if nothing happens inside */
         lastoffset = offset;
@@ -14923,7 +14923,7 @@ fWritePropertyMultipleRequest(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
     if (offset >= tvb_reported_length(tvb))
         return offset;
 
-    col_set_writable(pinfo->cinfo, COL_INFO, FALSE); /* don't set all infos into INFO column */
+    col_set_writable(pinfo->cinfo, COL_INFO, false); /* don't set all infos into INFO column */
     return fWriteAccessSpecification(tvb, pinfo, tree, offset);
 }
 
@@ -14965,7 +14965,7 @@ fPropertyReference(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint of
 static guint
 fBACnetPropertyReference(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset, guint8 list)
 {
-    col_set_writable(pinfo->cinfo, COL_INFO, FALSE); /* don't set all infos into INFO column */
+    col_set_writable(pinfo->cinfo, COL_INFO, false); /* don't set all infos into INFO column */
     return fPropertyReference(tvb, pinfo, tree, offset, 0, list);
 }
 
@@ -14983,7 +14983,7 @@ fBACnetObjectPropertyReference(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tr
             break;
         case 1: /* PropertyIdentifier and propertyArrayIndex */
             offset = fPropertyReference(tvb, pinfo, tree, offset, 1, 0);
-            col_set_writable(pinfo->cinfo, COL_INFO, FALSE); /* don't set all infos into INFO column */
+            col_set_writable(pinfo->cinfo, COL_INFO, false); /* don't set all infos into INFO column */
             /* FALLTHROUGH */
         default:
             lastoffset = offset; /* Set loop end condition */
@@ -15614,7 +15614,7 @@ fReadRangeAck(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset)
     /* itemData */
     fTagHeader(tvb, pinfo, offset, &tag_no, &tag_info, &lvt);
     if (tag_is_opening(tag_info)) {
-        col_set_writable(pinfo->cinfo, COL_INFO, FALSE); /* don't set all infos into INFO column */
+        col_set_writable(pinfo->cinfo, COL_INFO, false); /* don't set all infos into INFO column */
         subtree = proto_tree_add_subtree(subtree, tvb, offset, 1, ett_bacapp_value, NULL, "itemData");
         offset += fTagHeaderTree(tvb, pinfo, subtree, offset, &tag_no, &tag_info, &lvt);
         offset  = fAbstractSyntaxNType(tvb, pinfo, subtree, offset);
@@ -15760,14 +15760,14 @@ fAtomicReadFileAck(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint of
 static guint
 fReadPropertyMultipleRequest(tvbuff_t *tvb, packet_info *pinfo, proto_tree *subtree, guint offset)
 {
-    col_set_writable(pinfo->cinfo, COL_INFO, FALSE); /* don't set all infos into INFO column */
+    col_set_writable(pinfo->cinfo, COL_INFO, false); /* don't set all infos into INFO column */
     return fReadAccessSpecification(tvb, pinfo, subtree, offset);
 }
 
 static guint
 fReadPropertyMultipleAck(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset)
 {
-    col_set_writable(pinfo->cinfo, COL_INFO, FALSE); /* don't set all infos into INFO column */
+    col_set_writable(pinfo->cinfo, COL_INFO, false); /* don't set all infos into INFO column */
     return fReadAccessResult(tvb, pinfo, tree, offset);
 }
 
@@ -16331,7 +16331,7 @@ fWritePropertyMultipleError(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     guint8  tag_no     = 0, tag_info = 0;
     guint32 lvt        = 0;
 
-    col_set_writable(pinfo->cinfo, COL_INFO, FALSE); /* don't set all infos into INFO column */
+    col_set_writable(pinfo->cinfo, COL_INFO, false); /* don't set all infos into INFO column */
     while (tvb_reported_length_remaining(tvb, offset) > 0) {  /* exit loop if nothing happens inside */
         lastoffset = offset;
         switch (fTagNo(tvb, offset)) {

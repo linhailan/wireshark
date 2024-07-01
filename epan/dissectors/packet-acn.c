@@ -3315,8 +3315,8 @@ is_rdmnet_over_udp(tvbuff_t *tvb)
 
 /******************************************************************************/
 /* Heuristic dissector                                                        */
-static gboolean
-dissect_acn_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
+static bool
+dissect_acn_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
   /* This is a heuristic dissector, which means we get all the UDP
    * traffic not sent to a known dissector and not claimed by
@@ -3325,30 +3325,30 @@ dissect_acn_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data
 
   if (is_acn(tvb)) {
     dissect_acn(tvb, pinfo, tree, data);
-    return TRUE;
+    return true;
   }
 
   if (is_magic(tvb)) {
     dissect_magic(tvb, pinfo, tree);
-    return TRUE;
+    return true;
   }
 
   /* abort if it is NOT an ACN or Magic Bullet packet */
-  return FALSE;
+  return false;
 }
 
 
 /******************************************************************************/
 /* Heuristic dissector                                                        */
-static gboolean
+static bool
 dissect_rdmnet_over_udp_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
   if (!is_rdmnet_over_udp(tvb)) {
-    return FALSE;
+    return false;
   }
 
   dissect_rdmnet(tvb, pinfo, tree, 0, 1);
-  return TRUE;
+  return true;
 }
 
 #define RDMNET_TCP_FRAME_HEADER_LENGTH  16
@@ -3382,15 +3382,15 @@ dissect_rdmnet_over_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 
 /******************************************************************************/
 /* Heuristic dissector                                                        */
-static gboolean
+static bool
 dissect_rdmnet_over_tcp_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
   if (!is_rdmnet_over_tcp(tvb)) {
-    return FALSE;
+    return false;
   }
 
   dissect_rdmnet_over_tcp(tvb, pinfo, tree, data);
-  return TRUE;
+  return true;
 }
 
 
@@ -6205,15 +6205,15 @@ dissect_llrp_probe_reply_pdu(tvbuff_t *tvb, proto_tree *tree, int offset, acn_pd
 static guint32
 dissect_rdm_command(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pdu_tree, guint32 data_offset, guint32 length)
 {
-  gboolean         save_info;
-  gboolean         save_protocol;
+  bool             save_info;
+  bool             save_protocol;
   guint32          data_end;
   tvbuff_t        *next_tvb;
 
   save_info     = col_get_writable(pinfo->cinfo, COL_INFO);
   save_protocol = col_get_writable(pinfo->cinfo, COL_PROTOCOL);
-  col_set_writable(pinfo->cinfo, COL_INFO, FALSE);
-  col_set_writable(pinfo->cinfo, COL_PROTOCOL, FALSE);
+  col_set_writable(pinfo->cinfo, COL_INFO, false);
+  col_set_writable(pinfo->cinfo, COL_PROTOCOL, false);
 
   data_end = data_offset + length;
   next_tvb = tvb_new_subset_length(tvb, data_offset, length);

@@ -62,8 +62,8 @@ typedef struct pref_module_alias {
 /* Internal functions */
 static module_t *find_subtree(module_t *parent, const char *tilte);
 static module_t *prefs_register_module_or_subtree(module_t *parent,
-    const char *name, const char *title, const char *description, bool is_subtree,
-    void (*apply_cb)(void), bool use_gui);
+    const char *name, const char *title, const char *description, const char *help,
+    bool is_subtree, void (*apply_cb)(void), bool use_gui);
 static void prefs_register_modules(void);
 static module_t *prefs_find_module_alias(const char *name);
 static prefs_set_pref_e set_pref(char*, const char*, void *, bool);
@@ -270,6 +270,8 @@ struct preference {
       } enum_info;                   /**< for PREF_ENUM */
     } info;                          /**< display/text file information */
     struct pref_custom_cbs custom_cbs;   /**< for PREF_CUSTOM */
+    const char *dissector_table;     /**< for PREF_DECODE_AS_RANGE */
+    const char *dissector_desc;      /**< for PREF_DECODE_AS_RANGE */
 };
 
 const char* prefs_get_description(pref_t *pref)
@@ -295,6 +297,16 @@ const char* prefs_get_name(pref_t *pref)
 uint32_t prefs_get_max_value(pref_t *pref)
 {
     return pref->info.max_value;
+}
+
+const char* prefs_get_dissector_table(pref_t *pref)
+{
+    return pref->dissector_table;
+}
+
+static const char* prefs_get_dissector_description(pref_t *pref)
+{
+    return pref->dissector_desc;
 }
 
 /*
@@ -433,10 +445,10 @@ void prefs_set_gui_theme_is_dark(bool is_dark)
  */
 static module_t *
 prefs_register_module(module_t *parent, const char *name, const char *title,
-                      const char *description, void (*apply_cb)(void),
+                      const char *description, const char *help, void (*apply_cb)(void),
                       const bool use_gui)
 {
-    return prefs_register_module_or_subtree(parent, name, title, description,
+    return prefs_register_module_or_subtree(parent, name, title, description, help,
                                             false, apply_cb, use_gui);
 }
 
@@ -471,7 +483,7 @@ static module_t *
 prefs_register_subtree(module_t *parent, const char *title, const char *description,
                        void (*apply_cb)(void))
 {
-    return prefs_register_module_or_subtree(parent, NULL, title, description,
+    return prefs_register_module_or_subtree(parent, NULL, title, description, NULL,
                                             true, apply_cb,
                                             parent ? parent->use_gui : false);
 }
@@ -479,6 +491,7 @@ prefs_register_subtree(module_t *parent, const char *title, const char *descript
 static module_t *
 prefs_register_module_or_subtree(module_t *parent, const char *name,
                                  const char *title, const char *description,
+                                 const char *help,
                                  bool is_subtree, void (*apply_cb)(void),
                                  bool use_gui)
 {
@@ -490,6 +503,7 @@ prefs_register_module_or_subtree(module_t *parent, const char *name,
         module->name = name;
         module->apply_cb = apply_cb;
         module->description = description;
+        module->help = help;
 
         if (prefs_find_module(name) == NULL) {
             wmem_tree_insert_string(prefs_modules, name, module,
@@ -503,6 +517,7 @@ prefs_register_module_or_subtree(module_t *parent, const char *name,
     module->name = name;
     module->title = title;
     module->description = description;
+    module->help = help;
     module->apply_cb = apply_cb;
     module->prefs = NULL;    /* no preferences, to start */
     module->parent = parent;
@@ -580,24 +595,17 @@ void
 prefs_register_module_alias(const char *name, module_t *module)
 {
     module_alias_t *alias;
-    const char *p;
-    unsigned char c;
 
     /*
-     * Yes.
-     * Make sure that only ASCII letters, numbers, underscores, hyphens,
-     * and dots appear in the name.  We allow upper-case letters, to
-     * handle the Diameter dissector having used "Diameter" rather
+     * Accept any name that can occur in protocol names. We allow upper-case
+     * letters, to handle the Diameter dissector having used "Diameter" rather
      * than "diameter" as its preference module name in the past.
      *
-     * Crash if there is, as that's an error in the code, but the name
-     * can be used on the command line, and shouldn't require quoting,
-     * etc.
+     * Crash if the name is invalid, as that's an error in the code, but the name
+     * can be used on the command line, and shouldn't require quoting, etc.
      */
-    for (p = name; (c = *p) != '\0'; p++) {
-        if (!(g_ascii_isalpha(c) || g_ascii_isdigit(c) || c == '_' ||
-              c == '-' || c == '.'))
-            ws_error("Preference module alias \"%s\" contains invalid characters", name);
+    if (module_check_valid_name(name, false) != '\0') {
+        ws_error("Preference module alias \"%s\" contains invalid characters", name);
     }
 
     /*
@@ -648,7 +656,7 @@ prefs_register_protocol(int id, void (*apply_cb)(void))
     return prefs_register_module(protocols_module,
                                  proto_get_protocol_filter_name(id),
                                  proto_get_protocol_short_name(protocol),
-                                 proto_get_protocol_name(id), apply_cb, true);
+                                 proto_get_protocol_name(id), NULL, apply_cb, true);
 }
 
 void
@@ -720,7 +728,7 @@ prefs_register_protocol_subtree(const char *subtree, int id, void (*apply_cb)(vo
     return prefs_register_module(subtree_module,
                                  proto_get_protocol_filter_name(id),
                                  proto_get_protocol_short_name(protocol),
-                                 proto_get_protocol_name(id), apply_cb, true);
+                                 proto_get_protocol_name(id), NULL, apply_cb, true);
 }
 
 
@@ -751,7 +759,7 @@ prefs_register_protocol_obsolete(int id)
     module = prefs_register_module(protocols_module,
                                    proto_get_protocol_filter_name(id),
                                    proto_get_protocol_short_name(protocol),
-                                   proto_get_protocol_name(id), NULL, true);
+                                   proto_get_protocol_name(id), NULL, NULL, true);
     module->obsolete = true;
     return module;
 }
@@ -784,7 +792,7 @@ prefs_register_stat(const char *name, const char *title,
         prefs_register_modules();
     }
 
-    return prefs_register_module(stats_module, name, title, description,
+    return prefs_register_module(stats_module, name, title, description, NULL,
                                  apply_cb, true);
 }
 
@@ -816,7 +824,7 @@ prefs_register_codec(const char *name, const char *title,
         prefs_register_modules();
     }
 
-    return prefs_register_module(codecs_module, name, title, description,
+    return prefs_register_module(codecs_module, name, title, description, NULL,
                                  apply_cb, true);
 }
 
@@ -1592,7 +1600,7 @@ DIAG_ON(cast-qual)
 }
 
 /* Refactoring to handle both PREF_RANGE and PREF_DECODE_AS_RANGE */
-static void
+static pref_t*
 prefs_register_range_preference_common(module_t *module, const char *name,
                                 const char *title, const char *description,
                                 range_t **var, uint32_t max_value, int type)
@@ -1615,6 +1623,8 @@ prefs_register_range_preference_common(module_t *module, const char *name,
     preference->varp.range = var;
     preference->default_val.range = range_copy(wmem_epan_scope(), *var);
     preference->stashed_val.range = NULL;
+
+    return preference;
 }
 
 /*
@@ -1978,10 +1988,14 @@ prefs_register_custom_preference_TCP_Analysis(module_t *module, const char *name
  */
 void prefs_register_decode_as_range_preference(module_t *module, const char *name,
     const char *title, const char *description, range_t **var,
-    uint32_t max_value)
+    uint32_t max_value, const char *dissector_table, const char *dissector_description)
 {
-    prefs_register_range_preference_common(module, name, title,
+    pref_t *preference;
+
+    preference = prefs_register_range_preference_common(module, name, title,
                 description, var, max_value, PREF_DECODE_AS_RANGE);
+    preference->dissector_desc = dissector_description;
+    preference->dissector_table = dissector_table;
 }
 
 /*
@@ -2208,14 +2222,18 @@ pref_unstash(pref_t *pref, void *unstash_data_p)
         break;
 
     case PREF_DECODE_AS_RANGE:
+    {
+        const char* table_name = prefs_get_dissector_table(pref);
         if (!ranges_are_equal(*pref->varp.range, pref->stashed_val.range)) {
             uint32_t i, j;
             unstash_data->module->prefs_changed_flags |= prefs_get_effect_flags(pref);
 
             if (unstash_data->handle_decode_as) {
-                sub_dissectors = find_dissector_table(pref->name);
+                sub_dissectors = find_dissector_table(table_name);
                 if (sub_dissectors != NULL) {
-                    handle = dissector_table_get_dissector_handle(sub_dissectors, unstash_data->module->title);
+                    const char *handle_desc = prefs_get_dissector_description(pref);
+                    // It should perhaps be possible to get this via dissector name.
+                    handle = dissector_table_get_dissector_handle(sub_dissectors, handle_desc);
                     if (handle != NULL) {
                         /* Set the current handle to NULL for all the old values
                          * in the dissector table. If there isn't an initial
@@ -2229,12 +2247,12 @@ pref_unstash(pref_t *pref, void *unstash_data_p)
                          */
                         for (i = 0; i < (*pref->varp.range)->nranges; i++) {
                             for (j = (*pref->varp.range)->ranges[i].low; j < (*pref->varp.range)->ranges[i].high; j++) {
-                                dissector_change_uint(pref->name, j, NULL);
-                                decode_build_reset_list(pref->name, dissector_table_get_type(sub_dissectors), GUINT_TO_POINTER(j), NULL, NULL);
+                                dissector_change_uint(table_name, j, NULL);
+                                decode_build_reset_list(table_name, dissector_table_get_type(sub_dissectors), GUINT_TO_POINTER(j), NULL, NULL);
                             }
 
-                            dissector_change_uint(pref->name, (*pref->varp.range)->ranges[i].high, NULL);
-                            decode_build_reset_list(pref->name, dissector_table_get_type(sub_dissectors), GUINT_TO_POINTER((*pref->varp.range)->ranges[i].high), NULL, NULL);
+                            dissector_change_uint(table_name, (*pref->varp.range)->ranges[i].high, NULL);
+                            decode_build_reset_list(table_name, dissector_table_get_type(sub_dissectors), GUINT_TO_POINTER((*pref->varp.range)->ranges[i].high), NULL, NULL);
                         }
                     }
                 }
@@ -2250,18 +2268,18 @@ pref_unstash(pref_t *pref, void *unstash_data_p)
                     for (i = 0; i < (*pref->varp.range)->nranges; i++) {
 
                         for (j = (*pref->varp.range)->ranges[i].low; j < (*pref->varp.range)->ranges[i].high; j++) {
-                            dissector_change_uint(pref->name, j, handle);
-                            decode_build_reset_list(pref->name, dissector_table_get_type(sub_dissectors), GUINT_TO_POINTER(j), NULL, NULL);
+                            dissector_change_uint(table_name, j, handle);
+                            decode_build_reset_list(table_name, dissector_table_get_type(sub_dissectors), GUINT_TO_POINTER(j), NULL, NULL);
                         }
 
-                        dissector_change_uint(pref->name, (*pref->varp.range)->ranges[i].high, handle);
-                        decode_build_reset_list(pref->name, dissector_table_get_type(sub_dissectors), GUINT_TO_POINTER((*pref->varp.range)->ranges[i].high), NULL, NULL);
+                        dissector_change_uint(table_name, (*pref->varp.range)->ranges[i].high, handle);
+                        decode_build_reset_list(table_name, dissector_table_get_type(sub_dissectors), GUINT_TO_POINTER((*pref->varp.range)->ranges[i].high), NULL, NULL);
                     }
                 }
             }
         }
         break;
-
+    }
     case PREF_RANGE:
         if (!ranges_are_equal(*pref->varp.range, pref->stashed_val.range)) {
             unstash_data->module->prefs_changed_flags |= prefs_get_effect_flags(pref);
@@ -3207,7 +3225,7 @@ prefs_register_modules(void)
      * preference "string compare list" in set_pref()
      */
     extcap_module = prefs_register_module(NULL, "extcap", "Extcap Utilities",
-        "Extcap Utilities", NULL, false);
+        "Extcap Utilities", NULL, NULL, false);
 
     /* Setting default value to true */
     prefs.extcap_save_on_start = true;
@@ -3223,7 +3241,7 @@ prefs_register_modules(void)
      * preference "string compare list" in set_pref()
      */
     gui_module = prefs_register_module(NULL, "gui", "User Interface",
-        "User Interface", &gui_callback, false);
+        "User Interface", NULL, &gui_callback, false);
     /*
      * The GUI preferences don't affect dissection in general.
      * Any changes are signaled in other ways, so PREF_EFFECT_GUI doesn't
@@ -3508,13 +3526,13 @@ prefs_register_modules(void)
 
     prefs_register_uint_preference(gui_module, "debounce.timer",
                                    "How long to wait before processing computationally intensive user input",
-                                   "How long to wait (in milliseconds) before processing\
-                                   computationally intensive user input.\
-                                   If you type quickly, consider lowering the value for a 'snappier'\
-                                   experience.\
-                                   If you type slowly, consider increasing the value to avoid performance issues.\
-                                   This is currently used to delay searches in View -> Internals -> Supported Protocols\
-                                   and Preferences -> Advanced menu.",
+                                   "How long to wait (in milliseconds) before processing "
+                                   "computationally intensive user input. "
+                                   "If you type quickly, consider lowering the value for a 'snappier' "
+                                   "experience. "
+                                   "If you type slowly, consider increasing the value to avoid performance issues. "
+                                   "This is currently used to delay searches in View -> Internals -> Supported Protocols "
+                                   "and Preferences -> Advanced menu.",
                                    10,
                                    &prefs.gui_debounce_timer);
 
@@ -3642,7 +3660,7 @@ prefs_register_modules(void)
 
     prefs_register_enum_preference(gui_module, "packet_list_elide_mode",
                        "Elide mode",
-                       "The position of \"...\" in packet list text.",
+                       "The position of \"...\" (ellipsis) in packet list text.",
                        (int*)(void*)(&prefs.gui_packet_list_elide_mode), gui_packet_list_elide_mode, false);
     prefs_register_uint_preference(gui_module, "decimal_places1",
             "Count of decimal places for values of type 1",
@@ -3754,7 +3772,7 @@ prefs_register_modules(void)
      * preference "string compare list" in set_pref()
      */
     console_module = prefs_register_module(NULL, "console", "Console",
-        "Console logging and debugging output", NULL, false);
+        "Console logging and debugging output", NULL, NULL, false);
 
     prefs_register_obsolete_preference(console_module, "log.level");
 
@@ -3778,7 +3796,7 @@ prefs_register_modules(void)
      * preference "string compare list" in set_pref()
      */
     capture_module = prefs_register_module(NULL, "capture", "Capture",
-        "Capture preferences", NULL, false);
+        "Capture preferences", NULL, NULL, false);
     /* Capture preferences don't affect dissection */
     prefs_set_module_effect_flags(capture_module, PREF_EFFECT_CAPTURE);
 
@@ -3861,7 +3879,7 @@ prefs_register_modules(void)
 
     /* Name Resolution */
     nameres_module = prefs_register_module(NULL, "nameres", "Name Resolution",
-        "Name Resolution", addr_resolve_pref_apply, true);
+        "Name Resolution", "ChCustPreferencesSection.html#ChCustPrefsNameSection", addr_resolve_pref_apply, true);
     addr_resolve_pref_init(nameres_module);
     oid_pref_init(nameres_module);
     maxmind_db_pref_init(nameres_module);
@@ -3871,18 +3889,18 @@ prefs_register_modules(void)
      * in order to avoid errors when reading older preference files.
      */
     printing = prefs_register_module(NULL, "print", "Printing",
-        "Printing", NULL, false);
+        "Printing", NULL, NULL, false);
     prefs_register_obsolete_preference(printing, "format");
     prefs_register_obsolete_preference(printing, "command");
     prefs_register_obsolete_preference(printing, "file");
 
     /* Codecs */
     codecs_module = prefs_register_module(NULL, "codecs", "Codecs",
-        "Codecs", NULL, true);
+        "Codecs", NULL, NULL, true);
 
     /* Statistics */
     stats_module = prefs_register_module(NULL, "statistics", "Statistics",
-        "Statistics", &stats_callback, true);
+        "Statistics", "ChCustPreferencesSection.html#_statistics", &stats_callback, true);
 
     prefs_register_uint_preference(stats_module, "update_interval",
                                    "Tap update interval in ms",
@@ -3970,7 +3988,7 @@ prefs_register_modules(void)
 
     /* Protocols */
     protocols_module = prefs_register_module(NULL, "protocols", "Protocols",
-                                             "Protocols", NULL, true);
+                                             "Protocols", "ChCustPreferencesSection.html#ChCustPrefsProtocolsSection", NULL, true);
 
     prefs_register_bool_preference(protocols_module, "display_hidden_proto_items",
                                    "Display hidden protocol items",
@@ -4016,11 +4034,11 @@ prefs_register_modules(void)
      */
 
     /* taps is now part of the stats module */
-    prefs_register_module(NULL, "taps", "TAPS", "TAPS", NULL, false);
+    prefs_register_module(NULL, "taps", "TAPS", "TAPS", NULL, NULL, false);
     /* packet_list is now part of the protocol (parent) module */
-    prefs_register_module(NULL, "packet_list", "PACKET_LIST", "PACKET_LIST", NULL, false);
+    prefs_register_module(NULL, "packet_list", "PACKET_LIST", "PACKET_LIST", NULL, NULL, false);
     /* stream is now part of the gui module */
-    prefs_register_module(NULL, "stream", "STREAM", "STREAM", NULL, false);
+    prefs_register_module(NULL, "stream", "STREAM", "STREAM", NULL, NULL, false);
 
 }
 
@@ -6396,31 +6414,31 @@ set_pref(char *pref_name, const char *value, void *private_data,
                 *pref->varp.range = newrange;
                 containing_module->prefs_changed_flags |= prefs_get_effect_flags(pref);
 
-                /* Name of preference is the dissector table */
-                sub_dissectors = find_dissector_table(pref->name);
+                const char* table_name = prefs_get_dissector_table(pref);
+                sub_dissectors = find_dissector_table(table_name);
                 if (sub_dissectors != NULL) {
                     handle = dissector_table_get_dissector_handle(sub_dissectors, module->title);
                     if (handle != NULL) {
                         /* Delete all of the old values from the dissector table */
                         for (i = 0; i < (*pref->varp.range)->nranges; i++) {
                             for (j = (*pref->varp.range)->ranges[i].low; j < (*pref->varp.range)->ranges[i].high; j++) {
-                                dissector_delete_uint(pref->name, j, handle);
-                                decode_build_reset_list(pref->name, dissector_table_get_type(sub_dissectors), GUINT_TO_POINTER(j), NULL, NULL);
+                                dissector_delete_uint(table_name, j, handle);
+                                decode_build_reset_list(table_name, dissector_table_get_type(sub_dissectors), GUINT_TO_POINTER(j), NULL, NULL);
                             }
 
-                            dissector_delete_uint(pref->name, (*pref->varp.range)->ranges[i].high, handle);
-                            decode_build_reset_list(pref->name, dissector_table_get_type(sub_dissectors), GUINT_TO_POINTER((*pref->varp.range)->ranges[i].high), NULL, NULL);
+                            dissector_delete_uint(table_name, (*pref->varp.range)->ranges[i].high, handle);
+                            decode_build_reset_list(table_name, dissector_table_get_type(sub_dissectors), GUINT_TO_POINTER((*pref->varp.range)->ranges[i].high), NULL, NULL);
                         }
 
                         /* Add new values to the dissector table */
                         for (i = 0; i < newrange->nranges; i++) {
                             for (j = newrange->ranges[i].low; j < newrange->ranges[i].high; j++) {
-                                dissector_change_uint(pref->name, j, handle);
-                                decode_build_reset_list(pref->name, dissector_table_get_type(sub_dissectors), GUINT_TO_POINTER(j), NULL, NULL);
+                                dissector_change_uint(table_name, j, handle);
+                                decode_build_reset_list(table_name, dissector_table_get_type(sub_dissectors), GUINT_TO_POINTER(j), NULL, NULL);
                             }
 
-                            dissector_change_uint(pref->name, newrange->ranges[i].high, handle);
-                            decode_build_reset_list(pref->name, dissector_table_get_type(sub_dissectors), GUINT_TO_POINTER(newrange->ranges[i].high), NULL, NULL);
+                            dissector_change_uint(table_name, newrange->ranges[i].high, handle);
+                            decode_build_reset_list(table_name, dissector_table_get_type(sub_dissectors), GUINT_TO_POINTER(newrange->ranges[i].high), NULL, NULL);
                         }
 
                         /* XXX - Do we save the decode_as_entries file here? */

@@ -6682,7 +6682,7 @@ dissect_file_data_smb2_pipe(tvbuff_t *raw_tvb, packet_info *pinfo, proto_tree *t
 	 * Note: si is NULL for some callers from packet-smb.c
 	 */
 	const smb2_info_t *si = (const smb2_info_t *)data;
-	gboolean result=0;
+	bool result=false;
 	gboolean save_fragmented;
 	gint remaining;
 	guint reported_len;
@@ -11808,23 +11808,24 @@ dissect_smb2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, gboolea
 		offset = dissect_smb2_comp_transform_header(pinfo, header_tree, tvb, offset,
 							    scti, &comp_tvb, &plain_tvb);
 
+		comp_tree = proto_tree_add_subtree(header_tree, tvb, offset,
+						   tvb_reported_length_remaining(tvb, offset),
+						   ett_smb2_compressed, NULL,
+						   "Compressed SMB3 data");
+		proto_tree_add_item(comp_tree, hf_smb2_comp_transform_data,
+				    tvb, offset,
+				    tvb_reported_length_remaining(tvb, offset),
+				    ENC_NA);
+
 		if (plain_tvb) {
-			comp_tree = proto_tree_add_subtree(header_tree, plain_tvb, 0,
-							   tvb_reported_length_remaining(plain_tvb, 0),
-							   ett_smb2_decompressed, &decomp_item,
-							   "Decompressed SMB3 data");
+			proto_tree *decomp_tree;
+
+			decomp_tree = proto_tree_add_subtree(header_tree, plain_tvb, 0,
+							     tvb_reported_length_remaining(plain_tvb, 0),
+							     ett_smb2_decompressed, &decomp_item,
+							     "Decompressed SMB3 data");
 			proto_item_set_generated(decomp_item);
-			dissect_smb2(plain_tvb, pinfo, comp_tree, FALSE);
-		} else {
-			comp_tree = proto_tree_add_subtree(header_tree, tvb, offset,
-							   tvb_reported_length_remaining(tvb, offset),
-							   ett_smb2_compressed, NULL,
-							   "Compressed SMB3 data");
-			/* show the compressed payload only if we cant uncompress it */
-			proto_tree_add_item(comp_tree, hf_smb2_comp_transform_data,
-					    tvb, offset,
-					    tvb_reported_length_remaining(tvb, offset),
-					    ENC_NA);
+			dissect_smb2(plain_tvb, pinfo, decomp_tree, FALSE);
 		}
 
 		offset += tvb_reported_length_remaining(tvb, offset);
@@ -11848,26 +11849,26 @@ dissect_smb2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, gboolea
 	return offset;
 }
 
-static gboolean
+static bool
 dissect_smb2_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *data _U_)
 {
 	guint8 b;
 
 	/* must check that this really is a smb2 packet */
 	if (tvb_captured_length(tvb) < 4)
-		return FALSE;
+		return false;
 
 	b = tvb_get_guint8(tvb, 0);
 	if (((b != SMB2_COMP_HEADER) && (b != SMB2_ENCR_HEADER) && (b != SMB2_NORM_HEADER))
 	    || (tvb_get_guint8(tvb, 1) != 'S')
 	    || (tvb_get_guint8(tvb, 2) != 'M')
 	    || (tvb_get_guint8(tvb, 3) != 'B') ) {
-		return FALSE;
+		return false;
 	}
 
 	dissect_smb2(tvb, pinfo, parent_tree, TRUE);
 
-	return TRUE;
+	return true;
 }
 
 void

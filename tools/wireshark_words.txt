@@ -8,6 +8,7 @@
 3gpp2
 3pcap
 5views
+7login
 80211n
 80mhz
 abbrev
@@ -78,6 +79,7 @@ amperes
 amsdu
 amsterdam
 anacap
+analysing
 analyzers
 analyzes
 andxoffset
@@ -112,6 +114,7 @@ arista
 armscii
 arphrd
 aruba
+aruuid
 ascii
 asciidoc
 ashrae
@@ -150,6 +153,7 @@ authgss
 authn
 authntransitioning
 authorisation
+authorised
 authorizer
 authtoken
 authtype
@@ -162,6 +166,7 @@ autosar
 available
 avaya
 avrcp
+axcor
 b100base
 bacapp
 backedup
@@ -183,6 +188,7 @@ beamformee
 beamformer
 beamforming
 behaviour
+behaviours
 beijing
 belgacom
 berhad
@@ -280,6 +286,7 @@ ccache
 cccid
 ccitt
 ccpch
+ccsid
 cctrch
 cdma2000
 cdmacallmode
@@ -380,11 +387,13 @@ combi
 combiner
 combiners
 combobox
+comcast
 commaize
 comms
 communication
 companded
 compat
+compatibiity
 compatibles
 compilable
 compilers
@@ -458,6 +467,7 @@ cumulatively
 customizable
 customization
 customizing
+cyber
 cyphering
 cyrillic
 daintree
@@ -473,6 +483,7 @@ datastate
 datetime
 datum
 daysofweek
+dbuild
 dccreq
 dcerpc
 dcname
@@ -514,6 +525,7 @@ dedup
 deduplicate
 deenabled
 deenablement
+defence
 deferral
 defragment
 defragmentation
@@ -532,6 +544,7 @@ delimited
 delimiters
 delimiting
 demodulator
+demotivation
 demultiplex
 demultiplexed
 demultiplexer
@@ -577,6 +590,7 @@ devfs
 deviceid
 devmode
 devno
+devtype
 dfdpck
 dfilter
 dfilters
@@ -619,9 +633,12 @@ divisor
 djiuav
 dlmap
 dlsch
+dlstatus
 dmacros
 dmepi
+dmx4all
 dnskey
+dnsop
 dnssec
 dnssrv
 docomo
@@ -636,6 +653,7 @@ downlink
 doxygen
 dpauxmon
 dpnss
+drange
 drbid
 drdynvc
 droppable
@@ -718,6 +736,7 @@ ephemeris
 epoll
 epsem
 equinf
+equinix
 equiv
 equivalence
 ericsson
@@ -774,6 +793,7 @@ eyesdn
 f5eth
 fa1922dfa9a
 facch
+fahrenheit
 failover
 falco
 falcodump
@@ -801,6 +821,8 @@ flag1
 flag2
 flanger
 flavored
+flavour
+flavours
 flexray
 flowid
 flowmod
@@ -812,6 +834,7 @@ foffset
 followup
 foobar
 format0
+forti
 fortigate
 fortinet
 fpiur
@@ -881,6 +904,7 @@ gmprs
 gnodeb
 gnutls
 goaway
+goddard
 golomb
 goodput
 google
@@ -921,6 +945,7 @@ headend
 hebrew
 hellman
 heuristic
+heuristicly
 heuristics
 hfarr
 hfill,
@@ -928,6 +953,7 @@ hfindex
 hfinfo
 HI2Operations
 histogram
+historizing
 hitachi
 hnbap
 homedir
@@ -950,6 +976,7 @@ http2
 https
 huawei
 huffman
+hungarian
 hutchison
 hysteresis
 hytec
@@ -1005,6 +1032,7 @@ infix
 infolist
 informationitem
 informationlist
+informations
 infos
 inited
 initialisation
@@ -1047,6 +1075,7 @@ interruptible
 interworking
 intparam
 intra
+intrinsics
 intro
 intval
 inuse
@@ -1056,6 +1085,7 @@ invalidly
 invariance
 invariant
 ioctl
+ioepoch
 ioerr
 ioflag
 iograph
@@ -1105,6 +1135,7 @@ jacobson
 january
 japanese
 jetds
+jminfo
 joiners
 jsonraw
 jupmngr
@@ -1149,12 +1180,14 @@ leasequery
 legitimisation
 lempar
 level1login
+lfsck
 libcap
 libgcrypt
 libiconv
 libndr
 libnl
 libpcap
+libscap
 libsmi
 libssh
 licmgr
@@ -1254,6 +1287,8 @@ meshcop
 messageid
 metadata
 metamethod
+metamethods
+metatable
 metatraffic
 meteorological
 metermod
@@ -1558,6 +1593,7 @@ parameterfv
 parameteriv
 parameterization
 parameterized
+paramfmt
 params
 paramset
 parens
@@ -1583,6 +1619,7 @@ pcch
 pcell
 pcmax
 pcmaxc
+pcre2pattern
 pcrepattern
 pdcch
 pdelay
@@ -1625,6 +1662,7 @@ polycom
 polygon
 polynom
 popup
+portableapps
 portcounters
 portid
 portinfo
@@ -1645,6 +1683,9 @@ preambles
 preauth
 precisions
 precoding
+precompilation
+precompiled
+precompute
 preconfiguration
 preconfigured
 predef
@@ -1688,6 +1729,7 @@ pscell
 pseudowire
 psname
 ptime
+ptlrpc
 ptvcursor
 ptype
 pubdir
@@ -1722,6 +1764,7 @@ quantization
 quantized
 queryhit
 queryset
+queueing
 quiesce
 quiescing
 quintuplet
@@ -1741,6 +1784,8 @@ randomizer
 randpkt
 randr
 raster
+rawip
+rcode
 rcsta
 rctxinfo
 rdeth
@@ -1882,6 +1927,7 @@ resolver
 resolvers
 resub
 resubmission
+resync
 resynchronisation
 resynchronization
 resynchronize
@@ -1899,6 +1945,7 @@ retransmitter
 retries
 retry
 retrying
+returndiag
 retval
 retyping
 revalidate
@@ -1914,6 +1961,7 @@ rgoose
 ripemd
 rlcmac
 rmcap
+rmdir
 rngrsp
 rnsap
 roamer
@@ -1945,6 +1993,7 @@ rxlen
 rxlev
 rxmcsmap
 rxreq
+s3accountlist
 s3interval
 s7comm
 sabme
@@ -1955,6 +2004,7 @@ sanicap
 sanitization
 sanitize
 sanitizers
+santa
 santiago
 sapgui
 sarajevo
@@ -2016,10 +2066,12 @@ sessionid
 sessionkey
 setattr
 setcap
+setconf
 setkey
 setuid
 severities
 sfiocr
+sflag
 sflow
 sftpserver
 sftserver
@@ -2036,6 +2088,7 @@ showtechnic
 shtdn
 siapp
 sidelink
+sigcomp
 siginfo
 siglen
 signaal
@@ -2044,6 +2097,7 @@ signon
 simplestatusbit
 simulcast
 singulation
+sinsp
 sinteger
 sistemas
 sizeof
@@ -2088,6 +2142,7 @@ specifier
 specifiers
 spectrograph
 speex
+spirent
 spline
 spnego
 spoofing
@@ -2112,12 +2167,15 @@ stanag
 standardization
 stateful
 statfs
+statsum
 statusbar
 stderr
 stdin
 stdout
 steinigke
 stevens
+stmin
+stnode
 strawberryperl
 strbuf
 strcmp
@@ -2173,6 +2231,7 @@ subrects
 subselect
 subselection
 subslot
+subsys
 subtlv
 subtree
 subtrees
@@ -2336,6 +2395,8 @@ typedef
 typeof
 uarfcn
 uavcan
+ubertooth
+ubiquisys
 uboot
 ubuntu
 ucast
@@ -2364,6 +2425,7 @@ unassign
 unassoc
 unassociated
 unauthenticated
+unauthorised
 unavailability
 unbind
 unblocking
@@ -2397,6 +2459,7 @@ undecoded
 undecryptable
 undecrypted
 undelete
+undelimited
 undeliverable
 underflow
 underrun
@@ -2406,6 +2469,7 @@ undissected
 unduplicated
 unencoded
 unencrypted
+unescape
 unescaped
 unescaping
 unexported
@@ -2534,6 +2598,7 @@ v1310
 v1410
 v1530
 v1610
+valgrind
 validations
 validator
 valstringname
@@ -2585,6 +2650,7 @@ webkit
 websocket
 wednesday
 werror
+whereis
 whoami
 whois
 wideband
@@ -2645,5 +2711,6 @@ z3950
 zbncp
 zeroes
 zigbee
+zlibng
 zugtyp
 zürich

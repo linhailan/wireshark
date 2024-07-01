@@ -411,7 +411,7 @@ typedef struct
     struct rlc_channel_reassembly_info *reassembly_info;
 } channel_sequence_analysis_status;
 
-/* The sequence analysis channel hash table */
+/* The sequence analysis channel hash table (channel_hash_key* -> channel_sequence_analysis_status*) */
 static wmem_map_t *sequence_analysis_channel_hash;
 
 
@@ -442,7 +442,8 @@ typedef struct
 } sequence_analysis_report;
 
 
-/* The sequence analysis frame report hash table instance itself   */
+/* The sequence analysis frame report hash table instance itself, lookup when visited */
+/* rlc_result_hash_key* -> sequence_analysis_report* */
 static wmem_map_t *sequence_analysis_report_hash;
 
 
@@ -2773,7 +2774,7 @@ static void report_heur_error(proto_tree *tree, packet_info *pinfo, expert_field
 }
 
 /* Heuristic dissector looks for supported framing protocol (see wiki page)  */
-static gboolean dissect_rlc_lte_heur(tvbuff_t *tvb, packet_info *pinfo,
+static bool dissect_rlc_lte_heur(tvbuff_t *tvb, packet_info *pinfo,
                                      proto_tree *tree, void *data _U_)
 {
     gint                 offset = 0;
@@ -2788,12 +2789,12 @@ static gboolean dissect_rlc_lte_heur(tvbuff_t *tvb, packet_info *pinfo,
        - tag for data
        - at least one byte of RLC PDU payload */
     if (tvb_captured_length_remaining(tvb, offset) < (gint)(strlen(RLC_LTE_START_STRING)+1+2)) {
-        return FALSE;
+        return false;
     }
 
     /* OK, compare with signature string */
     if (tvb_strneql(tvb, offset, RLC_LTE_START_STRING, (gint)strlen(RLC_LTE_START_STRING)) != 0) {
-        return FALSE;
+        return false;
     }
     offset += (gint)strlen(RLC_LTE_START_STRING);
 
@@ -2858,7 +2859,7 @@ static gboolean dissect_rlc_lte_heur(tvbuff_t *tvb, packet_info *pinfo,
                     /* It must be a recognised tag */
                     report_heur_error(tree, pinfo, &ei_rlc_lte_unknown_udp_framing_tag, tvb, offset-1, 1);
                     wmem_free(wmem_file_scope(), p_rlc_lte_info);
-                    return TRUE;
+                    return true;
             }
         }
 
@@ -2866,7 +2867,7 @@ static gboolean dissect_rlc_lte_heur(tvbuff_t *tvb, packet_info *pinfo,
             /* Conditional field is not present */
             report_heur_error(tree, pinfo, &ei_rlc_lte_missing_udp_framing_tag, tvb, 0, offset);
             wmem_free(wmem_file_scope(), p_rlc_lte_info);
-            return TRUE;
+            return true;
         }
 
         /* Store info in packet */
@@ -2882,7 +2883,7 @@ static gboolean dissect_rlc_lte_heur(tvbuff_t *tvb, packet_info *pinfo,
     /* Create tvb that starts at actual RLC PDU */
     rlc_tvb = tvb_new_subset_remaining(tvb, offset);
     dissect_rlc_lte_common(rlc_tvb, pinfo, tree, TRUE);
-    return TRUE;
+    return true;
 }
 
 
@@ -3135,6 +3136,59 @@ void set_rlc_lte_drb_li_field(packet_info *pinfo, guint16 ueid, guint8 drbid,
     params->ext_li_field = ul_ext_li_field ? UL_EXT_LI : NO_EXT_LI;
     params->ext_li_field |= dl_ext_li_field ? DL_EXT_LI : NO_EXT_LI;
 }
+
+void rlc_lte_reset_ue_bearers(packet_info *pinfo, guint16 ueid)
+{
+    if (PINFO_FD_VISITED(pinfo)) {
+        return;
+    }
+
+    /* Need to reset current state of any entries in sequence_analysis_channel_hash */
+    channel_hash_key   channel_key;
+    channel_sequence_analysis_status     *p_channel_status;
+
+    channel_key.ueId = ueid;
+
+    /* SRBs (1-2, both directions) */
+    channel_key.channelType = CHANNEL_TYPE_SRB;
+    for (uint32_t channelId=1; channelId <= 2; ++channelId) {
+        for (uint32_t direction=0; direction <=1; ++direction) {
+            /* Update key */
+            channel_key.channelId = channelId;
+            channel_key.direction = direction;
+
+            /* Lookup existing channel status */
+            p_channel_status = (channel_sequence_analysis_status*)wmem_map_lookup(sequence_analysis_channel_hash, &channel_key);
+            if (p_channel_status) {
+                /* Reset if already exists */
+                p_channel_status->previousSequenceNumber = -1;
+                p_channel_status->previousFrameNum = 0;
+                p_channel_status->previousSegmentIncomplete = 0;
+            }
+        }
+    }
+
+    /* DRBs (1-32, both directions) */
+    channel_key.channelType = CHANNEL_TYPE_DRB;
+    for (uint32_t channelId=1; channelId <= 32; ++channelId) {
+        for (uint32_t direction=0; direction <=1; ++direction) {
+            /* Update key */
+            channel_key.channelId = channelId;
+            channel_key.direction = direction;
+
+            /* Lookup existing channel status */
+            p_channel_status = (channel_sequence_analysis_status*)wmem_map_lookup(sequence_analysis_channel_hash, &channel_key);
+            if (p_channel_status) {
+                /* Reset if already exists */
+                p_channel_status->previousSequenceNumber = -1;
+                p_channel_status->previousFrameNum = 0;
+                p_channel_status->previousSegmentIncomplete = 0;
+            }
+        }
+    }
+}
+
+
 
 void proto_register_rlc_lte(void)
 {

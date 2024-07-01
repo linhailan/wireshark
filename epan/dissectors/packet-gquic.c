@@ -1889,7 +1889,7 @@ dissect_gquic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *gquic_tr
             proto_tree_add_item(ft_tree, hf_gquic_crypto_crypto_data, tvb, offset, (guint32)crypto_length, ENC_NA);
 
             if (gquic_info->version == 50) {
-	        message_tag = tvb_get_ntohl(tvb, offset);
+                message_tag = tvb_get_ntohl(tvb, offset);
                 ti = proto_tree_add_item_ret_string(ft_tree, hf_gquic_tag, tvb, offset, 4, ENC_ASCII|ENC_NA, pinfo->pool, &message_tag_str);
                 proto_item_append_text(ti, " (%s)", val_to_str_const(message_tag, message_tag_vals, "Unknown Tag"));
                 col_add_str(pinfo->cinfo, COL_INFO, val_to_str_const(message_tag, message_tag_vals, "Unknown"));
@@ -1898,9 +1898,9 @@ dissect_gquic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *gquic_tr
                 offset = dissect_gquic_tags(tvb, pinfo, ft_tree, offset);
 	    } else { /* T050 and T051 */
                 tvbuff_t *next_tvb = tvb_new_subset_length(tvb, offset, (int)crypto_length);
-                col_set_writable(pinfo->cinfo, -1, FALSE);
+                col_set_writable(pinfo->cinfo, -1, false);
                 call_dissector_with_data(tls13_handshake_handle, next_tvb, pinfo, ft_tree, GUINT_TO_POINTER(crypto_offset));
-                col_set_writable(pinfo->cinfo, -1, TRUE);
+                col_set_writable(pinfo->cinfo, -1, true);
                 offset += (guint32)crypto_length;
 	    }
 
@@ -2434,7 +2434,7 @@ dissect_gquic(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     return dissect_gquic_q046(tvb, pinfo, tree, NULL);
 }
 
-static gboolean dissect_gquic_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
+static bool dissect_gquic_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
 
     conversation_t *conversation = NULL;
@@ -2443,7 +2443,7 @@ static gboolean dissect_gquic_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree
     guint32 version;
 
     if (tvb_captured_length(tvb) < 1) {
-        return FALSE;
+        return false;
     }
     flags = tvb_get_guint8(tvb, offset);
     offset += 1;
@@ -2453,17 +2453,17 @@ static gboolean dissect_gquic_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 
         /* Verify packet size  (Flag (1 byte) + Connection ID (8 bytes) + Version (4 bytes)) */
         if (tvb_captured_length(tvb) < 13) {
-            return FALSE;
+            return false;
         }
 
         /* Check if flags version is set */
         if((flags & PUFLAGS_VRSN) == 0) {
-            return FALSE;
+            return false;
         }
 
         /* Connection ID is always set to "long" (8bytes) too */
         if((flags & PUFLAGS_CID) == 0){
-            return FALSE;
+            return false;
         }
         offset += 8;
 
@@ -2473,28 +2473,28 @@ static gboolean dissect_gquic_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree
             conversation = find_or_create_conversation(pinfo);
             conversation_set_dissector(conversation, gquic_handle);
             dissect_gquic(tvb, pinfo, tree, data);
-            return TRUE;
+            return true;
         }
     } else if((flags & PUFLAGS_MPTH) && (flags & PUFLAGS_RSV)) {
         /* It may be > Q043, Long Header. We handle only Q046 */
 
         /* Verify packet size  (Flag (1 byte) + Version (4) + DCIL/SCIL (1) + Dest Connection ID (8 bytes)) */
         if (tvb_captured_length(tvb) < 14) {
-            return FALSE;
+            return false;
         }
 
         version = tvb_get_ntohl(tvb, offset);
         if (version != GQUIC_VERSION_Q046) {
-            return FALSE;
+            return false;
         }
 
         conversation = find_or_create_conversation(pinfo);
         conversation_set_dissector(conversation, gquic_handle);
         dissect_gquic(tvb, pinfo, tree, data);
-        return TRUE;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }
 
 void

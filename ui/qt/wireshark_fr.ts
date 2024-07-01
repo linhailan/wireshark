@@ -4070,28 +4070,27 @@ Pas exemple, inquiquez 1 heure pour avoir un nouveau fichier créé toutes les h
 &lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
-        <source>Remove this graph.</source>
-        <oldsource>Remove this dissection behavior.</oldsource>
-        <translation>Enlever ce graphique.</translation>
-    </message>
-    <message>
         <source>Add a new graph.</source>
         <translation>Ajouter un nouveau graphique.</translation>
-    </message>
-    <message>
-        <source>Duplicate this graph.</source>
-        <translation>Dupliquer ce graphique.</translation>
     </message>
     <message>
         <source>Clear all graphs.</source>
         <translation>Effacer tous les graphiques.</translation>
     </message>
     <message>
-        <source>Move this graph upwards.</source>
+        <source>Remove the selected graph(s).</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move this graph downwards.</source>
+        <source>Duplicate the selected graph(s).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the selected graph(s) upwards.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the selected graph(s) downwards.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6770,6 +6769,13 @@ Pas exemple, inquiquez 1 heure pour avoir un nouveau fichier créé toutes les h
             <numerusform>%Ln octets</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln bit(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
     <message>
         <source>Byte %1</source>
         <translation>Octet %1</translation>
@@ -7395,6 +7401,13 @@ Pas exemple, inquiquez 1 heure pour avoir un nouveau fichier créé toutes les h
         <translation type="unfinished">
             <numerusform>%Ln octets</numerusform>
             <numerusform>%Ln octets</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln bit(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
         </translation>
     </message>
 </context>
@@ -11484,12 +11497,21 @@ Pas exemple, inquiquez 1 heure pour avoir un nouveau fichier créé toutes les h
         <translation>Enregistrer sous…</translation>
     </message>
     <message>
+        <source>Decoded as %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Save Selected Packet Bytes As…</source>
         <translation>Enregistrer les octets de paquet sélectionnés sous…</translation>
     </message>
+    <message>
+        <source>compressed %1</source>
+        <translation type="unfinished"></translation>
+    </message>
     <message numerus="yes">
-        <source>Displaying %Ln byte(s).</source>
-        <translation>
+        <source>Using %Ln byte(s).</source>
+        <oldsource>Displaying %Ln byte(s).</oldsource>
+        <translation type="unfinished">
             <numerusform>Affichage de %Ln octet.</numerusform>
             <numerusform>Affichage de %Ln octets.</numerusform>
         </translation>
@@ -12565,22 +12587,20 @@ Changer la direction de la connexion (voir le flux inverse).&lt;/p&gt;&lt;/body&
         <translation>Créer une nouvelle entrée</translation>
     </message>
     <message>
-        <source>Remove this entry.</source>
-        <oldsource>Remove this profile.</oldsource>
-        <translation>Supprimer cette entrée.</translation>
+        <source>Remove the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Copy this entry.</source>
-        <oldsource>Copy this profile.</oldsource>
-        <translation>Copier cette entrée.</translation>
+        <source>Copy the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry up.</source>
-        <translation>Déplacer l&apos;entrée vers le haut.</translation>
+        <source>Move the selected entry(ies) up.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry down.</source>
-        <translation>Déplacer l&apos;entrée vers le bas.</translation>
+        <source>Move the selected entry(ies) down.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Clear all entries.</source>
@@ -12606,20 +12626,20 @@ Changer la direction de la connexion (voir le flux inverse).&lt;/p&gt;&lt;/body&
         <translation>Créer une nouvelle entrée.</translation>
     </message>
     <message>
-        <source>Remove this entry.</source>
-        <translation>Supprimer cette entrée.</translation>
+        <source>Remove the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Copy this entry.</source>
-        <translation>Copier cette entrée.</translation>
+        <source>Copy the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry up.</source>
-        <translation>Déplacer l&apos;entrée vers le haut.</translation>
+        <source>Move the selected entry(ies) up.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry down.</source>
-        <translation>Déplacer l&apos;entrée vers le bas.</translation>
+        <source>Move the selected entry(ies) down.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Clear all entries.</source>

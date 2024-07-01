@@ -4055,29 +4055,28 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 &lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
-        <source>Remove this graph.</source>
-        <oldsource>Remove this dissection behavior.</oldsource>
-        <translation>이 그래프를 삭제합니다.</translation>
-    </message>
-    <message>
         <source>Add a new graph.</source>
         <translation>새로운 그래프를 추가합니다.</translation>
-    </message>
-    <message>
-        <source>Duplicate this graph.</source>
-        <translation>이 그래프를 복제합니다.</translation>
     </message>
     <message>
         <source>Clear all graphs.</source>
         <translation>모든 그래프를 지웁니다.</translation>
     </message>
     <message>
-        <source>Move this graph upwards.</source>
-        <translation>이 그래프를 위로 이동합니다.</translation>
+        <source>Remove the selected graph(s).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move this graph downwards.</source>
-        <translation>이 그래프를 아래로 이동합니다.</translation>
+        <source>Duplicate the selected graph(s).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the selected graph(s) upwards.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the selected graph(s) downwards.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Mouse</source>
@@ -4455,10 +4454,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>All Execs</source>
         <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Access Denied</source>
-        <translation type="vanished">접근 거부됨</translation>
     </message>
     <message>
         <source>Hover over the graph for details.</source>
@@ -6757,6 +6752,12 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
             <numerusform>%Ln바이트</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln bit(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+        </translation>
+    </message>
     <message>
         <source>Byte %1</source>
         <translation>바이트 %1</translation>
@@ -7380,6 +7381,12 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <source>%Ln byte(s)</source>
         <translation>
             <numerusform>%Ln바이트</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln bit(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
 </context>
@@ -11461,12 +11468,21 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>다른 이름으로 저장…</translation>
     </message>
     <message>
+        <source>Decoded as %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Save Selected Packet Bytes As…</source>
         <translation>선택한 패킷 바이트를 다른 이름으로 저장…</translation>
     </message>
+    <message>
+        <source>compressed %1</source>
+        <translation type="unfinished"></translation>
+    </message>
     <message numerus="yes">
-        <source>Displaying %Ln byte(s).</source>
-        <translation>
+        <source>Using %Ln byte(s).</source>
+        <oldsource>Displaying %Ln byte(s).</oldsource>
+        <translation type="unfinished">
             <numerusform>%Ln바이트를 표시하고 있습니다.</numerusform>
         </translation>
     </message>
@@ -12540,22 +12556,20 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>새 항목을 만듭니다.</translation>
     </message>
     <message>
-        <source>Remove this entry.</source>
-        <oldsource>Remove this profile.</oldsource>
-        <translation>이 항목을 삭제합니다.</translation>
+        <source>Remove the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Copy this entry.</source>
-        <oldsource>Copy this profile.</oldsource>
-        <translation>이 항목을 복사합니다.</translation>
+        <source>Copy the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry up.</source>
-        <translation>항목을 위로 이동합니다.</translation>
+        <source>Move the selected entry(ies) up.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry down.</source>
-        <translation>항목을 아래로 이동합니다.</translation>
+        <source>Move the selected entry(ies) down.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Clear all entries.</source>
@@ -12581,20 +12595,20 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>새 항목을 만듭니다.</translation>
     </message>
     <message>
-        <source>Remove this entry.</source>
-        <translation>이 항목을 삭제합니다.</translation>
+        <source>Remove the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Copy this entry.</source>
-        <translation>이 항목을 복사합니다.</translation>
+        <source>Copy the selected entry(ies).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry up.</source>
-        <translation>항목을 위로 이동합니다.</translation>
+        <source>Move the selected entry(ies) up.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move entry down.</source>
-        <translation>항목을 아래로 이동합니다.</translation>
+        <source>Move the selected entry(ies) down.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Clear all entries.</source>

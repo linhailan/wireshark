@@ -19195,7 +19195,7 @@ dissect_ngap_SourceToTarget_TransparentContainer(tvbuff_t *tvb _U_, int offset _
       tvb_reported_length(parameter_tvb) > 0) {
     guint32 handover_type = ngap_get_private_data(actx->pinfo)->handover_type_value;
     /* Don't want elements inside container to write to info column */
-    col_set_writable(actx->pinfo->cinfo, COL_INFO, FALSE);
+    col_set_writable(actx->pinfo->cinfo, COL_INFO, false);
     subtree = proto_item_add_subtree(actx->created_item, ett_ngap_SourceToTarget_TransparentContainer);
     TRY {
         switch(handover_type) {
@@ -19219,7 +19219,7 @@ dissect_ngap_SourceToTarget_TransparentContainer(tvbuff_t *tvb _U_, int offset _
     ENDTRY;
 
     /* Enable writing of the column again */
-    col_set_writable(actx->pinfo->cinfo, COL_INFO, TRUE);
+    col_set_writable(actx->pinfo->cinfo, COL_INFO, true);
   }
 
 
@@ -19659,7 +19659,7 @@ dissect_ngap_TargetToSource_TransparentContainer(tvbuff_t *tvb _U_, int offset _
       tvb_reported_length(parameter_tvb) > 0) {
     struct ngap_private_data *ngap_data = ngap_get_private_data(actx->pinfo);
     /* Don't want elements inside container to write to info column */
-    col_set_writable(actx->pinfo->cinfo, COL_INFO, FALSE);
+    col_set_writable(actx->pinfo->cinfo, COL_INFO, false);
     subtree = proto_item_add_subtree(actx->created_item, ett_ngap_TargetToSource_TransparentContainer);
     if (ngap_data->procedure_code == id_HandoverPreparation) {
       switch(ngap_data->handover_type_value) {
@@ -19680,7 +19680,7 @@ dissect_ngap_TargetToSource_TransparentContainer(tvbuff_t *tvb _U_, int offset _
       dissect_ngap_TargetNGRANNode_ToSourceNGRANNode_TransparentContainer_PDU(parameter_tvb, actx->pinfo, subtree, NULL);
     }
     /* Enable writing of the column again */
-    col_set_writable(actx->pinfo->cinfo, COL_INFO, TRUE);
+    col_set_writable(actx->pinfo->cinfo, COL_INFO, true);
   }
 
 
@@ -19700,7 +19700,7 @@ dissect_ngap_TargettoSource_Failure_TransparentContainer(tvbuff_t *tvb _U_, int 
       tvb_reported_length(parameter_tvb) > 0) {
     struct ngap_private_data *ngap_data = ngap_get_private_data(actx->pinfo);
     /* Don't want elements inside container to write to info column */
-    col_set_writable(actx->pinfo->cinfo, COL_INFO, FALSE);
+    col_set_writable(actx->pinfo->cinfo, COL_INFO, false);
     subtree = proto_item_add_subtree(actx->created_item, ett_ngap_TargettoSource_Failure_TransparentContainer);
     switch(ngap_data->handover_type_value) {
     case intra5gs:
@@ -19710,7 +19710,7 @@ dissect_ngap_TargettoSource_Failure_TransparentContainer(tvbuff_t *tvb _U_, int 
       break;
     }
     /* Enable writing of the column again */
-    col_set_writable(actx->pinfo->cinfo, COL_INFO, TRUE);
+    col_set_writable(actx->pinfo->cinfo, COL_INFO, true);
   }
 
 
@@ -27124,7 +27124,7 @@ static int dissect_UnsuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, p
 static void
 ngap_stats_tree_init(stats_tree *st)
 {
-    st_node_packets = stats_tree_create_node(st, st_str_packets, 0, STAT_DT_INT, TRUE);
+    st_node_packets = stats_tree_create_node(st, st_str_packets, 0, STAT_DT_INT, true);
     st_node_packet_types = stats_tree_create_pivot(st, st_str_packet_types, st_node_packets);
 }
 
@@ -27134,7 +27134,7 @@ ngap_stats_tree_packet(stats_tree* st, packet_info* pinfo _U_,
 {
     const struct ngap_tap_t *pi = (const struct ngap_tap_t *) p;
 
-    tick_stat_node(st, st_str_packets, 0, FALSE);
+    tick_stat_node(st, st_str_packets, 0, false);
     stats_tree_tick_pivot(st, st_node_packet_types,
                           val_to_str(pi->ngap_mtype, mtype_names,
                                      "Unknown packet type (%d)"));
@@ -27335,7 +27335,7 @@ found:
         ngap_tree = tree;
     }
     save_writable = col_get_writable(pinfo->cinfo, COL_PROTOCOL);
-    col_set_writable(pinfo->cinfo, COL_PROTOCOL, FALSE);
+    col_set_writable(pinfo->cinfo, COL_PROTOCOL, false);
     call_dissector_with_data(subdissector, tvb, pinfo, ngap_tree, NULL);
     col_set_writable(pinfo->cinfo, COL_PROTOCOL, save_writable);
     return tvb_captured_length(tvb);
