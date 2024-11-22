@@ -76,11 +76,7 @@ AStringListListModel(parent)
 
     while (!ReadFile_authors.atEnd()) {
         QString line = ReadFile_authors.readLine();
-#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
         QStringList entry = line.split(",", Qt::SkipEmptyParts);
-#else
-        QStringList entry = QStringList() << line.section(',', 0, 0) << line.section(',', 1, 1);
-#endif
         if (entry.size() == 2) {
             appendRow(entry);
         }
@@ -189,7 +185,16 @@ ShortcutListModel::ShortcutListModel(QObject * parent):
         QStringList row;
         row << shortcuts[name].first << name << shortcuts[name].second;
         appendRow(row);
+        if (shortcuts[name].first == QKeySequence(Qt::CTRL | Qt::Key_Up).toString(QKeySequence::NativeText)) {
+            appendRow(QStringList() << "F7" << name << shortcuts[name].second);
+        }
+        if (shortcuts[name].first == QKeySequence(Qt::CTRL | Qt::Key_Down).toString(QKeySequence::NativeText)) {
+            appendRow(QStringList() << "F8" << name << shortcuts[name].second);
+        }
     }
+
+    /* Hard coded keyPressEvent() */
+    appendRow(QStringList() << QKeySequence(Qt::CTRL | Qt::Key_Slash).toString(QKeySequence::NativeText) << tr("Display Filter Input") << tr("Jump to display filter input box"));
 }
 
 QStringList ShortcutListModel::headerColumns() const
@@ -286,21 +291,10 @@ AboutDialog::AboutDialog(QWidget *parent) :
     QFile f_acknowledgements;
     QFile f_license;
 
-    AuthorListModel * authorModel = new AuthorListModel(this);
-    AStringListListSortFilterProxyModel * proxyAuthorModel = new AStringListListSortFilterProxyModel(this);
-    proxyAuthorModel->setSourceModel(authorModel);
-    proxyAuthorModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
-    proxyAuthorModel->setColumnToFilter(0);
-    proxyAuthorModel->setColumnToFilter(1);
-    ui->tblAuthors->setModel(proxyAuthorModel);
-    ui->tblAuthors->setRootIsDecorated(false);
-    ui->tblAuthors->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(ui->tblAuthors, &QTreeView::customContextMenuRequested, this, &AboutDialog::handleCopyMenu);
-    connect(ui->searchAuthors, &QLineEdit::textChanged, proxyAuthorModel, &AStringListListSortFilterProxyModel::setFilter);
-
     if (!is_packet_configuration_namespace()) {
-        setWindowTitle(tr("About Logray"));
-        ui->tabWidget->setTabText(ui->tabWidget->indexOf(ui->tab_wireshark), tr("Logray"));
+        setWindowTitle(tr("About Stratoshark"));
+        ui->tabWidget->setTabText(ui->tabWidget->indexOf(ui->tab_wireshark), tr("Stratoshark"));
+        ui->label_title->setText(tr("<h3>System Call and Event Log Analyzer</h3>"));
     }
 
     /* Wireshark tab */
@@ -314,11 +308,27 @@ AboutDialog::AboutDialog(QWidget *parent) :
         ui->label_logo->setPixmap(QPixmap(":/about/wssplash_dev.png"));
 #endif
 
+    /* Authors */
+    AuthorListModel * authorModel = new AuthorListModel(this);
+    AStringListListSortFilterProxyModel * authorProxyModel = new AStringListListSortFilterProxyModel(this);
+    authorProxyModel->setSourceModel(authorModel);
+    authorProxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
+    authorProxyModel->setColumnToFilter(0);
+    authorProxyModel->setColumnToFilter(1);
+    ui->tblAuthors->setModel(authorProxyModel);
+    ui->tblAuthors->setRootIsDecorated(false);
+    ui->tblAuthors->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui->tblAuthors, &QTreeView::customContextMenuRequested, this, &AboutDialog::handleCopyMenu);
+    connect(ui->searchAuthors, &QLineEdit::textChanged, authorProxyModel, &AStringListListSortFilterProxyModel::setFilter);
+
     /* Folders */
     FolderListModel * folderModel = new FolderListModel(this);
     AStringListListSortFilterProxyModel * folderProxyModel = new AStringListListSortFilterProxyModel(this);
     folderProxyModel->setSourceModel(folderModel);
+    folderProxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
+    folderProxyModel->setColumnToFilter(0);
     folderProxyModel->setColumnToFilter(1);
+    folderProxyModel->setColumnToFilter(2);
     folderProxyModel->setFilterType(AStringListListSortFilterProxyModel::FilterByStart);
     AStringListListUrlProxyModel * folderDisplayModel = new AStringListListUrlProxyModel(this);
     folderDisplayModel->setSourceModel(folderProxyModel);
@@ -334,20 +344,23 @@ AboutDialog::AboutDialog(QWidget *parent) :
     connect(ui->searchFolders, &QLineEdit::textChanged, folderProxyModel, &AStringListListSortFilterProxyModel::setFilter);
     connect(ui->tblFolders, &QTreeView::doubleClicked, this, &AboutDialog::urlDoubleClicked);
 
-
     /* Plugins */
     ui->label_no_plugins->hide();
     PluginListModel * pluginModel = new PluginListModel(this);
     AStringListListSortFilterProxyModel * pluginFilterModel = new AStringListListSortFilterProxyModel(this);
     pluginFilterModel->setSourceModel(pluginModel);
+    pluginFilterModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
     pluginFilterModel->setColumnToFilter(0);
+    pluginFilterModel->setColumnToFilter(1);
+    pluginFilterModel->setColumnToFilter(2);
+    pluginFilterModel->setColumnToFilter(3);
     AStringListListSortFilterProxyModel * pluginTypeModel = new AStringListListSortFilterProxyModel(this);
     pluginTypeModel->setSourceModel(pluginFilterModel);
     pluginTypeModel->setColumnToFilter(2);
     ui->tblPlugins->setModel(pluginTypeModel);
     ui->tblPlugins->setRootIsDecorated(false);
     UrlLinkDelegate *plugin_delegate = new UrlLinkDelegate(this);
-    script_pattern = QString("\\.(lua|py)$");
+    script_pattern = QStringLiteral("\\.(lua|py)$");
     plugin_delegate->setColCheck(3, script_pattern);
     ui->tblPlugins->setItemDelegateForColumn(3, plugin_delegate);
     ui->cmbType->addItems(pluginModel->typeNames());
@@ -372,6 +385,7 @@ AboutDialog::AboutDialog(QWidget *parent) :
     AStringListListSortFilterProxyModel * shortcutProxyModel = new AStringListListSortFilterProxyModel(this);
     shortcutProxyModel->setSourceModel(shortcutModel);
     shortcutProxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
+    shortcutProxyModel->setColumnToFilter(0);
     shortcutProxyModel->setColumnToFilter(1);
     shortcutProxyModel->setColumnToFilter(2);
     ui->tblShortcuts->setModel(shortcutProxyModel);
@@ -388,21 +402,12 @@ AboutDialog::AboutDialog(QWidget *parent) :
     f_acknowledgements.open(QFile::ReadOnly | QFile::Text);
     QTextStream ReadFile_acks(&f_acknowledgements);
 
-    /* QTextBrowser markdown support added in 5.14. */
-#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
     QTextBrowser *textBrowserAcks = new QTextBrowser();
     textBrowserAcks->setMarkdown(ReadFile_acks.readAll());
     textBrowserAcks->setReadOnly(true);
     textBrowserAcks->setOpenExternalLinks(true);
     textBrowserAcks->moveCursor(QTextCursor::Start);
     ui->ackVerticalLayout->addWidget(textBrowserAcks);
-#else
-    QPlainTextEdit *pte = new QPlainTextEdit();
-    pte->setPlainText(ReadFile_acks.readAll());
-    pte->setReadOnly(true);
-    pte->moveCursor(QTextCursor::Start);
-    ui->ackVerticalLayout->addWidget(pte);
-#endif
 
     /* License */
     f_license.setFileName(":/about/gpl-2.0-standalone.html");
@@ -466,7 +471,7 @@ void AboutDialog::showEvent(QShowEvent * event)
 
 void AboutDialog::updateWiresharkText()
 {
-    QString vcs_version_info_str = is_packet_configuration_namespace() ? get_ws_vcs_version_info() : get_lr_vcs_version_info();
+    QString vcs_version_info_str = is_packet_configuration_namespace() ? get_ws_vcs_version_info() : get_ss_vcs_version_info();
     QString copyright_info_str = get_copyright_info();
     QString license_info_str = get_license_info();
     QString comp_info_str = gstring_free_to_qbytearray(get_compiled_version_info(gather_wireshark_qt_compiled_info));
@@ -474,12 +479,17 @@ void AboutDialog::updateWiresharkText()
 
     QString message = ColorUtils::themeLinkStyle();
 
+    /* Convert newlines in the version strings to html <br/>*/
+    //comp_info_str = html_escape(comp_info_str);
+    //comp_info_str.replace("\n", "<br/>");
+    //runtime_info_str = html_escape(runtime_info_str);
+    //runtime_info_str.replace("\n", "<br/>");
     /* Construct the message string */
     message += "<p>Version " + html_escape(vcs_version_info_str) + ".</p>\n";
     message += "<p>" + html_escape(copyright_info_str) + "</p>\n";
     message += "<p>" + html_escape(license_info_str) + "</p>\n";
-    message += "<p>" + html_escape(comp_info_str) + "</p>\n";
-    message += "<p>" + html_escape(runtime_info_str) + "</p>\n";
+    message += "<pre>" + html_escape(comp_info_str) + "</pre>\n";
+    message += "<pre>" + html_escape(runtime_info_str) + "</pre>\n";
     message += "<p>Check the man page and <a href=https://www.wireshark.org>www.wireshark.org</a> "
                "for more information.</p>\n";
     ui->pte_wireshark->setHtml(message);
@@ -523,12 +533,12 @@ void AboutDialog::urlDoubleClicked(const QModelIndex &idx)
     if (! QDir(urlText).exists())
     {
         if (QMessageBox::question(this, tr("The directory does not exist"),
-                          QString(tr("Should the directory %1 be created?").arg(urlText))) == QMessageBox::Yes)
+                          tr("Should the directory %1 be created?").arg(urlText)) == QMessageBox::Yes)
         {
             if (! QDir().mkpath(urlText))
             {
                 QMessageBox::warning(this, tr("The directory could not be created"),
-                                     QString(tr("The directory %1 could not be created.").arg(urlText)));
+                                     tr("The directory %1 could not be created.").arg(urlText));
             }
         }
     }

@@ -58,8 +58,6 @@
  */
 %option prefix="Radius_"
 
-%option outfile="radius_dict.c"
-
 %{
 	/* radius_dict.l
 	*
@@ -822,7 +820,7 @@ bool radius_load_dictionary (radius_dictionary_t* d, char* dir, const char* file
 	if (!in) {
 		g_string_append_printf(state.error, "Could not open file: '%s', error: %s\n", state.fullpaths[0], g_strerror(errno));
 		g_free(state.fullpaths[0]);
-		*err_str = g_string_free(state.error,false);
+		*err_str = g_string_free(state.error,FALSE);
 		return false;
 	}
 
@@ -833,7 +831,7 @@ bool radius_load_dictionary (radius_dictionary_t* d, char* dir, const char* file
 		    strerror(errno));
 		fclose(in);
 		g_free(state.fullpaths[0]);
-		*err_str = g_string_free(state.error,false);
+		*err_str = g_string_free(state.error,FALSE);
 		return false;
 	}
 
@@ -860,11 +858,11 @@ bool radius_load_dictionary (radius_dictionary_t* d, char* dir, const char* file
 	g_hash_table_destroy(state.value_strings);
 
 	if (state.error->len > 0) {
-		*err_str = g_string_free(state.error,false);
+		*err_str = g_string_free(state.error,FALSE);
 		return false;
 	} else {
 		*err_str = NULL;
-		g_string_free(state.error,true);
+		g_string_free(state.error,TRUE);
 		return true;
 	}
 }

@@ -37,7 +37,6 @@
 #include <wsutil/plugins.h>
 #endif
 
-#include <wsutil/report_message.h>
 #include <wsutil/str_util.h>
 #include <wsutil/wslog.h>
 
@@ -79,21 +78,9 @@ int
 main(int argc, char *argv[])
 {
     char  *configuration_init_error;
-    static const struct report_message_routines captype_report_routines = {
-        failure_message,
-        failure_message,
-        open_failure_message,
-        read_failure_message,
-        write_failure_message,
-        cfile_open_failure_message,
-        cfile_dump_open_failure_message,
-        cfile_read_failure_message,
-        cfile_write_failure_message,
-        cfile_close_failure_message
-    };
     wtap  *wth;
     int    err;
-    gchar *err_info;
+    char *err_info;
     int    i;
     int    opt;
     int    overall_error_status;
@@ -123,9 +110,6 @@ main(int argc, char *argv[])
 
     ws_noisy("Finished log init and parsing command line log arguments");
 
-    /* Initialize the version information. */
-    ws_init_version_info("Captype", NULL, NULL);
-
 #ifdef _WIN32
     create_app_running_mutex();
 #endif /* _WIN32 */
@@ -147,9 +131,12 @@ main(int argc, char *argv[])
         g_free(configuration_init_error);
     }
 
-    init_report_message("captype", &captype_report_routines);
+    /* Initialize the version information. */
+    ws_init_version_info("Captype", NULL, NULL);
 
-    wtap_init(TRUE);
+    init_report_failure_message("captype");
+
+    wtap_init(true);
 
     /* Process the options */
     while ((opt = ws_getopt_long(argc, argv, "hv", long_options, NULL)) !=-1) {
@@ -182,7 +169,7 @@ main(int argc, char *argv[])
     overall_error_status = 0;
 
     for (i = 1; i < argc; i++) {
-        wth = wtap_open_offline(argv[i], WTAP_TYPE_AUTO, &err, &err_info, FALSE);
+        wth = wtap_open_offline(argv[i], WTAP_TYPE_AUTO, &err, &err_info, false);
 
         if(wth) {
             printf("%s: %s\n", argv[i], wtap_file_type_subtype_name(wtap_file_type_subtype(wth)));

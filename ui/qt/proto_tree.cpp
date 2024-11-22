@@ -27,6 +27,7 @@
 #include <ui/qt/filter_action.h>
 #include <ui/qt/follow_stream_action.h>
 #include <ui/qt/io_graph_action.h>
+#include <ui/qt/protocol_preferences_menu.h>
 #include <ui/all_files_wildcard.h>
 #include <ui/alert_box.h>
 #include <ui/urls.h>
@@ -64,7 +65,7 @@ ProtoTree::ProtoTree(QWidget *parent, epan_dissect_t *edt_fixed) :
     setHeaderHidden(true);
 
 #if !defined(Q_OS_WIN)
-    setStyleSheet(QString(
+    setStyleSheet(QStringLiteral(
         "QTreeView:item:hover {"
         "  background-color: %1;"
         "  color: palette(text);"
@@ -83,11 +84,6 @@ ProtoTree::ProtoTree(QWidget *parent, epan_dissect_t *edt_fixed) :
             this, SLOT(itemClicked(QModelIndex)));
     connect(this, SIGNAL(doubleClicked(QModelIndex)),
             this, SLOT(itemDoubleClicked(QModelIndex)));
-
-    connect(&proto_prefs_menu_, SIGNAL(showProtocolPreferences(QString)),
-            this, SIGNAL(showProtocolPreferences(QString)));
-    connect(&proto_prefs_menu_, SIGNAL(editProtocolPreference(preference*,pref_module*)),
-            this, SIGNAL(editProtocolPreference(preference*,pref_module*)));
 
     // resizeColumnToContents checks 1000 items by default. The user might
     // have scrolled to an area with a different width at this point.
@@ -176,7 +172,7 @@ void ProtoTree::ctxCopySelectedInfo()
         {
             epan_dissect_t *edt = cap_file_ ? cap_file_->edt : edt_;
             char* field_str = get_node_field_value(finfo.fieldInfo(), edt);
-            clip.append(field_str);
+            clip.append(field_str[0] ? field_str : "(null)");
             g_free(field_str);
         }
         break;
@@ -229,7 +225,7 @@ void ProtoTree::ctxOpenUrlWiki()
             if (protocol_field_selected)
             {
                 const QString proto_field_abbrev = proto_registrar_get_abbrev(finfo.headerInfo().id);
-                url.append(QString("#%1").arg(proto_field_abbrev));
+                url.append(QStringLiteral("#%1").arg(proto_field_abbrev));
             }
         } else {
             QMessageBox::information(this, tr("Not a field or protocol"),
@@ -388,7 +384,7 @@ void ProtoTree::contextMenuEvent(QContextMenuEvent *event)
         if (protocol_field_selected)
         {
             const QString proto_field_abbrev = proto_registrar_get_abbrev(finfo->headerInfo().id);
-            url.append(QString("#%1").arg(proto_field_abbrev));
+            url.append(QStringLiteral("#%1").arg(proto_field_abbrev));
         }
         action->setProperty("toolTip", url);
     }
@@ -396,7 +392,25 @@ void ProtoTree::contextMenuEvent(QContextMenuEvent *event)
         action->setEnabled(false);
         action->setProperty("toolTip", tr("No field reference available for text labels."));
     }
-    ctx_menu->addMenu(&proto_prefs_menu_);
+
+    // The "text only" header field will not give preferences for the selected protocol.
+    // Use parent in this case.
+    ProtoNode *node = proto_tree_model_->protoNodeFromIndex(index);
+    while (node && node->isValid() && node->protoNode()->finfo && node->protoNode()->finfo->hfinfo && node->protoNode()->finfo->hfinfo->id == hf_text_only) {
+        node = node->parentNode();
+    }
+
+    FieldInformation pref_finfo(node);
+
+    ProtocolPreferencesMenu *proto_prefs_menu = new ProtocolPreferencesMenu(ctx_menu);
+    proto_prefs_menu->setModule(pref_finfo.moduleName());
+
+    connect(proto_prefs_menu, &ProtocolPreferencesMenu::showProtocolPreferences,
+            this, &ProtoTree::showProtocolPreferences);
+    connect(proto_prefs_menu, SIGNAL(editProtocolPreference(preference*,pref_module*)),
+            this, SIGNAL(editProtocolPreference(preference*,pref_module*)));
+
+    ctx_menu->addMenu(proto_prefs_menu);
     ctx_menu->addSeparator();
 
     if (! buildForDialog)
@@ -410,16 +424,6 @@ void ProtoTree::contextMenuEvent(QContextMenuEvent *event)
             ctx_menu->addAction(window()->findChild<QAction *>("actionContextShowLinkedPacketInNewWindow"));
         }
     }
-
-    // The "text only" header field will not give preferences for the selected protocol.
-    // Use parent in this case.
-    ProtoNode *node = proto_tree_model_->protoNodeFromIndex(index);
-    while (node && node->isValid() && node->protoNode()->finfo && node->protoNode()->finfo->hfinfo && node->protoNode()->finfo->hfinfo->id == hf_text_only) {
-        node = node->parentNode();
-    }
-
-    FieldInformation pref_finfo(node);
-    proto_prefs_menu_.setModule(pref_finfo.moduleName());
 
     ctx_menu->popup(event->globalPos());
 }
@@ -793,7 +797,7 @@ QString ProtoTree::traverseTree(const QModelIndex & travTree, int identLevel) co
 
     if (travTree.isValid())
     {
-        result.append(QString("    ").repeated(identLevel));
+        result.append(QStringLiteral("    ").repeated(identLevel));
         result.append(travTree.data().toString());
         result.append("\n");
 
@@ -887,7 +891,7 @@ bool ProtoTree::eventFilter(QObject * obj, QEvent * event)
                     QDrag * drag = new QDrag(this);
                     drag->setMimeData(mimeData);
 
-                    QString lblTxt = QString("%1\n%2").arg(finfo.headerInfo().name, filter);
+                    QString lblTxt = QStringLiteral("%1\n%2").arg(finfo.headerInfo().name, filter);
 
                     DragLabel * content = new DragLabel(lblTxt, this);
 

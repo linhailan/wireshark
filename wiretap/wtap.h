@@ -785,6 +785,7 @@ struct ieee_802_11be_user_info {
     unsigned rsv2:2;
 };
 
+#define PHDR_802_11BE_MAX_USERS 4
 struct ieee_802_11be {
     /* Which of this information is present? */
     unsigned has_ru_mru_size:1;
@@ -795,7 +796,7 @@ struct ieee_802_11be {
     uint8_t  ru_mru_size:4;  /* RU/MRU allocation */
     uint8_t  gi:2;           /* Guard Interval */
     uint8_t  num_users;
-    struct ieee_802_11be_user_info user[4]; /* Adding info for only upto 4 users */
+    struct ieee_802_11be_user_info user[PHDR_802_11BE_MAX_USERS]; /* Adding info for only upto 4 users */
 };
 
 
@@ -1481,22 +1482,32 @@ typedef struct wtap_rec {
 #define WTAP_HAS_INTERFACE_ID   0x00000004  /**< interface ID */
 #define WTAP_HAS_SECTION_NUMBER 0x00000008  /**< section number */
 
+/*
+ * The old max name length define, both for backwards compatibility and because
+ * other name types (in epan) use it. While Name Resolution Blocks (NRBs) only
+ * support IPv4 and IPv6 currently, they could later support other name types.
+ */
 #ifndef MAXNAMELEN
-#define MAXNAMELEN  	64	/* max name length (hostname and port name) */
+#define MAXNAMELEN  	64	/* max name length (most names: DNS labels, services, eth) */
+#endif
+
+#ifndef MAXDNSNAMELEN
+#define MAXDNSNAMELEN  	256	/* max total length of a domain name in DNS */
 #endif
 
 typedef struct hashipv4 {
     unsigned          addr;
     uint8_t           flags;          /* B0 dummy_entry, B1 resolve, B2 If the address is used in the trace */
     char              ip[WS_INET_ADDRSTRLEN];
-    char              name[MAXNAMELEN];
+    char              name[MAXDNSNAMELEN];
+    char              cidr_addr[WS_INET_CIDRADDRSTRLEN];
 } hashipv4_t;
 
 typedef struct hashipv6 {
     uint8_t           addr[16];
     uint8_t           flags;          /* B0 dummy_entry, B1 resolve, B2 If the address is used in the trace */
     char              ip6[WS_INET6_ADDRSTRLEN];
-    char              name[MAXNAMELEN];
+    char              name[MAXDNSNAMELEN];
 } hashipv6_t;
 
 /** A struct with lists of resolved addresses.
@@ -1879,7 +1890,7 @@ typedef void (*wtap_new_ipv4_callback_t) (const unsigned addr, const char *name,
 WS_DLL_PUBLIC
 void wtap_set_cb_new_ipv4(wtap *wth, wtap_new_ipv4_callback_t add_new_ipv4);
 
-typedef void (*wtap_new_ipv6_callback_t) (const void *addrp, const char *name, const bool static_entry);
+typedef void (*wtap_new_ipv6_callback_t) (const ws_in6_addr *addrp, const char *name, const bool static_entry);
 WS_DLL_PUBLIC
 void wtap_set_cb_new_ipv6(wtap *wth, wtap_new_ipv6_callback_t add_new_ipv6);
 
@@ -1949,17 +1960,26 @@ typedef enum {
     WTAP_UNCOMPRESSED,
     WTAP_GZIP_COMPRESSED,
     WTAP_ZSTD_COMPRESSED,
-    WTAP_LZ4_COMPRESSED
+    WTAP_LZ4_COMPRESSED,
+    WTAP_UNKNOWN_COMPRESSION,
 } wtap_compression_type;
 
 WS_DLL_PUBLIC
 wtap_compression_type wtap_get_compression_type(wtap *wth);
+WS_DLL_PUBLIC
+wtap_compression_type wtap_name_to_compression_type(const char *name);
+WS_DLL_PUBLIC
+wtap_compression_type wtap_extension_to_compression_type(const char *ext);
 WS_DLL_PUBLIC
 const char *wtap_compression_type_description(wtap_compression_type compression_type);
 WS_DLL_PUBLIC
 const char *wtap_compression_type_extension(wtap_compression_type compression_type);
 WS_DLL_PUBLIC
 GSList *wtap_get_all_compression_type_extensions_list(void);
+WS_DLL_PUBLIC
+GSList *wtap_get_all_output_compression_type_names_list(void);
+WS_DLL_PUBLIC
+bool wtap_can_write_compression_type(wtap_compression_type compression_type);
 
 /*** get various information snippets about the current file ***/
 

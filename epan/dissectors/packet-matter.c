@@ -26,6 +26,7 @@
 
 #include <epan/expert.h>
 #include <epan/packet.h>
+#include <wsutil/array.h>
 
 /* Prototypes */
 /* (Required to prevent [-Wmissing-prototypes] warnings */
@@ -222,7 +223,7 @@ dissect_matter(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
 
     // Section 4.4.1.2
     proto_tree_add_bitmask(matter_tree, tvb, offset, hf_message_flags, ett_message_flags, message_flag_fields, ENC_LITTLE_ENDIAN);
-    message_flags = tvb_get_guint8(tvb, offset);
+    message_flags = tvb_get_uint8(tvb, offset);
     message_dsiz = (message_flags & MESSAGE_FLAG_DSIZ_MASK);
     offset += 1;
 
@@ -232,7 +233,7 @@ dissect_matter(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
 
     // Section 4.4.1.4
     proto_tree_add_bitmask(matter_tree, tvb, offset, hf_message_security_flags, ett_security_flags, message_secflag_fields, ENC_LITTLE_ENDIAN);
-    security_flags = tvb_get_guint8(tvb, offset);
+    security_flags = tvb_get_uint8(tvb, offset);
     message_session_type = (security_flags & SECURITY_FLAG_SESSION_TYPE_MASK);
     offset += 1;
 
@@ -309,7 +310,7 @@ dissect_matter_payload(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *pl_tre
     };
     // Section 4.4.3.1
     proto_tree_add_bitmask(pl_tree, tvb, offset, hf_payload_exchange_flags, ett_exchange_flags, exchange_flag_fields, ENC_LITTLE_ENDIAN);
-    exchange_flags = tvb_get_guint8(tvb, offset);
+    exchange_flags = tvb_get_uint8(tvb, offset);
     offset += 1;
 
     // Section 4.4.3.2
@@ -450,7 +451,7 @@ dissect_matter_tlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
             proto_tree_add_item_ret_uint64(tree_element, hf_matter_tlv_elem_length, tvb, offset, size, ENC_LITTLE_ENDIAN, &str_length);
             offset += size;
             proto_tree_add_item(tree_element, hf_matter_tlv_elem_value_bytes, tvb, offset, (int)str_length, ENC_NA);
-            offset += str_length;
+            offset += (int)str_length;
             break;
         }
         case 0x14: // Null

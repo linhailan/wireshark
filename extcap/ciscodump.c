@@ -116,7 +116,7 @@ static const struct ws_option longopts[] = {
 	EXTCAP_BASE_OPTIONS,
 	{ "help", ws_no_argument, NULL, OPT_HELP},
 	{ "version", ws_no_argument, NULL, OPT_VERSION},
-	SSH_BASE_OPTIONS,
+	SSH_BASE_PACKET_OPTIONS,
 	{ 0, 0, 0, 0}
 };
 
@@ -162,7 +162,7 @@ static char* interfaces_list_to_filter(GSList* interfaces, unsigned int remote_p
 		g_string_append_printf(filter, ", permit ip any any");
 	}
 
-	return g_string_free(filter, false);
+	return g_string_free(filter, FALSE);
 }
 
 static char* local_interfaces_to_filter(const unsigned int remote_port)

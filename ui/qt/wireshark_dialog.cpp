@@ -83,7 +83,8 @@ void WiresharkDialog::dialogCleanup(bool closeDialog)
     }
 
     if (retap_depth_ < 1 && dialog_closed_) {
-        disconnect();
+        // Is this disconnection necessary?
+        disconnect(&cap_file_, &CaptureFile::captureEvent, this, &WiresharkDialog::captureEvent);
         deleteLater();
     }
 }
@@ -100,7 +101,7 @@ bool WiresharkDialog::registerTapListener(const char *tap_name, void *tap_data, 
     if (error_string) {
         QMessageBox::warning(this, tr("Failed to attach to tap \"%1\"").arg(tap_name),
                              error_string->str);
-        g_string_free(error_string, true);
+        g_string_free(error_string, TRUE);
         return false;
     }
 

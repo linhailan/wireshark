@@ -373,11 +373,12 @@ void SearchFrame::on_searchTypeComboBox_currentIndexChanged(int idx)
 
     // Enable completion only for display filter search.
     sf_ui_->searchLineEdit->allowCompletion(idx == df_search_);
-    sf_ui_->searchLineEdit->enableBookmarks(idx == df_search_);
 
     if (idx == df_search_) {
+        sf_ui_->searchLineEdit->setPlaceholderText(DisplayFilterEdit::tr("Enter a display filter %1").arg(UTF8_HORIZONTAL_ELLIPSIS));
         sf_ui_->searchLineEdit->checkFilter();
     } else {
+        sf_ui_->searchLineEdit->setPlaceholderText(QString());
         sf_ui_->searchLineEdit->setToolTip(QString());
         mainApp->popStatus(MainApplication::FilterSyntax);
     }
@@ -536,7 +537,7 @@ void SearchFrame::on_findButton_clicked()
         }
     } else {
         /* Search via display filter */
-        found_packet = cf_find_packet_dfilter(cap_file_, dfp, cap_file_->dir);
+        found_packet = cf_find_packet_dfilter(cap_file_, dfp, cap_file_->dir, true);
         dfilter_free(dfp);
         if (!found_packet) {
             err_string = tr("No packet matched that filter.");

@@ -505,7 +505,7 @@ wtap_get_debug_if_descr(const wtap_block_t if_descr,
 			if_descr_mand->num_stat_entries,
 			line_end);
 
-	return g_string_free(info, false);
+	return g_string_free(info, FALSE);
 }
 
 wtap_block_t
@@ -1620,7 +1620,7 @@ wtapng_process_nrb_ipv6(wtap *wth, wtap_block_t nrb)
 	if (wth->add_new_ipv6) {
 		for (GList *elem = nrb_mand->ipv6_addr_list; elem != NULL; elem = elem->next) {
 			hashipv6_t *tp = elem->data;
-			wth->add_new_ipv6(tp->addr, tp->name, false);
+			wth->add_new_ipv6((ws_in6_addr *)tp->addr, tp->name, false);
 		}
 	}
 }

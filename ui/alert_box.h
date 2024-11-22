@@ -72,7 +72,7 @@ extern void cfile_read_failure_alert_box(const char *filename, int err,
 extern void cfile_write_failure_alert_box(const char *in_filename,
                                           const char *out_filename,
                                           int err, char *err_info,
-                                          uint32_t framenum,
+                                          uint64_t framenum,
                                           int file_type_subtype);
 
 /*
@@ -122,6 +122,22 @@ extern void read_failure_alert_box(const char *filename, int err);
  * "err" is assumed to be a UNIX-style errno.
  */
 extern void write_failure_alert_box(const char *filename, int err);
+
+/*
+ * Alert box for a failed attempt to rename a file.
+ * "err" is assumed to be a UNIX-style errno.
+ *
+ * XXX - whether we mention the source pathname, the target pathname,
+ * or both depends on the error and on what we find if we look for
+ * one or both of them.
+ */
+extern void rename_failure_alert_box(const char *old_filename,
+                                     const char *new_filename, int err);
+
+/*
+ * Register these routines with the report_message mechanism.
+ */
+extern void init_report_alert_box(const char *friendly_program_name);
 
 #ifdef __cplusplus
 }

@@ -41,13 +41,14 @@ MainWindowPreferencesFrame::MainWindowPreferencesFrame(QWidget *parent) :
     pref_prepend_window_title_ = prefFromPrefPtr(&prefs.gui_prepend_window_title);
 
     QStyleOption style_opt;
-    QString indent_ss = QString(
+    QString indent_ss = QStringLiteral(
                 "QRadioButton, QLineEdit, QLabel {"
                 "  margin-left: %1px;"
                 "}"
                 ).arg(ui->geometryCheckBox->style()->subElementRect(QStyle::SE_CheckBoxContents, &style_opt).left());
     ui->foStyleLastOpenedRadioButton->setStyleSheet(indent_ss);
     ui->foStyleSpecifiedRadioButton->setStyleSheet(indent_ss);
+    ui->foStyleCWDRadioButton->setStyleSheet(indent_ss);
     ui->maxFilterLineEdit->setStyleSheet(indent_ss);
     ui->maxRecentLineEdit->setStyleSheet(indent_ss);
 
@@ -61,7 +62,7 @@ MainWindowPreferencesFrame::MainWindowPreferencesFrame(QWidget *parent) :
     ui->maxFilterLineEdit->setMaximumWidth(num_entry_size.width());
     ui->maxRecentLineEdit->setMaximumWidth(num_entry_size.width());
 
-    QString li_path = QString(":/languages/language%1.svg").arg(ColorUtils::themeIsDark() ? ".dark" : "");
+    QString li_path = QStringLiteral(":/languages/language%1.svg").arg(ColorUtils::themeIsDark() ? ".dark" : "");
     QIcon language_icon = QIcon(li_path);
     ui->languageComboBox->setItemIcon(0, language_icon);
 
@@ -114,10 +115,18 @@ void MainWindowPreferencesFrame::updateWidgets()
         ui->geometryCheckBox->setChecked(false);
     }
 
-    if (prefs_get_enum_value(pref_fileopen_style_, pref_stashed) == FO_STYLE_LAST_OPENED) {
+    switch (prefs_get_enum_value(pref_fileopen_style_, pref_stashed)) {
+
+    case FO_STYLE_LAST_OPENED:
         ui->foStyleLastOpenedRadioButton->setChecked(true);
-    } else {
+        break;
+    case FO_STYLE_CWD:
+        ui->foStyleCWDRadioButton->setChecked(true);
+        break;
+    case FO_STYLE_SPECIFIED:
+    default:
         ui->foStyleSpecifiedRadioButton->setChecked(true);
+        break;
     }
 
     ui->foStyleSpecifiedLineEdit->setText(prefs_get_string_value(pref_fileopen_dir_, pref_stashed));
@@ -146,6 +155,13 @@ void MainWindowPreferencesFrame::on_geometryCheckBox_toggled(bool checked)
     prefs_set_bool_value(pref_geometry_save_position_, checked, pref_stashed);
     prefs_set_bool_value(pref_geometry_save_size_, checked, pref_stashed);
     prefs_set_bool_value(pref_geometry_save_maximized_, checked, pref_stashed);
+}
+
+void MainWindowPreferencesFrame::on_foStyleCWDRadioButton_toggled(bool checked)
+{
+    if (checked) {
+        prefs_set_enum_value(pref_fileopen_style_, FO_STYLE_CWD, pref_stashed);
+    }
 }
 
 void MainWindowPreferencesFrame::on_foStyleLastOpenedRadioButton_toggled(bool checked)

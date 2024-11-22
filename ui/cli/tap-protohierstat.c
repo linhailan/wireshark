@@ -23,7 +23,8 @@
 #include <wsutil/cmdarg_err.h>
 #include "tap-protohierstat.h"
 
-int pc_proto_id = -1;
+int pc_proto_id;
+int col_proto_id;
 
 void register_tap_listener_protohierstat(void);
 
@@ -90,13 +91,31 @@ protohierstat_packet(void *prs, packet_info *pinfo, epan_dissect_t *edt, const v
 	for (node=edt->tree->first_child; node; node=node->next) {
 		fi = PNODE_FINFO(node);
 
+		if (!fi || !(fi->hfinfo)) {
+			continue;
+		}
+
 		/*
 		 * If the first child is a tree of comments, skip over it.
 		 * This keeps us from having a top-level "pkt_comment"
 		 * entry that represents a nonexistent protocol,
 		 * and matches how the GUI treats comments.
+		 * Also skip the internal non-protocol for the columns
+		 * (the GUI does its own dissection with no columns instead
+		 * of adding a tap like other dialogs, so it never has the
+		 * column protocol.)
 		 */
-		if (G_UNLIKELY(fi->hfinfo->id == pc_proto_id)) {
+		if (G_UNLIKELY(fi->hfinfo->id == pc_proto_id || fi->hfinfo->id == col_proto_id)) {
+			continue;
+		}
+
+		/* Skip non protocols, e.g. top-level desegmentation items
+		 * "[Reassembled TCP Segments]", as the GUI does.
+		 *
+		 * Note the inverse issue (handling protocols that are not at
+		 * the top-level) is something done neither here nor in the GUI.
+		 */
+		if (!proto_registrar_is_protocol(fi->hfinfo->id)) {
 			continue;
 		}
 
@@ -200,17 +219,21 @@ protohierstat_init(const char *opt_arg, void *userdata _U_)
 	}
 
 	pc_proto_id = proto_registrar_get_id_byname("pkt_comment");
+	/* proto_get_id_by_filter_name searches a smaller table; we can't use
+	 * it for pkt_comment, which is a PINO, but can for _ws.col
+	 */
+	col_proto_id = proto_get_id_by_filter_name("_ws.col");
 
 	rs = new_phs_t(NULL, filter);
 
-	error_string = register_tap_listener("frame", rs, filter, TL_REQUIRES_PROTO_TREE, NULL, protohierstat_packet, protohierstat_draw, NULL);
+	error_string = register_tap_listener("frame", rs, filter, TL_REQUIRES_PROTO_TREE|TL_REQUIRES_PROTOCOLS, NULL, protohierstat_packet, protohierstat_draw, (tap_finish_cb)free_phs);
 	if (error_string) {
 		/* error, we failed to attach to the tap. clean up */
 		free_phs(rs);
 
 		cmdarg_err("Couldn't register io,phs tap: %s",
 			error_string->str);
-		g_string_free(error_string, true);
+		g_string_free(error_string, TRUE);
 		exit(1);
 	}
 }

@@ -119,7 +119,7 @@ PacketDialog::PacketDialog(QWidget &parent, CaptureFile &cf, frame_data *fdata) 
     QStringList col_parts;
     for (int i = 0; i < cap_file_.capFile()->cinfo.num_cols; ++i) {
         // ElidedLabel doesn't support rich text / HTML
-        col_parts << QString("%1: %2")
+        col_parts << QStringLiteral("%1: %2")
                      .arg(get_column_title(i))
                      .arg(get_column_text(&cap_file_.capFile()->cinfo, i));
     }
@@ -161,7 +161,11 @@ PacketDialog::PacketDialog(QWidget &parent, CaptureFile &cf, frame_data *fdata) 
 #else
     connect(ui->layoutComboBox, &QComboBox::currentIndexChanged, this, &PacketDialog::layoutChanged, Qt::AutoConnection);
 #endif
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+    connect(ui->chkShowByteView, &QCheckBox::checkStateChanged, this, &PacketDialog::viewVisibilityStateChanged);
+#else
     connect(ui->chkShowByteView, &QCheckBox::stateChanged, this, &PacketDialog::viewVisibilityStateChanged);
+#endif
 }
 
 PacketDialog::~PacketDialog()
@@ -197,11 +201,11 @@ void PacketDialog::setHintText(FieldInformation * finfo)
          QString field_str;
 
          if (pos.length < 2) {
-             hint = QString(tr("Byte %1")).arg(pos.start);
+             hint = tr("Byte %1").arg(pos.start);
          } else {
-             hint = QString(tr("Bytes %1-%2")).arg(pos.start).arg(pos.start + pos.length - 1);
+             hint = tr("Bytes %1-%2").arg(pos.start).arg(pos.start + pos.length - 1);
          }
-         hint += QString(": %1 (%2)")
+         hint += QStringLiteral(": %1 (%2)")
                  .arg(finfo->headerInfo().name)
                  .arg(finfo->headerInfo().abbreviation);
      }
@@ -251,8 +255,13 @@ void PacketDialog::setHintTextSelected(FieldInformation* finfo)
     ui->hintLabel->setText(hint);
 }
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+void PacketDialog::viewVisibilityStateChanged(Qt::CheckState state)
+#else
 void PacketDialog::viewVisibilityStateChanged(int state)
+#endif
 {
+    // Qt::PartiallyChecked is not possible
     byte_view_tab_->setVisible(state == Qt::Checked);
     ui->layoutComboBox->setEnabled(state == Qt::Checked);
 

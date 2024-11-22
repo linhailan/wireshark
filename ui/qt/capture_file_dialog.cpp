@@ -248,7 +248,7 @@ QString CaptureFileDialog::fileExtensionType(int et, bool extension_globs)
     /* Construct the list of patterns. */
     for (extension = extensions_list; extension != NULL;
          extension = g_slist_next(extension)) {
-        QString bare_wc = QString("*.%1").arg((char *)extension->data);
+        QString bare_wc = QStringLiteral("*.%1").arg((char *)extension->data);
         all_wildcards << bare_wc;
 
         // Does this end with a compression suffix?
@@ -256,7 +256,7 @@ QString CaptureFileDialog::fileExtensionType(int et, bool extension_globs)
         for (GSList *compression_type_extension = compression_type_extensions;
             compression_type_extension != NULL;
             compression_type_extension = g_slist_next(compression_type_extension)) {
-            QString suffix = QString(".") + (char *)compression_type_extension->data;
+            QString suffix = QStringLiteral(".") + (char *)compression_type_extension->data;
             if (bare_wc.endsWith(suffix)) {
                 ends_with_compression_suffix = true;
                 break;
@@ -274,7 +274,7 @@ QString CaptureFileDialog::fileExtensionType(int et, bool extension_globs)
     // We set HideNameFilterDetails so that "All Files" and "All Capture
     // Files" don't show a wildcard list. We want to show the associated
     // wildcards for individual file types so we add them twice.
-    return QString("%1 (%2) (%3)")
+    return QStringLiteral("%1 (%2) (%3)")
             .arg(extension_type_name)
             .arg(no_compression_suffix_wildcards.join(" "))
             .arg(all_wildcards.join(" "));
@@ -307,7 +307,7 @@ QString CaptureFileDialog::fileType(int ft, QStringList &suffixes)
         for (GSList *extension = extensions_list; extension != NULL;
              extension = g_slist_next(extension)) {
             QString suffix((char *)extension->data);
-            filter += " *." + suffix;;
+            filter += " *." + suffix;
             suffixes << suffix;
         }
         wtap_free_extensions_list(extensions_list);
@@ -338,7 +338,7 @@ QStringList CaptureFileDialog::buildFileOpenTypeList() {
      * the filter will be a bit long, so it *really* shouldn't be shown.
      * What about other platforms?
      */
-    filters << QString(tr("All Files (" ALL_FILES_WILDCARD ")"));
+    filters << tr("All Files (" ALL_FILES_WILDCARD ")");
 
     /*
      * Add an "All Capture Files" entry, with all the capture file
@@ -418,25 +418,24 @@ void CaptureFileDialog::fixFilenameExtension()
     }
 
     // Fixup the new suffix based on whether we're compressing or not.
-    if (compressionType() == WTAP_UNCOMPRESSED) {
-        // Not compressing; strip off any compression suffix
-        GSList *compression_type_extensions = wtap_get_all_compression_type_extensions_list();
-        for (GSList *compression_type_extension = compression_type_extensions;
-            compression_type_extension != NULL;
-            compression_type_extension = g_slist_next(compression_type_extension)) {
-            QString suffix = QString(".") + (char *)compression_type_extension->data;
-            if (new_suffix.endsWith(suffix)) {
-                //
-                // It ends with this compression suffix; chop it off.
-                //
-                new_suffix.chop(suffix.size());
-                break;
-            }
+    // Strip off any compression suffix
+    GSList *compression_type_extensions = wtap_get_all_compression_type_extensions_list();
+    for (GSList *compression_type_extension = compression_type_extensions;
+        compression_type_extension != NULL;
+        compression_type_extension = g_slist_next(compression_type_extension)) {
+        QString suffix = QStringLiteral(".") + (char *)compression_type_extension->data;
+        if (new_suffix.endsWith(suffix)) {
+            //
+            // It ends with this compression suffix; chop it off.
+            //
+            new_suffix.chop(suffix.size());
+            break;
         }
-        g_slist_free(compression_type_extensions);
-    } else {
+    }
+    g_slist_free(compression_type_extensions);
+    if (compressionType() != WTAP_UNCOMPRESSED) {
         // Compressing; append the appropriate compression suffix.
-        QString compressed_file_extension = QString(".") + wtap_compression_type_extension(compressionType());
+        QString compressed_file_extension = QStringLiteral(".") + wtap_compression_type_extension(compressionType());
         if (valid_extensions.contains(new_suffix + compressed_file_extension)) {
             new_suffix += compressed_file_extension;
         }
@@ -503,7 +502,7 @@ int CaptureFileDialog::selectedFileType() {
 }
 
 wtap_compression_type CaptureFileDialog::compressionType() {
-    return compress_.isChecked() ? WTAP_GZIP_COMPRESSED : WTAP_UNCOMPRESSED;
+    return compress_group_box_.compressionType();
 }
 
 void CaptureFileDialog::addDisplayFilterEdit(QString &display_filter) {
@@ -539,15 +538,11 @@ void CaptureFileDialog::addFormatTypeSelector(QVBoxLayout &v_box) {
 }
 
 void CaptureFileDialog::addGzipControls(QVBoxLayout &v_box) {
-    compress_.setText(tr("Compress with g&zip"));
-    if (cap_file_->compression_type == WTAP_GZIP_COMPRESSED &&
-        wtap_dump_can_compress(default_ft_)) {
-        compress_.setChecked(true);
-    } else {
-        compress_.setChecked(false);
+    if (wtap_dump_can_compress(default_ft_)) {
+        compress_group_box_.setCompressionType(cap_file_->compression_type);
     }
-    v_box.addWidget(&compress_, 0, Qt::AlignTop);
-    connect(&compress_, &QCheckBox::stateChanged, this, &CaptureFileDialog::fixFilenameExtension);
+    v_box.addWidget(&compress_group_box_, 0, Qt::AlignTop);
+    connect(&compress_group_box_, &CompressionGroupBox::stateChanged, this, &CaptureFileDialog::fixFilenameExtension);
 
 }
 
@@ -751,8 +746,17 @@ QStringList CaptureFileDialog::buildFileSaveAsTypeList(bool must_support_all_com
             if (default_ft_ < 1)
                 default_ft_ = ft; /* first file type is the default */
             QString type_name(wtap_file_type_subtype_description(ft));
-            filters << type_name + fileType(ft, type_suffixes_[type_name]);
+            QString filter(type_name + fileType(ft, type_suffixes_[type_name]));
+            /* Before Qt 6.8, selectedNameFilter() returns the current filter
+               text; i.e., as we set HideNameFilterDetails it does not include
+               the parenthetical extension list.
+               As of 6.8, hidden details are included.
+               https://bugreports.qt.io/browse/QTBUG-127924
+               One simple approach is to just add both to the hash.
+             */
+            type_hash_[filter] = ft;
             type_hash_[type_name] = ft;
+            filters << filter;
         }
         g_array_free(savable_file_types_subtypes, true);
     }
@@ -858,7 +862,7 @@ void CaptureFileDialog::preview(const QString & path)
         ti_tm = localtime(&ti_time);
         first_elapsed = "?";
         if (ti_tm) {
-            first_elapsed = QString("%1-%2-%3 %4:%5:%6")
+            first_elapsed = QStringLiteral("%1-%2-%3 %4:%5:%6")
                     .arg(ti_tm->tm_year + 1900, 4, 10, QChar('0'))
                     .arg(ti_tm->tm_mon + 1, 2, 10, QChar('0'))
                     .arg(ti_tm->tm_mday, 2, 10, QChar('0'))
@@ -883,10 +887,10 @@ void CaptureFileDialog::preview(const QString & path)
         //
         elapsed_time = (unsigned int)(stats.stop_time-stats.start_time);
         if (elapsed_time/86400) {
-            first_elapsed += QString("%1 days ").arg(elapsed_time/86400, 2, 10, QChar('0'));
+            first_elapsed += QStringLiteral("%1 days ").arg(elapsed_time/86400, 2, 10, QChar('0'));
             elapsed_time = elapsed_time % 86400;
         }
-        first_elapsed += QString("%2:%3:%4")
+        first_elapsed += QStringLiteral("%2:%3:%4")
                 .arg(elapsed_time%86400/3600, 2, 10, QChar('0'))
                 .arg(elapsed_time%3600/60, 2, 10, QChar('0'))
                 .arg(elapsed_time%60, 2, 10, QChar('0'));

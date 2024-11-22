@@ -700,8 +700,9 @@ bool PacketListModel::isNumericColumn(int column)
     case COL_RSSI:           /**< 22) IEEE 802.11 - received signal strength */
     case COL_TX_RATE:        /**< 23) IEEE 802.11 - TX rate in Mbps */
     case COL_NUMBER:         /**< 32) Packet list item number */
-    case COL_PACKET_LENGTH:  /**< 33) Packet length in bytes */
-    case COL_UNRES_SRC_PORT: /**< 41) Unresolved source port */
+    case COL_NUMBER_DIS:     /**< 33) Packet list item number */
+    case COL_PACKET_LENGTH:  /**< 34) Packet length in bytes */
+    case COL_UNRES_SRC_PORT: /**< 42) Unresolved source port */
         return true;
 
     /*
@@ -710,8 +711,8 @@ bool PacketListModel::isNumericColumn(int column)
      * */
     case COL_RES_DST_PORT:   /**< 10) Resolved dest port */
     case COL_DEF_DST_PORT:   /**< 12) Destination port */
-    case COL_DEF_SRC_PORT:   /**< 37) Source port */
-    case COL_RES_SRC_PORT:   /**< 40) Resolved source port */
+    case COL_DEF_SRC_PORT:   /**< 38) Source port */
+    case COL_RES_SRC_PORT:   /**< 41) Resolved source port */
         return true;
 
     case COL_CUSTOM:
@@ -882,13 +883,10 @@ QVariant PacketListModel::data(const QModelIndex &d_index, int role) const
         switch(recent_get_column_xalign(d_index.column())) {
         case COLUMN_XALIGN_RIGHT:
             return Qt::AlignRight;
-            break;
         case COLUMN_XALIGN_CENTER:
             return Qt::AlignCenter;
-            break;
         case COLUMN_XALIGN_LEFT:
             return Qt::AlignLeft;
-            break;
         case COLUMN_XALIGN_DEFAULT:
         default:
             if (right_justify_column(d_index.column(), cap_file_)) {
@@ -962,8 +960,10 @@ QVariant PacketListModel::headerData(int section, Qt::Orientation orientation,
             return QVariant::fromValue(QString(get_column_title(section)));
         case Qt::ToolTipRole:
             return QVariant::fromValue(gchar_free_to_qstring(get_column_tooltip(section)));
-        case PacketListModel::HEADER_CAN_RESOLVE:
-            return (bool)resolve_column(section, cap_file_);
+        case PacketListModel::HEADER_CAN_DISPLAY_STRINGS:
+            return (bool)display_column_strings(section, cap_file_);
+        case PacketListModel::HEADER_CAN_DISPLAY_DETAILS:
+            return (bool)display_column_details(section, cap_file_);
         default:
             break;
         }
@@ -1005,6 +1005,12 @@ void PacketListModel::dissectIdle(bool reset)
     }
 
     idle_dissection_timer_->restart();
+
+    if (!cap_file_ || cap_file_->read_lock) {
+        // File is in use (at worst, being rescanned). Try again later.
+        QTimer::singleShot(idle_dissection_interval_, this, [=]() { dissectIdle(); });
+        return;
+    }
 
     int first = idle_dissection_row_;
     while (idle_dissection_timer_->elapsed() < idle_dissection_interval_

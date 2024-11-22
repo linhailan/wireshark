@@ -65,19 +65,20 @@
 enum configuration_namespace_e {
     CONFIGURATION_NAMESPACE_UNINITIALIZED,
     CONFIGURATION_NAMESPACE_WIRESHARK,
-    CONFIGURATION_NAMESPACE_LOGRAY
+    CONFIGURATION_NAMESPACE_STRATOSHARK
 };
 enum configuration_namespace_e configuration_namespace = CONFIGURATION_NAMESPACE_UNINITIALIZED;
 
-#define CONFIGURATION_NAMESPACE_PROPER (configuration_namespace == CONFIGURATION_NAMESPACE_WIRESHARK ? "Wireshark" : "Logray")
-#define CONFIGURATION_NAMESPACE_LOWER (configuration_namespace == CONFIGURATION_NAMESPACE_WIRESHARK ? "wireshark" : "logray")
-#define CONFIGURATION_ENVIRONMENT_VARIABLE(suffix) (configuration_namespace == CONFIGURATION_NAMESPACE_WIRESHARK ? "WIRESHARK_" suffix : "LOGRAY_" suffix)
+#define CONFIGURATION_NAMESPACE_PROPER (configuration_namespace == CONFIGURATION_NAMESPACE_WIRESHARK ? "Wireshark" : "Stratoshark")
+#define CONFIGURATION_NAMESPACE_LOWER (configuration_namespace == CONFIGURATION_NAMESPACE_WIRESHARK ? "wireshark" : "stratoshark")
+#define CONFIGURATION_ENVIRONMENT_VARIABLE(suffix) (configuration_namespace == CONFIGURATION_NAMESPACE_WIRESHARK ? "WIRESHARK_" suffix : "STRATOSHARK_" suffix)
 
 char *persconffile_dir;
 char *datafile_dir;
 char *persdatafile_dir;
 char *persconfprofile;
 char *doc_dir;
+char *current_working_dir;
 
 /* Directory from which the executable came. */
 static char *progfile_dir;
@@ -311,9 +312,9 @@ set_configuration_namespace(const char *namespace_name)
     {
         configuration_namespace = CONFIGURATION_NAMESPACE_WIRESHARK;
     }
-    else if (g_ascii_strcasecmp(namespace_name, "logray") == 0)
+    else if (g_ascii_strcasecmp(namespace_name, "stratoshark") == 0)
     {
-        configuration_namespace = CONFIGURATION_NAMESPACE_LOGRAY;
+        configuration_namespace = CONFIGURATION_NAMESPACE_STRATOSHARK;
     }
     else
     {
@@ -331,7 +332,7 @@ get_configuration_namespace(void)
 
 bool is_packet_configuration_namespace(void)
 {
-    return configuration_namespace != CONFIGURATION_NAMESPACE_LOGRAY;
+    return configuration_namespace != CONFIGURATION_NAMESPACE_STRATOSHARK;
 }
 
 #ifndef _WIN32
@@ -537,18 +538,37 @@ get_current_executable_path(void)
 }
 #endif /* _WIN32 */
 
+/* Extcap executables are in their own subdirectory. This trims that off and
+ * reduces progfile_dir to the common program file directory. */
 static void trim_progfile_dir(void)
 {
-#ifdef _WIN32
-    char *namespace_last_dir = find_last_pathname_separator(progfile_dir);
-    if (namespace_last_dir && strncmp(namespace_last_dir + 1, CONFIGURATION_NAMESPACE_LOWER, sizeof(CONFIGURATION_NAMESPACE_LOWER)) == 0) {
-        *namespace_last_dir = '\0';
-    }
-#endif
-
     char *progfile_last_dir = find_last_pathname_separator(progfile_dir);
 
+#ifdef _WIN32
+    /*
+     * Check for a namespaced extcap subdirectory.
+     * XXX - Do we only need to do this on Windows, or on other platforms too?
+     */
+    if (progfile_last_dir && strncmp(progfile_last_dir + 1, CONFIGURATION_NAMESPACE_LOWER, sizeof(CONFIGURATION_NAMESPACE_LOWER)) == 0) {
+        char* namespace_last_dir = find_last_pathname_separator(progfile_dir);
+        char namespace_sep = *namespace_last_dir;
+        *namespace_last_dir = '\0';
+
+        progfile_last_dir = find_last_pathname_separator(progfile_dir);
+
+        if (!(progfile_last_dir && strncmp(progfile_last_dir + 1, "extcap", sizeof("extcap")) == 0)) {
+            /*
+             * Not an extcap, restore the namespace separator (it might have been
+             * some other "wireshark" directory, especially on case insensitive
+             * filesystems.)
+             */
+            *namespace_last_dir = namespace_sep;
+            return;
+        }
+    } else
+#endif
     if (! (progfile_last_dir && strncmp(progfile_last_dir + 1, "extcap", sizeof("extcap")) == 0)) {
+        /* Check for a non namespaced extcap directory. */
         return;
     }
 
@@ -629,8 +649,14 @@ configuration_init_w32(const char* arg0 _U_)
          */
         progfile_dir = g_path_get_dirname(prog_pathname);
         if (progfile_dir != NULL) {
+            /* We succeeded. */
             trim_progfile_dir();
-            /* we succeeded */
+            /* Now try to figure out if we're running in a build directory. */
+            char *wsutil_lib = g_build_filename(progfile_dir, "wsutil.lib", (char *)NULL);
+            if (file_exists(wsutil_lib)) {
+                running_in_build_directory_flag = true;
+            }
+            g_free(wsutil_lib);
         } else {
             /*
              * OK, no. What do we do now?
@@ -965,6 +991,33 @@ get_progfile_dir(void)
     return progfile_dir;
 }
 
+extern const char *
+get_current_working_dir(void)
+{
+    if (current_working_dir != NULL) {
+        return current_working_dir;
+    }
+
+    /*
+     * It's good to cache this because on Windows Microsoft cautions
+     * against using GetCurrentDirectory except early on, e.g. when
+     * parsing command line options.
+     */
+    current_working_dir = g_get_current_dir();
+    /*
+     * The above always returns something, with a fallback, e.g., on macOS
+     * if the program is run from Finder, of G_DIR_SEPARATOR_S.
+     * On Windows when run from a shortcut / taskbar it returns whatever
+     * the "run in" directory is on the shortcut, which is usually the
+     * directory where the program resides, which isn't that useful.
+     * Should we set it to the home directory on macOS or the
+     * "My Documents" folder on Windows in those cases,
+     * as we do in get_persdatafile_dir()? This isn't the default preference
+     * setting so perhaps caveat emptor is ok.
+     */
+    return current_working_dir;
+}
+
 /*
  * Get the directory in which the global configuration and data files are
  * stored.
@@ -1011,7 +1064,7 @@ get_datafile_dir(void)
         /*
          * The user specified a different directory for data files
          * and we aren't running with special privileges.
-         * Let {WIRESHARK,LOGRAY}_DATA_DIR take precedence.
+         * Let {WIRESHARK,STRATOSHARK}_DATA_DIR take precedence.
          * XXX - We might be able to dispense with the priv check
          */
         datafile_dir = g_strdup(g_getenv(data_dir_envar));
@@ -1079,7 +1132,11 @@ get_datafile_dir(void)
          */
         datafile_dir = g_strdup(progfile_dir);
     } else {
-        datafile_dir = g_build_filename(install_prefix, DATA_DIR, CONFIGURATION_NAMESPACE_LOWER, (char *)NULL);
+        if (g_path_is_absolute(DATA_DIR)) {
+            datafile_dir = g_build_filename(DATA_DIR, CONFIGURATION_NAMESPACE_LOWER, (char *)NULL);
+        } else {
+            datafile_dir = g_build_filename(install_prefix, DATA_DIR, CONFIGURATION_NAMESPACE_LOWER, (char *)NULL);
+        }
     }
 #endif
     return datafile_dir;
@@ -1121,8 +1178,7 @@ get_doc_dir(void)
      * it; we don't need to call started_with_special_privs().)
      */
     else if (appbundle_dir != NULL) {
-        doc_dir = ws_strdup_printf("%s/Contents/Resources/%s",
-                                        appbundle_dir, DATA_DIR);
+        doc_dir = g_strdup(get_datafile_dir());
     }
 #endif
     else if (running_in_build_directory_flag && progfile_dir != NULL) {
@@ -1132,7 +1188,11 @@ get_doc_dir(void)
          */
         doc_dir = g_strdup(progfile_dir);
     } else {
-        doc_dir = g_build_filename(install_prefix, DOC_DIR, (char *)NULL);
+        if (g_path_is_absolute(DOC_DIR)) {
+            doc_dir = g_strdup(DOC_DIR);
+        } else {
+            doc_dir = g_build_filename(install_prefix, DOC_DIR, (char *)NULL);
+        }
     }
 #endif
     return doc_dir;
@@ -1174,7 +1234,7 @@ init_plugin_dir(void)
         /*
          * The user specified a different directory for plugins
          * and we aren't running with special privileges.
-         * Let {WIRESHARK,LOGRAY}_PLUGIN_DIR take precedence.
+         * Let {WIRESHARK,STRATOSHARK}_PLUGIN_DIR take precedence.
          */
         plugin_dir = g_strdup(g_getenv(plugin_dir_envar));
     }
@@ -1219,7 +1279,11 @@ init_plugin_dir(void)
          */
         plugin_dir = g_build_filename(get_progfile_dir(), "plugins", (char *)NULL);
     } else {
-        plugin_dir = g_build_filename(install_prefix, PLUGIN_DIR, (char *)NULL);
+        if (g_path_is_absolute(PLUGIN_DIR)) {
+            plugin_dir = g_strdup(PLUGIN_DIR);
+        } else {
+            plugin_dir = g_build_filename(install_prefix, PLUGIN_DIR, (char *)NULL);
+        }
     }
 #endif // HAVE_MSYSTEM / _WIN32
 #endif /* defined(HAVE_PLUGINS) || defined(HAVE_LUA) */
@@ -1317,14 +1381,17 @@ init_extcap_dir(void)
         extcap_dir = g_build_filename(install_prefix, EXTCAP_DIR, (char *)NULL);
     }
 #elif defined(_WIN32)
-    else {
         /*
          * On Windows, extcap utilities are stored in "extcap/<program name>"
-         * in the program file directory in both the build and installation
-         * directories.
+         * in the build directory and in "extcap" in the installation
+         * directory.
          */
+    else if (running_in_build_directory_flag) {
         extcap_dir = g_build_filename(get_progfile_dir(), EXTCAP_DIR_NAME,
             CONFIGURATION_NAMESPACE_LOWER, (char *)NULL);
+    } else {
+        extcap_dir = g_build_filename(get_progfile_dir(), EXTCAP_DIR_NAME,
+            (char *)NULL);
     }
 #else
 #ifdef ENABLE_APPLICATION_BUNDLE
@@ -1352,8 +1419,12 @@ init_extcap_dir(void)
             CONFIGURATION_NAMESPACE_LOWER, (char *)NULL);
     }
     else {
-        extcap_dir = g_build_filename(install_prefix,
-            is_packet_configuration_namespace() ? EXTCAP_DIR : LOG_EXTCAP_DIR, (char *)NULL);
+        if (g_path_is_absolute(EXTCAP_DIR)) {
+            extcap_dir = g_strdup(is_packet_configuration_namespace() ? EXTCAP_DIR : LOG_EXTCAP_DIR);
+        } else {
+            extcap_dir = g_build_filename(install_prefix,
+                is_packet_configuration_namespace() ? EXTCAP_DIR : LOG_EXTCAP_DIR, (char *)NULL);
+        }
     }
 #endif // HAVE_MSYSTEM / _WIN32
 }
@@ -1527,7 +1598,13 @@ get_persconffile_dir_no_profile(void)
     env = g_getenv(config_dir_envar);
 #ifdef _WIN32
     if (env == NULL) {
-        /* for backward compatibility */
+        /*
+         * The PortableApps launcher sets this environment variable.
+         * XXX - That's only for the GUI. We don't have launchers/batch
+         * scripts for the command line tools, and just package the same
+         * binaries as built for NSIS and WiX, so if the user is running
+         * tshark from the PortableApps directory, how do we tell? (#20095)
+         */
         env = g_getenv("WIRESHARK_APPDATA");
     }
 #endif
@@ -1549,7 +1626,7 @@ get_persconffile_dir_no_profile(void)
     const char *persconf_namespace = CONFIGURATION_NAMESPACE_PROPER;
     if (env != NULL) {
         /*
-         * Concatenate %APPDATA% with "\Wireshark" or "\Logray".
+         * Concatenate %APPDATA% with "\Wireshark" or "\Stratoshark".
          */
         persconffile_dir = g_build_filename(env, persconf_namespace, NULL);
         return persconffile_dir;
@@ -1610,7 +1687,7 @@ get_persconffile_dir_no_profile(void)
         }
     }
     path = g_build_filename(homedir,
-                            configuration_namespace == CONFIGURATION_NAMESPACE_WIRESHARK ? ".wireshark" : ".logray",
+                            configuration_namespace == CONFIGURATION_NAMESPACE_WIRESHARK ? ".wireshark" : ".stratoshark",
                             NULL);
     if (g_file_test(path, G_FILE_TEST_IS_DIR)) {
         g_free(xdg_path);
@@ -2700,6 +2777,8 @@ free_progdirs(void)
     doc_dir = NULL;
     g_free(install_prefix);
     install_prefix = NULL;
+    g_free(current_working_dir);
+    current_working_dir = NULL;
 #if defined(HAVE_PLUGINS) || defined(HAVE_LUA)
     g_free(plugin_dir);
     plugin_dir = NULL;

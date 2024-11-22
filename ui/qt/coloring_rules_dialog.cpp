@@ -235,7 +235,7 @@ void ColoringRulesDialog::updateHint(QModelIndex idx)
         //list is not guaranteed to be sorted, so force it
         std::sort(keys.begin(), keys.end());
         const QModelIndex& error_key = keys[0];
-        error_text = QString("%1: %2")
+        error_text = QStringLiteral("%1: %2")
                             .arg(colorRuleModel_.data(colorRuleModel_.index(error_key.row(), ColoringRulesModel::colName), Qt::DisplayRole).toString())
                             .arg(errors_[error_key]);
     }
@@ -315,7 +315,7 @@ void ColoringRulesDialog::changeColor(bool foreground)
     if (!current.isValid())
         return;
 
-    QColorDialog *color_dlg = new QColorDialog();
+    QColorDialog *color_dlg = new QColorDialog(this);
     color_dlg->setCurrentColor(colorRuleModel_.data(current, foreground ? Qt::ForegroundRole : Qt::BackgroundRole).toString());
 
     connect(color_dlg, &QColorDialog::colorSelected, std::bind(&ColoringRulesDialog::colorChanged, this, foreground, std::placeholders::_1));

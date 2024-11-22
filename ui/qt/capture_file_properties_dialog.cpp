@@ -98,12 +98,10 @@ static const QString para_tmpl_ = "<p>%1</p>\n";
 
 QString CaptureFilePropertiesDialog::summaryToHtml()
 {
-    summary_tally summary;
+    summary_tally summary = {};
     double seconds = 0.0;
     double disp_seconds = 0.0;
     double marked_seconds = 0.0;
-
-    memset(&summary, 0, sizeof(summary_tally));
 
     QString table_begin, table_end;
     QString table_row_begin, table_ul_row_begin, table_row_end;
@@ -120,13 +118,16 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
     table_hheader25_tmpl = "<td width=\"25%\"><u>%1</u></td>";
     table_data_tmpl = "<td>%1</td>";
 
-    if (!file_closed_) {
-        /* initial computations */
-        summary_fill_in(cap_file_.capFile(), &summary);
-#ifdef HAVE_LIBPCAP
-        summary_fill_in_capture(cap_file_.capFile(), &global_capture_opts, &summary);
-#endif
+    if (file_closed_) {
+        // We shouldn't be here since our menu item or the refresh button should be disabled.
+        return QString();
     }
+
+    /* initial computations */
+    summary_fill_in(cap_file_.capFile(), &summary);
+#ifdef HAVE_LIBPCAP
+    summary_fill_in_capture(cap_file_.capFile(), &global_capture_opts, &summary);
+#endif
 
     seconds = summary.stop_time - summary.start_time;
     disp_seconds = summary.filtered_stop - summary.filtered_start;
@@ -163,7 +164,7 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
     QString format_str = wtap_file_type_subtype_description(summary.file_type);
     const char *compression_type_description = wtap_compression_type_description(summary.compression_type);
     if (compression_type_description != nullptr) {
-        format_str += QString(" (%1)").arg(compression_type_description);
+        format_str += QStringLiteral(" (%1)").arg(compression_type_description);
     }
     out << table_row_begin
         << table_vheader_tmpl.arg(tr("Format"))
@@ -228,10 +229,10 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
             unsigned int elapsed_time = (unsigned int)summary.elapsed_time;
             if (elapsed_time/86400)
             {
-                elapsed_str = QString("%1 days ").arg(elapsed_time / 86400);
+                elapsed_str = QStringLiteral("%1 days ").arg(elapsed_time / 86400);
             }
 
-            elapsed_str += QString("%1:%2:%3")
+            elapsed_str += QStringLiteral("%1:%2:%3")
                     .arg(elapsed_time % 86400 / 3600, 2, 10, QChar('0'))
                     .arg(elapsed_time % 3600 / 60, 2, 10, QChar('0'))
                     .arg(elapsed_time % 60, 2, 10, QChar('0'));
@@ -251,7 +252,7 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
 
         // If we have more than one section, add headers for each section.
         if (wtap_file_get_num_shbs(cap_file_.capFile()->provider.wth) > 1)
-            out << section_tmpl_.arg(QString(tr("Section %1"))
+            out << section_tmpl_.arg(tr("Section %1")
                                      .arg(section_number + 1));
 
         wtap_block_t shb_inf = wtap_file_get_shb(cap_file_.capFile()->provider.wth, section_number);
@@ -339,7 +340,7 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
             /* Dropped count */
             QString interface_drops(unknown);
             if (iface.drops_known) {
-                interface_drops = QString("%1 (%2%)").arg(iface.drops).arg(QString::number(
+                interface_drops = QStringLiteral("%1 (%2%)").arg(iface.drops).arg(QString::number(
                     /* MSVC cannot convert from unsigned __int64 to float, so first convert to signed __int64 */
                     summary.packet_count ? (100.0 * (int64_t)iface.drops)/summary.packet_count : 0, 'f', 1));
             }
@@ -349,10 +350,10 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
             if (iface.cfilter && iface.cfilter[0] != '\0') {
                 interface_cfilter = iface.cfilter;
             } else if (iface.name) {
-                interface_cfilter = QString(tr("none"));
+                interface_cfilter = tr("none");
             }
 
-            QString interface_snaplen = QString(tr("%1 bytes").arg(iface.snap));
+            QString interface_snaplen = tr("%1 bytes").arg(iface.snap);
 
             out << table_row_begin
                 << table_data_tmpl.arg(interface_name)
@@ -374,7 +375,6 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
                 if (wtap_block_get_nth_string_option_value(shb_inf, OPT_COMMENT, i,
                                                            &shb_comment) == WTAP_OPTTYPE_SUCCESS) {
                     QString section_comment = shb_comment;
-                    QString section_comment_html;
                     if (num_comments > 1) {
                         out << tr("Comment %1: ").arg(i+1);
                     }
@@ -435,12 +435,12 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
     // Packets
     displayed_str = marked_str = n_a;
     if (summary.filtered_count > 0 && summary.packet_count > 0) {
-            displayed_str = QString("%1 (%2%)")
+            displayed_str = QStringLiteral("%1 (%2%)")
             .arg(summary.filtered_count)
             .arg(100.0 * summary.filtered_count / summary.packet_count, 1, 'f', 1);
     }
     if (summary.packet_count > 0 && summary.marked_count > 0) {
-            marked_str = QString("%1 (%2%)")
+            marked_str = QStringLiteral("%1 (%2%)")
             .arg(summary.marked_count)
             .arg(100.0 * summary.marked_count / summary.packet_count, 1, 'f', 1);
     }
@@ -459,13 +459,13 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
     // Time between first and last
     captured_str = displayed_str = marked_str = n_a;
     if (seconds > 0) {
-            captured_str = QString("%1").arg(seconds, 1, 'f', 3);
+            captured_str = QStringLiteral("%1").arg(seconds, 1, 'f', 3);
     }
     if (disp_seconds > 0) {
-            displayed_str = QString("%1").arg(disp_seconds, 1, 'f', 3);
+            displayed_str = QStringLiteral("%1").arg(disp_seconds, 1, 'f', 3);
     }
     if (marked_seconds > 0) {
-            marked_str = QString("%1").arg(marked_seconds, 1, 'f', 3);
+            marked_str = QStringLiteral("%1").arg(marked_seconds, 1, 'f', 3);
     }
     out << table_row_begin
         << table_data_tmpl.arg(tr("Time span, s"))
@@ -477,13 +477,13 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
     // Average packets per second
     captured_str = displayed_str = marked_str = n_a;
     if (seconds > 0) {
-            captured_str = QString("%1").arg(summary.packet_count/seconds, 1, 'f', 1);
+            captured_str = QStringLiteral("%1").arg(summary.packet_count/seconds, 1, 'f', 1);
     }
     if (disp_seconds > 0) {
-            displayed_str = QString("%1").arg(summary.filtered_count/disp_seconds, 1, 'f', 1);
+            displayed_str = QStringLiteral("%1").arg(summary.filtered_count/disp_seconds, 1, 'f', 1);
     }
     if (marked_seconds > 0) {
-            marked_str = QString("%1").arg(summary.marked_count/marked_seconds, 1, 'f', 1);
+            marked_str = QStringLiteral("%1").arg(summary.marked_count/marked_seconds, 1, 'f', 1);
     }
     out << table_row_begin
         << table_data_tmpl.arg(tr("Average pps"))
@@ -517,12 +517,12 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
     // Byte count
     displayed_str = marked_str = "0";
     if (summary.bytes > 0 && summary.filtered_bytes > 0) {
-        displayed_str = QString("%1 (%2%)")
+        displayed_str = QStringLiteral("%1 (%2%)")
                 .arg(summary.filtered_bytes)
                 .arg(100.0 * summary.filtered_bytes / summary.bytes, 1, 'f', 1);
     }
     if (summary.bytes > 0 && summary.marked_bytes > 0) {
-        marked_str = QString("%1 (%2%)")
+        marked_str = QStringLiteral("%1 (%2%)")
                 .arg(summary.marked_bytes)
                 .arg(100.0 * summary.marked_bytes / summary.bytes, 1, 'f', 1);
     }
@@ -664,7 +664,7 @@ void CaptureFilePropertiesDialog::on_buttonBox_clicked(QAbstractButton *button)
         if (is_packet_configuration_namespace()) {
             details = tr("Created by Wireshark %1\n\n").arg(get_ws_vcs_version_info());
         } else {
-            details = tr("Created by Logray %1\n\n").arg(get_lr_vcs_version_info());
+            details = tr("Created by Stratoshark %1\n\n").arg(get_ss_vcs_version_info());
         }
         details.append(ui->detailsTextEdit->toPlainText());
         clipboard->setText(details);

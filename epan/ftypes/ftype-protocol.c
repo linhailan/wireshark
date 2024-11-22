@@ -9,10 +9,9 @@
 #include "config.h"
 
 #include <ftypes-int.h>
-#include <epan/strutil.h>
 #include <epan/to_str.h>
 #include <string.h>
-#include <wsutil/glib-compat.h>
+#include <wsutil/array.h>
 
 #include <epan/exceptions.h>
 #include <wsutil/ws_assert.h>
@@ -47,14 +46,12 @@ value_free(fvalue_t *fv)
 static void
 value_set(fvalue_t *fv, tvbuff_t *value, const char *name, int length)
 {
-	if (value != NULL) {
-		/* Free up the old value, if we have one */
-		value_free(fv);
+	/* Free up the old value, if we have one */
+	value_free(fv);
 
-		/* Set the protocol description and an (optional, nullable) tvbuff. */
-		fv->value.protocol.tvb = value;
-		fv->value.protocol.proto_string = g_strdup(name);
-	}
+	/* Set the protocol description and an (optional, nullable) tvbuff. */
+	fv->value.protocol.tvb = value;
+	fv->value.protocol.proto_string = g_strdup(name);
 	fv->value.protocol.length = length;
 }
 
@@ -200,6 +197,8 @@ val_to_repr(wmem_allocator_t *scope, const fvalue_t *fv, ftrepr_t rtype, int fie
 static tvbuff_t *
 value_get(fvalue_t *fv)
 {
+	if (fv->value.protocol.tvb == NULL)
+		return NULL;
 	if (fv->value.protocol.length < 0)
 		return fv->value.protocol.tvb;
 	return tvb_new_subset_length_caplen(fv->value.protocol.tvb, 0, fv->value.protocol.length, fv->value.protocol.length);

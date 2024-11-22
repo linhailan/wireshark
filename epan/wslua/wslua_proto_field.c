@@ -17,13 +17,17 @@
 
 #include "config.h"
 
+#include <epan/tfs.h>
+#include <epan/unit_strings.h>
+
 #include "wslua.h"
 
 /* WSLUA_CONTINUE_MODULE Proto */
 
 
 WSLUA_CLASS_DEFINE(ProtoField,FAIL_ON_NULL("null ProtoField"));
-    /* A Protocol field (to be used when adding items to the dissection tree). */
+    /* A Protocol field (to be used when adding items to the dissection tree).
+       It must be registered via being added to a `Proto.fields` table. */
 
 static const wslua_ft_types_t ftenums[] = {
     {"ftypes.NONE", FT_NONE},
@@ -420,7 +424,7 @@ static uint64_t get_mask(lua_State* L, int idx, uint64_t default_value) {
 
     switch(lua_type(L, idx)) {
         case LUA_TNUMBER:
-            mask = (uint64_t)wslua_optuint32(L, idx, (lua_Number)default_value);
+            mask = wslua_optuint64(L, idx, (lua_Number)default_value);
             break;
         case LUA_TSTRING:
         case LUA_TUSERDATA:

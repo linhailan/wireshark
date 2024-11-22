@@ -85,7 +85,7 @@ WSLUA_FUNCTION wslua_register_menu(lua_State* L) { /*  Register a menu item in o
     * MENU_TELEPHONY_SCTP: menu:Telephony[SCTP]
     * MENU_TOOLS_UNSORTED: menu:Tools[]
 
-    Valid log (Logray) items are:
+    Valid log (Stratoshark) items are:
     * MENU_LOG_ANALYZE_UNSORTED: menu:Analyze[]
     * MENU_LOG_STAT_UNSORTED: menu:Statistics[]
 
@@ -1029,7 +1029,7 @@ WSLUA_FUNCTION wslua_copy_to_clipboard(lua_State* L) { /* Copy a string into the
 
     ops->copy_to_clipboard(gstr);
 
-    g_string_free(gstr,true);
+    g_string_free(gstr,TRUE);
 
     return 0;
 }

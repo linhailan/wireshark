@@ -17,7 +17,12 @@
 #include <epan/oids.h>
 #include <epan/asn1.h>
 
+#include <wsutil/array.h>
+
 #include "packet-ber.h"
+#include "packet-e212.h"
+#include "packet-gsm_a_common.h"
+#include "packet-gtpv2.h"
 #include "packet-isup.h"
 #include "packet-q931.h"
 
@@ -33,6 +38,12 @@ int proto_HI2Operations;
 #include "packet-HI2Operations-hf.c"
 
 /* Initialize the subtree pointers */
+static int ett_HI2Operations_eps_paa;
+static int ett_HI2Operations_eps_qos;
+static int ett_HI2Operations_eps_apn_ambr;
+static int ett_HI2Operations_eps_uli;
+static int ett_HI2Operations_eps_tft;
+static int ett_HI2Operations_eps_network;
 #include "packet-HI2Operations-ett.c"
 
 #include "packet-HI2Operations-fn.c"
@@ -51,7 +62,13 @@ void proto_register_HI2Operations(void) {
   };
 
   /* List of subtrees */
-  static gint *ett[] = {
+  static int *ett[] = {
+    &ett_HI2Operations_eps_paa,
+    &ett_HI2Operations_eps_qos,
+    &ett_HI2Operations_eps_apn_ambr,
+    &ett_HI2Operations_eps_uli,
+    &ett_HI2Operations_eps_tft,
+    &ett_HI2Operations_eps_network,
 #include "packet-HI2Operations-ettarr.c"
   };
 

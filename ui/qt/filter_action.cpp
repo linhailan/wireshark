@@ -66,25 +66,18 @@ const QString FilterAction::actionName(Action action) {
     switch (action) {
     case ActionApply:
         return QObject::tr("Apply as Filter");
-        break;
     case ActionPrepare:
         return QObject::tr("Prepare as Filter");
-        break;
     case ActionFind:
         return QObject::tr("Find");
-        break;
     case ActionColorize:
         return QObject::tr("Colorize");
-        break;
     case ActionWebLookup:
         return QObject::tr("Look Up");
-        break;
     case ActionCopy:
         return QObject::tr("Copy");
-        break;
     default:
         return QObject::tr("UNKNOWN");
-        break;
     }
 }
 
@@ -118,25 +111,18 @@ const QString FilterAction::actionTypeName(ActionType type) {
     switch (type) {
     case ActionTypePlain:
         return QObject::tr("Selected");
-        break;
     case ActionTypeNot:
         return QObject::tr("Not Selected");
-        break;
     case ActionTypeAnd:
         return QObject::tr("…and Selected");
-        break;
     case ActionTypeOr:
         return QObject::tr("…or Selected");
-        break;
     case ActionTypeAndNot:
         return QObject::tr("…and not Selected");
-        break;
     case ActionTypeOrNot:
         return QObject::tr("…or not Selected");
-        break;
     default:
         return QObject::tr("UNKNOWN");
-        break;
     }
 }
 
@@ -160,34 +146,24 @@ const QString FilterAction::actionDirectionName(ActionDirection direction) {
     switch (direction) {
     case ActionDirectionAToFromB:
         return QObject::tr("A " UTF8_LEFT_RIGHT_ARROW " B");
-        break;
     case ActionDirectionAToB:
         return QObject::tr("A " UTF8_RIGHTWARDS_ARROW " B");
-        break;
     case ActionDirectionAFromB:
         return QObject::tr("B " UTF8_RIGHTWARDS_ARROW " A");
-        break;
     case ActionDirectionAToFromAny:
         return QObject::tr("A " UTF8_LEFT_RIGHT_ARROW " Any");
-        break;
     case ActionDirectionAToAny:
         return QObject::tr("A " UTF8_RIGHTWARDS_ARROW " Any");
-        break;
     case ActionDirectionAFromAny:
         return QObject::tr("Any " UTF8_RIGHTWARDS_ARROW " A");
-        break;
     case ActionDirectionAnyToFromB:
         return QObject::tr("Any " UTF8_LEFT_RIGHT_ARROW " B");
-        break;
     case ActionDirectionAnyToB:
         return QObject::tr("Any " UTF8_RIGHTWARDS_ARROW " B");
-        break;
     case ActionDirectionAnyFromB:
         return QObject::tr("B " UTF8_RIGHTWARDS_ARROW " Any");
-        break;
     default:
         return QObject::tr("UNKNOWN");
-        break;
     }
 }
 
@@ -241,7 +217,7 @@ QMenu * FilterAction::createFilterMenu(FilterAction::Action act, QString filter,
     if (filter.length() > 0)
     {
         int one_em = submenu->fontMetrics().height();
-        QString prep_text = QString("%1: %2").arg(title).arg(filter);
+        QString prep_text = QStringLiteral("%1: %2").arg(title).arg(filter);
         prep_text = submenu->fontMetrics().elidedText(prep_text, Qt::ElideRight, one_em * 40);
         QAction * comment = submenu->addAction(prep_text);
         comment->setEnabled(false);

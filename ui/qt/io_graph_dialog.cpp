@@ -101,6 +101,7 @@ const int stat_update_interval_ = 200; // ms
 // Saved graph settings
 typedef struct _io_graph_settings_t {
     bool enabled;
+    bool asAOT;
     char* name;
     char* dfilter;
     unsigned color;
@@ -177,9 +178,9 @@ static uat_t *iog_uat_;
 // record_errors and dirty_records lists do not.
 static QPointer<UatModel> static_uat_model_;
 
-// y_axis_factor was added in 3.6. Provide backward compatibility.
+// y_axis_factor was added in 3.6. asAOT in 4.6/5.0 Provide backward compatibility.
 static const char *iog_uat_defaults_[] = {
-    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "1"
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, "1", "false"
 };
 
 static char *decimal_point;
@@ -314,6 +315,7 @@ UAT_VS_DEF(io_graph, style, io_graph_settings_t, uint32_t, 0, "Line")
 UAT_VS_DEF(io_graph, yaxis, io_graph_settings_t, uint32_t, 0, "Packets")
 UAT_PROTO_FIELD_CB_DEF(io_graph, yfield, io_graph_settings_t)
 UAT_DEC_CB_DEF(io_graph, y_axis_factor, io_graph_settings_t)
+UAT_BOOL_ENABLE_CB_DEF(io_graph, asAOT, io_graph_settings_t)
 
 static uat_field_t io_graph_packet_fields[] = {
     UAT_FLD_BOOL_ENABLE(io_graph, enabled, "Enabled", "Graph visibility"),
@@ -325,6 +327,7 @@ static uat_field_t io_graph_packet_fields[] = {
     UAT_FLD_PROTO_FIELD(io_graph, yfield, "Y Field", "Apply calculations to this field"),
     UAT_FLD_SMA_PERIOD(io_graph, sma_period, "SMA Period", moving_avg_vs, "Simple moving average period"),
     UAT_FLD_DEC(io_graph, y_axis_factor, "Y Axis Factor", "Y Axis Factor"),
+    UAT_FLD_BOOL_ENABLE(io_graph, asAOT, "Avg over Time", "Average over time interpretation"),
 
     UAT_END_FIELDS
 };
@@ -339,6 +342,7 @@ static uat_field_t io_graph_event_fields[] = {
     UAT_FLD_PROTO_FIELD(io_graph, yfield, "Y Field", "Apply calculations to this field"),
     UAT_FLD_SMA_PERIOD(io_graph, sma_period, "SMA Period", moving_avg_vs, "Simple moving average period"),
     UAT_FLD_DEC(io_graph, y_axis_factor, "Y Axis Factor", "Y Axis Factor"),
+    UAT_FLD_BOOL_ENABLE(io_graph, asAOT, "asAOT", "asAOT"),
 
     UAT_END_FIELDS
 };
@@ -348,6 +352,7 @@ static void* io_graph_copy_cb(void* dst_ptr, const void* src_ptr, size_t) {
     const io_graph_settings_t* src = (const io_graph_settings_t *)src_ptr;
 
     dst->enabled = src->enabled;
+    dst->asAOT = src->asAOT;
     dst->name = g_strdup(src->name);
     dst->dfilter = g_strdup(src->dfilter);
     dst->color = src->color;
@@ -438,7 +443,10 @@ IOGraphDialog::IOGraphDialog(QWidget &parent, CaptureFile &cf, QString displayFi
 
     ui->automaticUpdateCheckBox->setChecked(prefs.gui_io_graph_automatic_update ? true : false);
 
-    ui->enableLegendCheckBox->setChecked(prefs.gui_io_graph_enable_legend ? true : false);
+    ui->actionLegend->setChecked(prefs.gui_io_graph_enable_legend);
+    connect(ui->actionLegend, &QAction::triggered, this, &IOGraphDialog::actionLegendTriggered);
+    connect(ui->actionTimeOfDay, &QAction::triggered, this, &IOGraphDialog::actionTimeOfDayTriggered);
+    connect(ui->actionLogScale, &QAction::triggered, this, &IOGraphDialog::actionLogScaleTriggered);
 
     stat_timer_ = new QTimer(this);
     connect(stat_timer_, SIGNAL(timeout()), this, SLOT(updateStatistics()));
@@ -478,7 +486,6 @@ IOGraphDialog::IOGraphDialog(QWidget &parent, CaptureFile &cf, QString displayFi
     ui->intervalComboBox->addItem(tr("10 min"), SCALE * 600);
     ui->intervalComboBox->setCurrentIndex(18);
 
-    ui->todCheckBox->setChecked(false);
     iop->xAxis->setTicker(number_ticker_);
 
     ui->dragRadioButton->setChecked(mouse_drags_);
@@ -504,7 +511,10 @@ IOGraphDialog::IOGraphDialog(QWidget &parent, CaptureFile &cf, QString displayFi
     ctx_menu_.addSeparator();
     ctx_menu_.addAction(ui->actionDragZoom);
     ctx_menu_.addAction(ui->actionToggleTimeOrigin);
+    ctx_menu_.addAction(ui->actionTimeOfDay);
+    ctx_menu_.addAction(ui->actionLogScale);
     ctx_menu_.addAction(ui->actionCrosshairs);
+    ctx_menu_.addAction(ui->actionLegend);
     set_action_shortcuts_visible_in_context_menu(ctx_menu_.actions());
 
     iop->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -540,7 +550,7 @@ IOGraphDialog::IOGraphDialog(QWidget &parent, CaptureFile &cf, QString displayFi
     }
 
     if (! filterExists && (!displayFilter.isEmpty() || !yfield.isEmpty())) {
-        addGraph(true, displayFilter, value_units, yfield);
+        addGraph(true, false, displayFilter, value_units, yfield);
     }
 
     toggleTracerStyle(true);
@@ -601,7 +611,7 @@ void IOGraphDialog::copyFromProfile(QString filename)
     }
 }
 
-void IOGraphDialog::addGraph(bool checked, QString name, QString dfilter, QRgb color_idx, IOGraph::PlotStyles style, io_graph_item_unit_t value_units, QString yfield, int moving_average, int y_axis_factor)
+void IOGraphDialog::addGraph(bool checked, bool asAOT, QString name, QString dfilter, QRgb color_idx, IOGraph::PlotStyles style, io_graph_item_unit_t value_units, QString yfield, int moving_average, int y_axis_factor)
 {
     if (uat_model_ == nullptr)
         return;
@@ -620,6 +630,7 @@ void IOGraphDialog::addGraph(bool checked, QString name, QString dfilter, QRgb c
     newRowData.append(yfield);
     newRowData.append(val_to_str_const((uint32_t) moving_average, moving_avg_vs, "None"));
     newRowData.append(y_axis_factor);
+    newRowData.append(asAOT ? Qt::Checked : Qt::Unchecked);
 
     QModelIndex newIndex = uat_model_->appendEntry(newRowData);
     if ( !newIndex.isValid() )
@@ -630,7 +641,7 @@ void IOGraphDialog::addGraph(bool checked, QString name, QString dfilter, QRgb c
     ui->graphUat->setCurrentIndex(newIndex);
 }
 
-void IOGraphDialog::addGraph(bool checked, QString dfilter, io_graph_item_unit_t value_units, QString yfield)
+void IOGraphDialog::addGraph(bool checked, bool asAOT, QString dfilter, io_graph_item_unit_t value_units, QString yfield)
 {
     if (uat_model_ == nullptr)
         return;
@@ -649,7 +660,7 @@ void IOGraphDialog::addGraph(bool checked, QString dfilter, io_graph_item_unit_t
             graph_name = QString(val_to_str_const(value_units, y_axis_event_vs, "Unknown")).replace("Y Field", yfield);
         }
     }
-    addGraph(checked, std::move(graph_name), dfilter, ColorUtils::graphColor(uat_model_->rowCount()),
+    addGraph(checked, asAOT, std::move(graph_name), dfilter, ColorUtils::graphColor(uat_model_->rowCount()),
         IOGraph::psLine, value_units, yfield, DEFAULT_MOVING_AVERAGE, DEFAULT_Y_AXIS_FACTOR);
 }
 
@@ -702,22 +713,22 @@ void IOGraphDialog::addDefaultGraph(bool enabled, int idx)
     if (is_packet_configuration_namespace()) {
         switch (idx % 2) {
         case 0:
-            addGraph(enabled, tr("All Packets"), QString(), ColorUtils::graphColor(idx),
+            addGraph(enabled, false, tr("All Packets"), QString(), ColorUtils::graphColor(idx),
                     IOGraph::psLine, IOG_ITEM_UNIT_PACKETS, QString(), DEFAULT_MOVING_AVERAGE, DEFAULT_Y_AXIS_FACTOR);
             break;
         default:
-            addGraph(enabled, tr("TCP Errors"), "tcp.analysis.flags", ColorUtils::graphColor(4), // 4 = red
+            addGraph(enabled, false, tr("TCP Errors"), "tcp.analysis.flags", ColorUtils::graphColor(4), // 4 = red
                     IOGraph::psBar, IOG_ITEM_UNIT_PACKETS, QString(), DEFAULT_MOVING_AVERAGE, DEFAULT_Y_AXIS_FACTOR);
             break;
         }
     } else {
         switch (idx % 2) {
         case 0:
-            addGraph(enabled, tr("All Events"), QString(), ColorUtils::graphColor(idx),
+            addGraph(enabled, false, tr("All Events"), QString(), ColorUtils::graphColor(idx),
                     IOGraph::psLine, IOG_ITEM_UNIT_PACKETS, QString(), DEFAULT_MOVING_AVERAGE, DEFAULT_Y_AXIS_FACTOR);
             break;
         default:
-            addGraph(enabled, tr("All Execs"), "evt.type == \"execve\"", ColorUtils::graphColor(4), // 4 = red
+            addGraph(enabled, false, tr("All Execs"), "evt.type == \"execve\"", ColorUtils::graphColor(4), // 4 = red
                     IOGraph::psDot, IOG_ITEM_UNIT_PACKETS, QString(), DEFAULT_MOVING_AVERAGE, DEFAULT_Y_AXIS_FACTOR);
             break;
         }
@@ -747,6 +758,9 @@ void IOGraphDialog::syncGraphSettings(int row)
 
     iog->setName(uat_model_->data(uat_model_->index(row, colName)).toString());
     iog->setFilter(uat_model_->data(uat_model_->index(row, colDFilter)).toString());
+
+    bool asAOT = graphAsAOT(row);
+    iog->setAOT(asAOT);
 
     /* plot style depend on the value unit, so set it first. */
     data_str = uat_model_->data(uat_model_->index(row, colYAxis)).toString();
@@ -1002,7 +1016,6 @@ void IOGraphDialog::panAxes(int x_pixels, int y_pixels)
     }
 }
 
-
 void IOGraphDialog::toggleTracerStyle(bool force_default)
 {
     if (!tracer_->visible() && !force_default) return;
@@ -1059,6 +1072,17 @@ bool IOGraphDialog::graphIsEnabled(int row) const
     }
 }
 
+bool IOGraphDialog::graphAsAOT(int row) const
+{
+    if (uat_model_) {
+        Qt::CheckState state = static_cast<Qt::CheckState>(uat_model_->data(uat_model_->index(row, colAOT), Qt::CheckStateRole).toInt());
+        return state == Qt::Checked;
+    } else {
+        IOGraph* iog = ioGraphs_.value(row, nullptr);
+        return (iog && iog->getAOT());
+    }
+}
+
 // Scan through our graphs and gather information.
 // QCPItemTracers can only be associated with QCPGraphs. Find the first one
 // and associate it with our tracer. Set bar stacking order while we're here.
@@ -1111,7 +1135,7 @@ void IOGraphDialog::updateHint()
     // XXX: ElidedLabel doesn't support rich text / HTML, we
     // used to bold this error
     if (!hint_err_.isEmpty()) {
-        hint += QString("%1 ").arg(hint_err_);
+        hint += QStringLiteral("%1 ").arg(hint_err_);
     }
     if (mouse_drags_) {
         double ts = 0;
@@ -1133,11 +1157,11 @@ void IOGraphDialog::updateHint()
             if (interval_packet > 0) {
                 packet_num_ = (uint32_t) interval_packet;
                 if (is_packet_configuration_namespace()) {
-                    msg = QString("%1 %2")
+                    msg = QStringLiteral("%1 %2")
                             .arg(!file_closed_ ? tr("Click to select packet") : tr("Packet"))
                             .arg(packet_num_);
                 } else {
-                    msg = QString("%1 %2")
+                    msg = QStringLiteral("%1 %2")
                             .arg(!file_closed_ ? tr("Click to select event") : tr("Event"))
                             .arg(packet_num_);
                 }
@@ -1177,6 +1201,7 @@ void IOGraphDialog::updateLegend()
     QSet<format_size_units_e> format_units_set;
     QSet<QString> vu_label_set;
     QString intervalText = ui->intervalComboBox->itemText(ui->intervalComboBox->currentIndex());
+    QSet<bool> aot_set;
 
     iop->legend->setVisible(false);
     iop->yAxis->setLabel(QString());
@@ -1188,6 +1213,18 @@ void IOGraphDialog::updateLegend()
             QString label(iog->valueUnitLabel());
             vu_label_set.insert(label);
             format_units_set.insert(iog->formatUnits());
+
+            /* Track "as throughput" checkboxes values */
+            io_graph_item_unit_t vu = iog->valueUnits();
+            switch(vu) {
+                case IOG_ITEM_UNIT_PACKETS:
+                case IOG_ITEM_UNIT_BYTES:
+                case IOG_ITEM_UNIT_BITS:
+                    aot_set.insert(iog->getAOT());
+                    break;
+                default:
+                    break;
+            }
         }
     }
 
@@ -1207,11 +1244,11 @@ void IOGraphDialog::updateLegend()
         if (si_ticker) {
             si_ticker->setUnit(format_units);
         } else {
-            iop->yAxis->setTicker(QSharedPointer<QCPAxisTickerSi>(new QCPAxisTickerSi(format_units, QString(), ui->logCheckBox->isChecked())));
+            iop->yAxis->setTicker(QSharedPointer<QCPAxisTickerSi>(new QCPAxisTickerSi(format_units, QString(), ui->actionLogScale->isChecked())));
         }
     } else {
         if (si_ticker) {
-            if (ui->logCheckBox->isChecked()) {
+            if (ui->actionLogScale->isChecked()) {
                 iop->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
             } else {
                 iop->yAxis->setTicker(QSharedPointer<QCPAxisTicker>(new QCPAxisTicker));
@@ -1220,14 +1257,20 @@ void IOGraphDialog::updateLegend()
     }
 
     // All the same. Use the Y Axis label.
-    if (vu_label_set.size() == 1) {
-        iop->yAxis->setLabel(vu_label_set.values().constFirst() + "/" + intervalText);
+    if ((vu_label_set.size() == 1) && (aot_set.size() == 1)) {
+        if(aot_set.contains(1)) {
+            // "as throughput" was requested
+            iop->yAxis->setLabel(vu_label_set.values().constFirst() + "/s");
+        }
+        else {
+            iop->yAxis->setLabel(vu_label_set.values().constFirst() + "/" + intervalText);
+        }
     }
 
     // Create a legend with a Title label at top.
     // Legend Title thanks to: https://www.qcustomplot.com/index.php/support/forum/443
     iop->legend->clearItems();
-    QCPStringLegendItem *legendTitle = new QCPStringLegendItem(iop->legend, QString(tr("%1 Intervals ").arg(intervalText)));
+    QCPStringLegendItem *legendTitle = new QCPStringLegendItem(iop->legend, tr("%1 Intervals ").arg(intervalText));
     iop->legend->insertRow(0);
     iop->legend->addElement(0, 0, legendTitle);
 
@@ -1276,25 +1319,71 @@ QRectF IOGraphDialog::getZoomRanges(QRect zoom_rect)
 
 void IOGraphDialog::showContextMenu(const QPoint &pos)
 {
-    ctx_menu_.popup(ui->ioPlot->mapToGlobal(pos));
+    if (ui->ioPlot->legend->selectTest(pos, false) >= 0) {
+        // XXX - Should we check if the legend is visible before showing
+        // its context menu instead of the main context menu?
+        QMenu *menu = new QMenu(this);
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+        menu->addAction(ui->actionLegend);
+        menu->addSeparator();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 2, 0)
+        menu->addAction(tr("Move to top left"), this, &IOGraphDialog::moveLegend)->setData((Qt::AlignTop|Qt::AlignLeft).toInt());
+        menu->addAction(tr("Move to top center"), this, &IOGraphDialog::moveLegend)->setData((Qt::AlignTop|Qt::AlignHCenter).toInt());
+        menu->addAction(tr("Move to top right"), this, &IOGraphDialog::moveLegend)->setData((Qt::AlignTop|Qt::AlignRight).toInt());
+        menu->addAction(tr("Move to bottom left"), this, &IOGraphDialog::moveLegend)->setData((Qt::AlignBottom|Qt::AlignLeft).toInt());
+        menu->addAction(tr("Move to bottom center"), this, &IOGraphDialog::moveLegend)->setData((Qt::AlignBottom|Qt::AlignHCenter).toInt());
+        menu->addAction(tr("Move to bottom right"), this, &IOGraphDialog::moveLegend)->setData((Qt::AlignBottom|Qt::AlignRight).toInt());
+#else
+        menu->addAction(tr("Move to top left"), this, &IOGraphDialog::moveLegend)->setData(static_cast<Qt::Alignment::Int>(Qt::AlignTop|Qt::AlignLeft));
+        menu->addAction(tr("Move to top center"), this, &IOGraphDialog::moveLegend)->setData(static_cast<Qt::Alignment::Int>(Qt::AlignTop|Qt::AlignHCenter));
+        menu->addAction(tr("Move to top right"), this, &IOGraphDialog::moveLegend)->setData(static_cast<Qt::Alignment::Int>(Qt::AlignTop|Qt::AlignRight));
+        menu->addAction(tr("Move to bottom left"), this, &IOGraphDialog::moveLegend)->setData(static_cast<Qt::Alignment::Int>(Qt::AlignBottom|Qt::AlignLeft));
+        menu->addAction(tr("Move to bottom center"), this, &IOGraphDialog::moveLegend)->setData(static_cast<Qt::Alignment::Int>(Qt::AlignBottom|Qt::AlignHCenter));
+        menu->addAction(tr("Move to bottom right"), this, &IOGraphDialog::moveLegend)->setData(static_cast<Qt::Alignment::Int>(Qt::AlignBottom|Qt::AlignRight));
+#endif
+        menu->popup(ui->ioPlot->mapToGlobal(pos));
+    } else if (ui->ioPlot->xAxis->selectTest(pos, false, nullptr) >= 0) {
+        QMenu *menu = new QMenu(this);
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+        // XXX - actionToggleTimeOrigin doesn't actually work so don't add it
+        menu->addAction(ui->actionTimeOfDay);
+        menu->popup(ui->ioPlot->mapToGlobal(pos));
+    } else if (ui->ioPlot->yAxis->selectTest(pos, false, nullptr) >= 0) {
+        QMenu *menu = new QMenu(this);
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+        menu->addAction(ui->actionLogScale);
+        menu->popup(ui->ioPlot->mapToGlobal(pos));
+    } else {
+        ctx_menu_.popup(ui->ioPlot->mapToGlobal(pos));
+    }
 }
 
 void IOGraphDialog::graphClicked(QMouseEvent *event)
 {
     QCustomPlot *iop = ui->ioPlot;
 
-    if (mouse_drags_) {
-        if (iop->axisRect()->rect().contains(event->pos())) {
-            iop->setCursor(QCursor(Qt::ClosedHandCursor));
+    switch (event->button()) {
+
+    case Qt::LeftButton:
+        if (mouse_drags_) {
+            if (iop->axisRect()->rect().contains(event->pos())) {
+                iop->setCursor(QCursor(Qt::ClosedHandCursor));
+            }
+            on_actionGoToPacket_triggered();
+        } else {
+            if (!rubber_band_) {
+                rubber_band_ = new QRubberBand(QRubberBand::Rectangle, iop);
+            }
+            rb_origin_ = event->pos();
+            rubber_band_->setGeometry(QRect(rb_origin_, QSize()));
+            rubber_band_->show();
         }
-        on_actionGoToPacket_triggered();
-    } else {
-        if (!rubber_band_) {
-            rubber_band_ = new QRubberBand(QRubberBand::Rectangle, iop);
+        break;
+
+    default:
+        if (mouse_drags_) {
+            iop->setCursor(QCursor(Qt::OpenHandCursor));
         }
-        rb_origin_ = event->pos();
-        rubber_band_->setGeometry(QRect(rb_origin_, QSize()));
-        rubber_band_->show();
     }
     iop->setFocus();
 }
@@ -1306,6 +1395,9 @@ void IOGraphDialog::mouseMoved(QMouseEvent *event)
 
     if (event->buttons().testFlag(Qt::LeftButton)) {
         if (mouse_drags_) {
+            // XXX - We might not actually be dragging. QCustomPlot iRangeDrag
+            // controls dragging, and it stops dragging when a button other
+            // than LeftButton is released (even if LeftButton is held down.)
             shape = Qt::ClosedHandCursor;
         } else {
             shape = Qt::CrossCursor;
@@ -1337,7 +1429,7 @@ void IOGraphDialog::mouseReleased(QMouseEvent *event)
 {
     QCustomPlot *iop = ui->ioPlot;
     auto_axes_ = false;
-    if (rubber_band_) {
+    if (rubber_band_ && event->button() == Qt::LeftButton) {
         rubber_band_->hide();
         if (!mouse_drags_) {
             QRectF zoom_ranges = getZoomRanges(QRect(rb_origin_, event->pos()));
@@ -1350,7 +1442,24 @@ void IOGraphDialog::mouseReleased(QMouseEvent *event)
             }
         }
     } else if (iop->cursor().shape() == Qt::ClosedHandCursor) {
+        // QCustomPlot iRangeDrag controls dragging, and it stops dragging
+        // when a button other than LeftButton is released (even if
+        // LeftButton is still held down.)
         iop->setCursor(QCursor(Qt::OpenHandCursor));
+    }
+}
+
+void IOGraphDialog::moveLegend()
+{
+    if (QAction *contextAction = qobject_cast<QAction*>(sender())) {
+        if (contextAction->data().canConvert<Qt::Alignment::Int>()) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 2, 0)
+            ui->ioPlot->axisRect()->insetLayout()->setInsetAlignment(0, Qt::Alignment::fromInt(contextAction->data().value<Qt::Alignment::Int>()));
+#else
+            ui->ioPlot->axisRect()->insetLayout()->setInsetAlignment(0, static_cast<Qt::Alignment>(contextAction->data().value<Qt::Alignment::Int>()));
+#endif
+            ui->ioPlot->replot();
+        }
     }
 }
 
@@ -1496,6 +1605,13 @@ void IOGraphDialog::loadProfileGraphs()
 
     ui->graphUat->setHeader(new ResizeHeaderView(Qt::Horizontal, ui->graphUat));
 
+    // asAOT was added most recently, so it's in the last section (9).
+    // This moves its visual location to the index immediately after Enabled
+    // without sacrificing backwards compatibility. The user can move them
+    // freely to override this. (We could parse through io_graph_packet_fields
+    // to get the indices programmatically if necessary.)
+    ui->graphUat->header()->moveSection(colAOT, 1);
+
     connect(uat_model_, &UatModel::dataChanged, this, &IOGraphDialog::modelDataChanged);
     connect(uat_model_, &UatModel::modelReset, this, &IOGraphDialog::modelRowsReset);
     connect(uat_model_, &UatModel::rowsInserted, this, &IOGraphDialog::modelRowsInserted);
@@ -1545,26 +1661,6 @@ void IOGraphDialog::on_intervalComboBox_currentIndexChanged(int)
     if (need_retap) {
         scheduleRetap(true);
     }
-}
-
-void IOGraphDialog::on_todCheckBox_toggled(bool checked)
-{
-    nstime_t orig_start;
-    nstime_copy(&orig_start, &start_time_);
-    bool orig_auto = auto_axes_;
-
-    if (checked) {
-        ui->ioPlot->xAxis->setTicker(datetime_ticker_);
-    } else {
-        ui->ioPlot->xAxis->setTicker(number_ticker_);
-    }
-    auto_axes_ = false;
-    scheduleRecalc(true);
-    auto_axes_ = orig_auto;
-    getGraphInfo();
-    nstime_delta(&orig_start, &start_time_, &orig_start);
-    ui->ioPlot->xAxis->moveRange(nstime_to_sec(&orig_start));
-    updateHint();
 }
 
 void IOGraphDialog::modelRowsReset()
@@ -1814,28 +1910,6 @@ void IOGraphDialog::on_zoomRadioButton_toggled(bool checked)
     ui->ioPlot->setInteractions(QCP::Interactions());
 }
 
-void IOGraphDialog::on_logCheckBox_toggled(bool checked)
-{
-    QCustomPlot *iop = ui->ioPlot;
-    QSharedPointer<QCPAxisTickerSi> si_ticker = qSharedPointerDynamicCast<QCPAxisTickerSi>(iop->yAxis->ticker());
-    if (si_ticker != nullptr) {
-        si_ticker->setLog(checked);
-    }
-
-    if (checked) {
-        iop->yAxis->setScaleType(QCPAxis::stLogarithmic);
-        if (si_ticker == nullptr) {
-            iop->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
-        }
-    } else {
-        iop->yAxis->setScaleType(QCPAxis::stLinear);
-        if (si_ticker == nullptr) {
-            iop->yAxis->setTicker(QSharedPointer<QCPAxisTicker>(new QCPAxisTicker));
-        }
-    }
-    iop->replot();
-}
-
 void IOGraphDialog::on_automaticUpdateCheckBox_toggled(bool checked)
 {
     prefs.gui_io_graph_automatic_update = checked ? true : false;
@@ -1846,15 +1920,6 @@ void IOGraphDialog::on_automaticUpdateCheckBox_toggled(bool checked)
     {
         updateStatistics();
     }
-}
-
-void IOGraphDialog::on_enableLegendCheckBox_toggled(bool checked)
-{
-    prefs.gui_io_graph_enable_legend = checked ? true : false;
-
-    prefs_main_write();
-
-    ui->ioPlot->legend->layer()->replot();
 }
 
 void IOGraphDialog::on_actionReset_triggered()
@@ -1974,7 +2039,7 @@ void IOGraphDialog::on_buttonBox_accepted()
     // Gaze upon my beautiful graph with lossy artifacts!
     QString jpeg_filter = tr("JPEG File Interchange Format (*.jpeg *.jpg)");
     QString csv_filter = tr("Comma Separated Values (*.csv)");
-    QString filter = QString("%1;;%2;;%3;;%4;;%5")
+    QString filter = QStringLiteral("%1;;%2;;%3;;%4;;%5")
             .arg(pdf_filter)
             .arg(png_filter)
             .arg(bmp_filter)
@@ -1983,7 +2048,7 @@ void IOGraphDialog::on_buttonBox_accepted()
 
     QString save_file = path.canonicalPath();
     if (!file_closed_) {
-        save_file += QString("/%1").arg(cap_file_.fileBaseName());
+        save_file += QStringLiteral("/%1").arg(cap_file_.fileBaseName());
     }
     file_name = WiresharkFileDialog::getSaveFileName(this, mainApp->windowTitleString(tr("Save Graph As…")),
                                              save_file, filter, &extension);
@@ -2019,6 +2084,57 @@ void IOGraphDialog::buttonBoxClicked(QAbstractButton *button)
     }
 }
 
+void IOGraphDialog::actionLegendTriggered(bool checked)
+{
+    prefs.gui_io_graph_enable_legend = checked ? true : false;
+
+    prefs_main_write();
+
+    ui->ioPlot->legend->layer()->replot();
+}
+
+void IOGraphDialog::actionLogScaleTriggered(bool checked)
+{
+    QCustomPlot *iop = ui->ioPlot;
+    QSharedPointer<QCPAxisTickerSi> si_ticker = qSharedPointerDynamicCast<QCPAxisTickerSi>(iop->yAxis->ticker());
+    if (si_ticker != nullptr) {
+        si_ticker->setLog(checked);
+    }
+
+    if (checked) {
+        iop->yAxis->setScaleType(QCPAxis::stLogarithmic);
+        if (si_ticker == nullptr) {
+            iop->yAxis->setTicker(QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog));
+        }
+    } else {
+        iop->yAxis->setScaleType(QCPAxis::stLinear);
+        if (si_ticker == nullptr) {
+            iop->yAxis->setTicker(QSharedPointer<QCPAxisTicker>(new QCPAxisTicker));
+        }
+    }
+    iop->replot();
+}
+
+void IOGraphDialog::actionTimeOfDayTriggered(bool checked)
+{
+    nstime_t orig_start;
+    nstime_copy(&orig_start, &start_time_);
+    bool orig_auto = auto_axes_;
+
+    if (checked) {
+        ui->ioPlot->xAxis->setTicker(datetime_ticker_);
+    } else {
+        ui->ioPlot->xAxis->setTicker(number_ticker_);
+    }
+    auto_axes_ = false;
+    scheduleRecalc(true);
+    auto_axes_ = orig_auto;
+    getGraphInfo();
+    nstime_delta(&orig_start, &start_time_, &orig_start);
+    ui->ioPlot->xAxis->moveRange(nstime_to_sec(&orig_start));
+    updateHint();
+}
+
 void IOGraphDialog::makeCsv(QTextStream &stream) const
 {
     QList<IOGraph *> activeGraphs;
@@ -2034,7 +2150,7 @@ void IOGraphDialog::makeCsv(QTextStream &stream) const
                 max_interval = ioGraphs_[row]->maxInterval();
             }
             QString name = ioGraphs_[row]->name().toUtf8();
-            name = QString("\"%1\"").arg(name.replace("\"", "\"\""));  // RFC 4180
+            name = QStringLiteral("\"%1\"").arg(name.replace("\"", "\"\""));  // RFC 4180
             stream << "," << name;
         }
     }
@@ -2109,6 +2225,7 @@ IOGraph::IOGraph(QCustomPlot *parent) :
     hf_index_(-1),
     interval_(0),
     start_time_(NSTIME_INIT_ZERO),
+    asAOT_(false),
     cur_idx_(-1)
 {
     Q_ASSERT(parent_ != NULL);
@@ -2128,7 +2245,7 @@ IOGraph::IOGraph(QCustomPlot *parent) :
 //        QMessageBox::critical(this, tr("%1 failed to register tap listener").arg(name_),
 //                             error_string->str);
 //        config_err_ = error_string->str;
-        g_string_free(error_string, true);
+        g_string_free(error_string, TRUE);
         tap_registered_ = false;
     }
 }
@@ -2179,7 +2296,7 @@ bool IOGraph::setFilter(const QString &filter)
     error_string = check_field_unit(vu_field_.toUtf8().constData(), NULL, val_units_);
     if (error_string) {
         config_err_ = error_string->str;
-        g_string_free(error_string, true);
+        g_string_free(error_string, TRUE);
         return false;
     }
 
@@ -2189,7 +2306,7 @@ bool IOGraph::setFilter(const QString &filter)
         if (full_filter.isEmpty()) {
             full_filter = vu_field_;
         } else {
-            full_filter += QString(" && (%1)").arg(vu_field_);
+            full_filter += QStringLiteral(" && (%1)").arg(vu_field_);
         }
     }
 
@@ -2197,7 +2314,7 @@ bool IOGraph::setFilter(const QString &filter)
         error_string = set_tap_dfilter(this, full_filter.toUtf8().constData());
         if (error_string) {
             config_err_ = error_string->str;
-            g_string_free(error_string, true);
+            g_string_free(error_string, TRUE);
             return false;
         }
 
@@ -2240,6 +2357,22 @@ void IOGraph::applyCurrentColor()
         // that uses QCustomPlot) - see link below for how to set QCP colors:
         // https://www.qcustomplot.com/index.php/demos/barchartdemo
         bars_->setBrush(color_);
+    }
+}
+
+// Sets the Average Over Time value.
+// Mostly C/P of setVisible(), Refer to this method for comments.
+void IOGraph::setAOT(bool asAOT)
+{
+    bool old_val = asAOT_;
+    asAOT_ = asAOT;
+    if (old_val != asAOT) {
+        if (visible_ && need_retap_) {
+            need_retap_ = false;
+            emit requestRetap();
+        } else {
+            emit requestRecalc();
+        }
     }
 }
 
@@ -2573,24 +2706,19 @@ void IOGraph::recalcGraphData(capture_file *cap_file)
          * just to make sure average on leftmost and rightmost displayed
          * values is as reliable as possible
          */
-        uint64_t warmup_interval = 0;
+        unsigned warmup_interval = 0;
 
-//        for (; warmup_interval < first_interval; warmup_interval += interval_) {
-//            mavg_cumulated += get_it_value(io, i, (int)warmup_interval/interval_);
-//            mavg_in_average_count++;
-//            mavg_left++;
-//        }
-        mavg_cumulated += getItemValue((int)warmup_interval/interval_, cap_file);
+        mavg_cumulated += getItemValue((int)warmup_interval, cap_file);
         mavg_in_average_count++;
-        for (warmup_interval = interval_;
-            ((warmup_interval < (0 + (moving_avg_period_ / 2) * (uint64_t)interval_)) &&
-             (warmup_interval <= (cur_idx_ * (uint64_t)interval_)));
-             warmup_interval += interval_) {
+        for (warmup_interval = 1;
+            (warmup_interval < moving_avg_period_ / 2) &&
+             (warmup_interval <= (unsigned)cur_idx_);
+             warmup_interval += 1) {
 
-            mavg_cumulated += getItemValue((int)warmup_interval / interval_, cap_file);
+            mavg_cumulated += getItemValue((int)warmup_interval, cap_file);
             mavg_in_average_count++;
         }
-        mavg_to_add = (unsigned int)warmup_interval;
+        mavg_to_add = warmup_interval;
     }
 
     double ts_offset = startOffset();
@@ -2604,13 +2732,13 @@ void IOGraph::recalcGraphData(capture_file *cap_file)
                 if (mavg_left > moving_avg_period_ / 2) {
                     mavg_left--;
                     mavg_in_average_count--;
-                    mavg_cumulated -= getItemValue((int)mavg_to_remove / interval_, cap_file);
-                    mavg_to_remove += interval_;
+                    mavg_cumulated -= getItemValue(mavg_to_remove, cap_file);
+                    mavg_to_remove += 1;
                 }
-                if (mavg_to_add <= (unsigned int) cur_idx_ * interval_) {
+                if (mavg_to_add <= (unsigned int) cur_idx_) {
                     mavg_in_average_count++;
-                    mavg_cumulated += getItemValue((int)mavg_to_add / interval_, cap_file);
-                    mavg_to_add += interval_;
+                    mavg_cumulated += getItemValue(mavg_to_add, cap_file);
+                    mavg_to_add += 1;
                 }
             }
             if (mavg_in_average_count > 0) {
@@ -2649,10 +2777,8 @@ format_size_units_e IOGraph::formatUnits() const
         return FORMAT_SIZE_UNIT_BITS;
     case IOG_ITEM_UNIT_CALC_LOAD:
         return FORMAT_SIZE_UNIT_ERLANGS;
-        break;
     case IOG_ITEM_UNIT_CALC_FIELDS:
         return FORMAT_SIZE_UNIT_FIELDS;
-        break;
     case IOG_ITEM_UNIT_CALC_SUM:
     case IOG_ITEM_UNIT_CALC_MAX:
     case IOG_ITEM_UNIT_CALC_MIN:
@@ -2667,6 +2793,8 @@ format_size_units_e IOGraph::formatUnits() const
             // and some unit strings are already prefixed units.
         }
         return FORMAT_SIZE_UNIT_NONE;
+    case IOG_ITEM_UNIT_CALC_THROUGHPUT:
+        return FORMAT_SIZE_UNIT_BITS_S;
     default:
         return FORMAT_SIZE_UNIT_NONE;
     }
@@ -2733,6 +2861,7 @@ bool IOGraph::showsZero() const
     case IOG_ITEM_UNIT_CALC_MIN:
     case IOG_ITEM_UNIT_CALC_AVERAGE:
     case IOG_ITEM_UNIT_CALC_LOAD:
+    case IOG_ITEM_UNIT_CALC_THROUGHPUT:
         // These are not the same sort of "omitted zeros" as above,
         // but changing val_units_ always results in a recalculation
         // so it doesn't matter (see modelDataChanged)
@@ -2771,6 +2900,7 @@ bool IOGraph::hasItemToShow(int idx, double value) const
     case IOG_ITEM_UNIT_CALC_MIN:
     case IOG_ITEM_UNIT_CALC_AVERAGE:
     case IOG_ITEM_UNIT_CALC_LOAD:
+    case IOG_ITEM_UNIT_CALC_THROUGHPUT:
         if (item->fields) {
             result = true;
         }
@@ -2797,7 +2927,7 @@ double IOGraph::getItemValue(int idx, const capture_file *cap_file) const
 {
     ws_assert(idx < max_io_items_);
 
-    return get_io_graph_item(&items_[0], val_units_, idx, hf_index_, cap_file, interval_, cur_idx_);
+    return get_io_graph_item(&items_[0], val_units_, idx, hf_index_, cap_file, interval_, cur_idx_, asAOT_);
 }
 
 // "tap_reset" callback for register_tap_listener

@@ -77,7 +77,8 @@ FunnelAction::FunnelAction(QString title, funnel_menu_callback callback, void *c
         title_(title),
         callback_(callback),
         callback_data_(callback_data),
-        retap_(retap)
+        retap_(retap),
+        packetData_(NULL)
 {
     // Use "&&" to get a real ampersand in the menu item.
     title.replace('&', "&&");
@@ -93,12 +94,13 @@ FunnelAction::FunnelAction(QString title, funnel_packet_menu_callback callback, 
         callback_data_(callback_data),
         retap_(retap),
         packetCallback_(callback),
+        packetData_(NULL),
         packetRequiredFields_(QSet<QString>())
 {
     // Use "&&" to get a real ampersand in the menu item.
     title.replace('&', "&&");
 
-    QStringList menuComponents = title.split(QString("/"));
+    QStringList menuComponents = title.split(QStringLiteral("/"));
     // Set the menu's text to the rightmost component, set the path to being everything to the left:
     setText("(empty)");
     packetSubmenu_ = "";
@@ -140,11 +142,7 @@ void FunnelAction::setPacketRequiredFields(const char *required_fields_str) {
     // Also remove leading and trailing spaces, in case someone writes
     // "http, dns" instead of "http,dns"
     QString requiredFieldsJoined = QString(required_fields_str);
-#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
     QStringList requiredFieldsSplit = requiredFieldsJoined.split(",", Qt::SkipEmptyParts);
-#else
-    QStringList requiredFieldsSplit = requiredFieldsJoined.split(",", QString::SkipEmptyParts);
-#endif
     foreach (QString requiredField, requiredFieldsSplit) {
         QString trimmedFieldName = requiredField.trimmed();
         if (! trimmedFieldName.isEmpty()) {
@@ -216,7 +214,7 @@ FunnelConsoleAction::FunnelConsoleAction(QString name,
         callback_data_(callback_data)
 {
     // Use "&&" to get a real ampersand in the menu item.
-    QString title = QString("%1 Console").arg(name).replace('&', "&&");
+    QString title = QStringLiteral("%1 Console").arg(name).replace('&', "&&");
 
     setText(title);
     setObjectName(FunnelStatistics::actionName());

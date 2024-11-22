@@ -241,7 +241,7 @@ static int FieldInfo_get_display(lua_State* L) {
 
     if (!fi->ws_fi->rep) {
         label_ptr = label_str;
-        proto_item_fill_label(fi->ws_fi, label_str);
+        proto_item_fill_label(fi->ws_fi, label_str, NULL);
     } else
         label_ptr = fi->ws_fi->rep->representation;
 
@@ -565,13 +565,13 @@ void lua_prime_all_fields(proto_tree* tree _U_) {
 
         if (error) {
             report_failure("while registering lua_fake_tap:\n%s",error->str);
-            g_string_free(error,true);
+            g_string_free(error,TRUE);
         } else if (!dfilter_compile(fake_tap_filter->str, &wslua_dfilter, &df_err)) {
             report_failure("while compiling dfilter \"%s\" for wslua: %s", fake_tap_filter->str, df_err->msg);
             df_error_free(&df_err);
         }
     }
-    g_string_free(fake_tap_filter, true);
+    g_string_free(fake_tap_filter, TRUE);
 }
 
 WSLUA_CONSTRUCTOR Field_new(lua_State *L) {

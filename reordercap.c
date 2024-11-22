@@ -33,7 +33,6 @@
 #include <wsutil/plugins.h>
 #endif
 
-#include <wsutil/report_message.h>
 #include <wsutil/wslog.h>
 
 #include "ui/failure_message.h"
@@ -56,8 +55,8 @@ print_usage(FILE *output)
 
 /* Remember where this frame was in the file */
 typedef struct FrameRecord_t {
-    gint64       offset;
-    guint        num;
+    int64_t      offset;
+    unsigned     num;
 
     nstime_t     frame_time;
 } FrameRecord_t;
@@ -83,7 +82,7 @@ frame_write(FrameRecord_t *frame, wtap *wth, wtap_dumper *pdh,
             const char *outfile)
 {
     int    err;
-    gchar  *err_info;
+    char   *err_info;
 
     DEBUG_PRINT("\nDumping frame (offset=%" PRIu64 ")\n",
                 frame->offset);
@@ -121,7 +120,7 @@ frame_write(FrameRecord_t *frame, wtap *wth, wtap_dumper *pdh,
    positive if (t1 > t2)
 */
 static int
-frames_compare(gconstpointer a, gconstpointer b)
+frames_compare(const void *a, const void *b)
 {
     const FrameRecord_t *frame1 = *(const FrameRecord_t *const *) a;
     const FrameRecord_t *frame2 = *(const FrameRecord_t *const *) b;
@@ -161,28 +160,16 @@ int
 main(int argc, char *argv[])
 {
     char *configuration_init_error;
-    static const struct report_message_routines reordercap_message_routines = {
-        failure_message,
-        failure_message,
-        open_failure_message,
-        read_failure_message,
-        write_failure_message,
-        cfile_open_failure_message,
-        cfile_dump_open_failure_message,
-        cfile_read_failure_message,
-        cfile_write_failure_message,
-        cfile_close_failure_message
-    };
     wtap *wth = NULL;
     wtap_dumper *pdh = NULL;
     wtap_rec rec;
     Buffer buf;
     int err;
-    gchar *err_info;
-    gint64 data_offset;
-    guint wrong_order_count = 0;
-    gboolean write_output_regardless = TRUE;
-    guint i;
+    char *err_info;
+    int64_t data_offset;
+    unsigned wrong_order_count = 0;
+    bool write_output_regardless = true;
+    unsigned i;
     wtap_dump_params params;
     int                          ret = EXIT_SUCCESS;
 
@@ -209,9 +196,6 @@ main(int argc, char *argv[])
 
     ws_noisy("Finished log init and parsing command line log arguments");
 
-    /* Initialize the version information. */
-    ws_init_version_info("Reordercap", NULL, NULL);
-
     /*
      * Get credential information for later use.
      */
@@ -229,15 +213,18 @@ main(int argc, char *argv[])
         g_free(configuration_init_error);
     }
 
-    init_report_message("reordercap", &reordercap_message_routines);
+    /* Initialize the version information. */
+    ws_init_version_info("Reordercap", NULL, NULL);
 
-    wtap_init(TRUE);
+    init_report_failure_message("reordercap");
+
+    wtap_init(true);
 
     /* Process the options first */
     while ((opt = ws_getopt_long(argc, argv, "hnv", long_options, NULL)) != -1) {
         switch (opt) {
             case 'n':
-                write_output_regardless = FALSE;
+                write_output_regardless = false;
                 break;
             case 'h':
                 show_help_header("Reorder timestamps of input file frames into output file.");
@@ -268,7 +255,7 @@ main(int argc, char *argv[])
     /* Open infile */
     /* TODO: if reordercap is ever changed to give the user a choice of which
        open_routine reader to use, then the following needs to change. */
-    wth = wtap_open_offline(infile, WTAP_TYPE_AUTO, &err, &err_info, TRUE);
+    wth = wtap_open_offline(infile, WTAP_TYPE_AUTO, &err, &err_info, true);
     if (wth == NULL) {
         cfile_open_failure_message(infile, err, err_info);
         ret = WS_EXIT_OPEN_ERROR;

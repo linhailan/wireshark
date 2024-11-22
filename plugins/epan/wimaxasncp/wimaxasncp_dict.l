@@ -63,8 +63,6 @@
  */
 %option prefix="WimaxasncpDict_"
 
-%option outfile="wimaxasncp_dict.c"
-
 %{
 	/*
 	 ** wimaxasncp_dict.h
@@ -766,12 +764,12 @@ wimaxasncp_dict_t *wimaxasncp_dict_scan(
 
 	if (state.dict_error->len > 0)
 	{
-		*error = g_string_free(state.dict_error, false);
+		*error = g_string_free(state.dict_error, FALSE);
 	}
 	else
 	{
 		*error = NULL;
-		g_string_free(state.dict_error, true);
+		g_string_free(state.dict_error, TRUE);
 	}
 	return state.dict;
 }

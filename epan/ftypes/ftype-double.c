@@ -8,13 +8,9 @@
 
 #include "config.h"
 
-#include <stdio.h>
 #include <ftypes-int.h>
-#include <math.h>
-#include <errno.h>
 #include <float.h>
-
-#include "strutil.h"
+#include <wsutil/array.h>
 
 static void
 double_fvalue_new(fvalue_t *fv)
@@ -122,6 +118,12 @@ val_divide(fvalue_t * dst, const fvalue_t *a, const fvalue_t *b, char **err_ptr 
 static enum ft_result
 cmp_order(const fvalue_t *a, const fvalue_t *b, int *cmp)
 {
+	/* In C, NaNs compare unordered with everything, including the same NaN.
+	 * The below makes all NaNs compare equal with everything. We could make
+	 * NaNs ordered by having negative NaNs below -inf and positive NaNs above
+	 * inf. C23 adds the totalorder function (which distinguishes NaNs from
+	 * each other by payload and also distinguishes -0 from 0.)
+	 */
 	if (a->value.floating < b->value.floating)
 		*cmp = -1;
 	else if (a->value.floating > b->value.floating)

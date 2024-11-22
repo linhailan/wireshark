@@ -12,8 +12,6 @@
 #ifndef __COLUMN_UTILS_H__
 #define __COLUMN_UTILS_H__
 
-#include <glib.h>
-
 #include "packet_info.h"
 #include "ws_symbol_export.h"
 
@@ -95,20 +93,21 @@ enum {
   COL_DEF_NET_DST,    /**< 30) Network layer dest address */
   COL_DEF_NET_SRC,    /**< 31) Network layer source address */
   COL_NUMBER,         /**< 32) Packet list item number */
-  COL_PACKET_LENGTH,  /**< 33) Packet length in bytes */
-  COL_PROTOCOL,       /**< 34) Protocol */
-  COL_REL_TIME,       /**< 35) Relative time */
-  COL_DEF_SRC,        /**< 36) Source address */
-  COL_DEF_SRC_PORT,   /**< 37) Source port */
-  COL_RES_SRC,        /**< 38) Resolved source */
-  COL_UNRES_SRC,      /**< 39) Unresolved source */
-  COL_RES_SRC_PORT,   /**< 40) Resolved source port */
-  COL_UNRES_SRC_PORT, /**< 41) Unresolved source port */
-  COL_UTC_YMD_TIME,   /**< 42) UTC date, as YYYY-MM-DD, and time */
-  COL_UTC_YDOY_TIME,  /**< 43) UTC date, as YYYY/DOY, and time */
-  COL_UTC_TIME,       /**< 44) UTC time */
-  COL_CLS_TIME,       /**< 45) Command line-specified time (default relative) */
-  NUM_COL_FMTS        /**< 46) Should always be last */
+  COL_NUMBER_DIS,     /**< 33) Packet list item number displayed */
+  COL_PACKET_LENGTH,  /**< 34) Packet length in bytes */
+  COL_PROTOCOL,       /**< 35) Protocol */
+  COL_REL_TIME,       /**< 36) Relative time */
+  COL_DEF_SRC,        /**< 37) Source address */
+  COL_DEF_SRC_PORT,   /**< 38) Source port */
+  COL_RES_SRC,        /**< 39) Resolved source */
+  COL_UNRES_SRC,      /**< 40) Unresolved source */
+  COL_RES_SRC_PORT,   /**< 41) Resolved source port */
+  COL_UNRES_SRC_PORT, /**< 42) Unresolved source port */
+  COL_UTC_YMD_TIME,   /**< 43) UTC date, as YYYY-MM-DD, and time */
+  COL_UTC_YDOY_TIME,  /**< 44) UTC date, as YYYY/DOY, and time */
+  COL_UTC_TIME,       /**< 45) UTC time */
+  COL_CLS_TIME,       /**< 46) Command line-specified time (default relative) */
+  NUM_COL_FMTS        /**< 47) Should always be last */
 };
 
 /** Are the columns writable?
@@ -179,7 +178,7 @@ WS_DLL_PUBLIC void col_set_str(column_info *cinfo, const int col, const char * s
 
 /** Add (replace) the text of a column element, the text will be formatted and copied.
  *
- * Unprintable characters according to isprint() are escaped.
+ * Unprintable characters according to g_ascii_isprint() are escaped.
  *
  * @param cinfo the current packet row
  * @param col the column to use, e.g. COL_INFO
@@ -194,7 +193,7 @@ WS_DLL_PUBLIC void col_add_lstr(column_info *cinfo, const int el, const char *st
 
 /** Add (replace) the text of a column element, the text will be formatted and copied.
  *
- * Unprintable characters according to isprint() are escaped.
+ * Unprintable characters according to g_ascii_isprint() are escaped.
  *
  * Same function as col_add_str() but using a printf-like format string.
  *
@@ -208,7 +207,7 @@ WS_DLL_PUBLIC void col_add_fstr(column_info *cinfo, const int col, const char *f
 
 /** Append the given text to a column element, the text will be formatted and copied.
  *
- * Unprintable characters according to isprint() are escaped.
+ * Unprintable characters according to g_ascii_isprint() are escaped.
  *
  * @param cinfo the current packet row
  * @param col the column to use, e.g. COL_INFO
@@ -254,7 +253,7 @@ WS_DLL_PUBLIC void col_append_lstr(column_info *cinfo, const int el, const char 
 
 /** Append the given text to a column element, the text will be formatted and copied.
  *
- * Unprintable characters according to isprint() are escaped.
+ * Unprintable characters according to g_ascii_isprint() are escaped.
  *
  * Same function as col_append_str() but using a printf-like format string.
  *
@@ -268,7 +267,7 @@ WS_DLL_PUBLIC void col_append_fstr(column_info *cinfo, const int col, const char
 
 /** Prepend the given text to a column element, the text will be formatted and copied.
  *
- * Unprintable characters according to isprint() are escaped.
+ * Unprintable characters according to g_ascii_isprint() are escaped.
  *
  * @param cinfo the current packet row
  * @param col the column to use, e.g. COL_INFO
@@ -280,7 +279,7 @@ WS_DLL_PUBLIC void col_prepend_fstr(column_info *cinfo, const int col, const cha
 
 /** Prepend the given text to a column element, the text will be formatted and copied.
  *
- * Unprintable characters according to isprint() are escaped.
+ * Unprintable characters according to g_ascii_isprint() are escaped.
  *
  * This function is similar to col_prepend_fstr() but this function will
  * unconditionally set a fence to the end of the prepended data even if there
@@ -294,7 +293,7 @@ WS_DLL_PUBLIC void col_prepend_fence_fstr(column_info *cinfo, const int col, con
 
 /** Append the given text (prepended by a separator) to a column element.
  *
- * Unprintable characters according to isprint() are escaped.
+ * Unprintable characters according to g_ascii_isprint() are escaped.
  *
  * Much like col_append_str() but will prepend the given separator if the column isn't empty.
  *
@@ -308,7 +307,7 @@ WS_DLL_PUBLIC void col_append_sep_str(column_info *cinfo, const int col, const c
 
 /** Append the given text (prepended by a separator) to a column element.
  *
- * Unprintable characters according to isprint() are escaped.
+ * Unprintable characters according to g_ascii_isprint() are escaped.
  *
  * Much like col_append_fstr() but will prepend the given separator if the column isn't empty.
  *

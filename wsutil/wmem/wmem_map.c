@@ -408,6 +408,30 @@ wmem_map_foreach(wmem_map_t *map, GHFunc foreach_func, void * user_data)
     }
 }
 
+void*
+wmem_map_find(wmem_map_t *map, GHRFunc foreach_func, void * user_data)
+{
+    wmem_map_item_t **item;
+    unsigned i;
+
+    /* Make sure we have a table */
+    if (map == NULL || map->table == NULL) {
+        return 0;
+    }
+
+    for (i = 0; i < CAPACITY(map); i++) {
+        item = &(map->table[i]);
+        while (*item) {
+            if (foreach_func((void *)(*item)->key, (void *)(*item)->value, user_data)) {
+                return (*item)->value;
+            } else {
+                item = &((*item)->next);
+            }
+        }
+    }
+    return NULL;
+}
+
 unsigned
 wmem_map_foreach_remove(wmem_map_t *map, GHRFunc foreach_func, void * user_data)
 {
@@ -484,19 +508,19 @@ wmem_strong_hash(const uint8_t *buf, const size_t len)
 }
 
 unsigned
-wmem_str_hash(gconstpointer key)
+wmem_str_hash(const void *key)
 {
     return wmem_strong_hash((const uint8_t *)key, strlen((const char *)key));
 }
 
 unsigned
-wmem_int64_hash(gconstpointer key)
+wmem_int64_hash(const void *key)
 {
     return wmem_strong_hash((const uint8_t *)key, sizeof(uint64_t));
 }
 
 unsigned
-wmem_double_hash(gconstpointer key)
+wmem_double_hash(const void *key)
 {
     return wmem_strong_hash((const uint8_t *)key, sizeof(double));
 }

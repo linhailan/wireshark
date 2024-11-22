@@ -43,8 +43,8 @@ TrafficTableDialog::TrafficTableDialog(QWidget &parent, CaptureFile &cf, const Q
     loadGeometry(parent.width(), parent.height() * 3 / 4);
 
     ui->absoluteTimeCheckBox->hide();
-    setWindowSubtitle(QString("%1s").arg(table_name));
-    ui->grpSettings->setTitle(QString("%1 Settings").arg(table_name));
+    setWindowSubtitle(QStringLiteral("%1s").arg(table_name));
+    ui->grpSettings->setTitle(QStringLiteral("%1 Settings").arg(table_name));
 
     copy_bt_ = buttonBox()->addButton(tr("Copy"), QDialogButtonBox::ActionRole);
     copy_bt_->setMenu(ui->trafficTab->createCopyMenu(copy_bt_));
@@ -70,6 +70,8 @@ TrafficTableDialog::TrafficTableDialog(QWidget &parent, CaptureFile &cf, const Q
     connect(ui->trafficListSearch, &QLineEdit::textChanged, ui->trafficList, &TrafficTypesList::filterList);
     connect(ui->trafficList, &TrafficTypesList::clearFilterList, ui->trafficListSearch, &QLineEdit::clear);
 
+    connect(mainApp->mainWindow(), SIGNAL(displayFilterSuccess(bool)), this, SLOT(displayFilterSuccess(bool)));
+
     QPushButton *close_bt = ui->buttonBox->button(QDialogButtonBox::Close);
     if (close_bt)
         close_bt->setDefault(true);
@@ -90,6 +92,11 @@ void TrafficTableDialog::addProgressFrame(QObject *parent)
 QDialogButtonBox *TrafficTableDialog::buttonBox() const
 {
     return ui->btnBoxSettings;
+}
+
+QVBoxLayout *TrafficTableDialog::getVerticalLayout() const
+{
+    return ui->verticalLayout;
 }
 
 QCheckBox *TrafficTableDialog::displayFilterCheckBox() const
@@ -124,6 +131,20 @@ void TrafficTableDialog::currentTabChanged()
     }
 }
 
+void TrafficTableDialog::aggregationSummaryOnlyCheckBoxToggled(bool checked)
+{
+    if (!cap_file_.isValid()) {
+        return;
+    }
+
+    ATapDataModel * atdm = trafficTab()->dataModelForTabIndex(1);
+    if(atdm) {
+        atdm->updateFlags(checked);
+    }
+
+    cap_file_.retapPackets();
+}
+
 void TrafficTableDialog::on_nameResolutionCheckBox_toggled(bool checked)
 {
     ui->trafficTab->setNameResolution(checked);
@@ -131,16 +152,28 @@ void TrafficTableDialog::on_nameResolutionCheckBox_toggled(bool checked)
 
 void TrafficTableDialog::displayFilterCheckBoxToggled(bool checked)
 {
+    displayFilterUpdate(checked);
+}
+
+void TrafficTableDialog::displayFilterUpdate(bool set_filter)
+{
     if (!cap_file_.isValid()) {
         return;
     }
 
-    if (checked)
+    if (set_filter)
         trafficTab()->setFilter(cap_file_.displayFilter());
     else
         trafficTab()->setFilter(QString());
 
     cap_file_.retapPackets();
+}
+
+void TrafficTableDialog::displayFilterSuccess(bool success)
+{
+    if (success && ui->displayFilterCheckBox->isEnabled() && ui->displayFilterCheckBox->isChecked()) {
+       displayFilterUpdate(true);
+    }
 }
 
 void TrafficTableDialog::captureEvent(CaptureEvent e)

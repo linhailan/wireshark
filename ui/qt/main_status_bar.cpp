@@ -96,7 +96,7 @@ MainStatusBar::MainStatusBar(QWidget *parent) :
 #if defined(Q_OS_WIN)
     // Handles are the same color as widgets, at least on Windows 7.
     splitter->setHandleWidth(3);
-    splitter->setStyleSheet(QString(
+    splitter->setStyleSheet(QStringLiteral(
                                 "QSplitter::handle {"
                                 "  border-left: 1px solid palette(mid);"
                                 "  border-right: 1px solid palette(mid);"
@@ -228,7 +228,7 @@ void MainStatusBar::setFileName(CaptureFile &cf)
 {
     if (cf.isValid()) {
         popGenericStatus(STATUS_CTX_FILE);
-        QString msgtip = QString("%1 (%2)")
+        QString msgtip = QStringLiteral("%1 (%2)")
                 .arg(cf.capFile()->filename, file_size_to_qstring(cf.capFile()->f_datalen));
         pushGenericStatus(STATUS_CTX_FILE, cf.fileName(), msgtip);
     }
@@ -256,7 +256,7 @@ void MainStatusBar::setStatusbarForCaptureFile()
 {
     if (cap_file_ && cap_file_->filename && (cap_file_->state != FILE_CLOSED)) {
         popGenericStatus(STATUS_CTX_FILE);
-        QString msgtip = QString("%1 (%2)")
+        QString msgtip = QStringLiteral("%1 (%2)")
                 .arg(cap_file_->filename, file_size_to_qstring(cap_file_->f_datalen));
         pushGenericStatus(STATUS_CTX_FILE,
                 gchar_free_to_qstring(cf_get_display_name(cap_file_)), msgtip);
@@ -315,7 +315,7 @@ void MainStatusBar::highlightedFieldChanged(FieldInformation * finfo)
         } else {
             hint = tr("Bytes %1-%2").arg(pos.start).arg(pos.start + pos.length - 1);
         }
-        hint += QString(": %1 (%2)")
+        hint += QStringLiteral(": %1 (%2)")
                 .arg(finfo->headerInfo().name, finfo->headerInfo().abbreviation);
     }
 
@@ -477,6 +477,10 @@ void MainStatusBar::showCaptureStatistics()
     pushGenericStatus(STATUS_CTX_MAIN, packets_str);
 }
 
+// These two counts are different in multiple file mode. cap_session->count
+// is the total number in the session across all files; cap_file_->count is
+// count in the current file. Perhaps we could display both in both cases?
+
 void MainStatusBar::updateCaptureStatistics(capture_session *cap_session)
 {
     cs_fixed_ = false;
@@ -635,7 +639,7 @@ void MainStatusBar::showProfileMenu(const QPoint &global_pos, Qt::MouseButton bu
 void MainStatusBar::toggleBackground(bool enabled)
 {
     if (enabled) {
-        setStyleSheet(QString(
+        setStyleSheet(QStringLiteral(
                           "QStatusBar {"
                           "  background-color: %2;"
                           "}"

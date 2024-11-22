@@ -3,11 +3,11 @@ include::../attributes.adoc[]
 :doctype: manpage
 :stylesheet: ws.css
 :linkcss:
-:copycss: ../docbook/{stylesheet}
+:copycss: {css_dir}/{stylesheet}
 
 == NAME
 
-sshdump - Provide interfaces to capture from a remote host through SSH using a remote capture binary.
+sshdump - Provide interfaces to capture packets from a remote host through SSH using a remote capture binary.
 
 == SYNOPSIS
 
@@ -94,7 +94,7 @@ To explicitly control the remote capture command:
 
 Supported interfaces:
 
-1. ssh
+1. sshdump
 
 == OPTIONS
 

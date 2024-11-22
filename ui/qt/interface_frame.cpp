@@ -68,7 +68,7 @@ InterfaceFrame::InterfaceFrame(QWidget * parent)
 {
     ui->setupUi(this);
 
-    setStyleSheet(QString(
+    setStyleSheet(QStringLiteral(
                       "QFrame {"
                       "  border: 0;"
                       "}"
@@ -226,7 +226,7 @@ void InterfaceFrame::scanLocalInterfaces(GList *filter_list)
         mainApp->emitAppSignal(MainApplication::LocalInterfacesChanged);
         scan_mutex.unlock();
     } else {
-        qWarning() << "scan mutex locked, can't scan interfaces";
+        qDebug() << "scan mutex locked, can't scan interfaces";
     }
 }
 #endif // HAVE_LIBPCAP
@@ -296,7 +296,7 @@ void InterfaceFrame::resetInterfaceTreeDisplay()
     ui->warningLabel->hide();
     ui->warningLabel->clear();
 
-    ui->warningLabel->setStyleSheet(QString(
+    ui->warningLabel->setStyleSheet(QStringLiteral(
                 "QLabel {"
                 "  border-radius: 0.5em;"
                 "  padding: 0.33em;"
@@ -367,7 +367,7 @@ void InterfaceFrame::resetInterfaceTreeDisplay()
     if (!ui->warningLabel->text().isEmpty() && recent.sys_warn_if_no_capture)
     {
         QString warning_text = ui->warningLabel->text();
-        warning_text.append(QString("<p><a href=\"%1\">%2</a></p>")
+        warning_text.append(QStringLiteral("<p><a href=\"%1\">%2</a></p>")
                             .arg(no_capture_link)
                             .arg(SimpleDialog::dontShowThisAgain()));
         ui->warningLabel->setText(warning_text);

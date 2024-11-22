@@ -74,8 +74,8 @@ BrandingText "Wireshark${U+00ae} Installer"
 ; is usually not associated with an appropriate text editor. We should use extension "txt"
 ; for a text file or "html" for an html README file.
 !define MUI_FINISHPAGE_TITLE_3LINES
-!define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\NEWS.txt"
-!define MUI_FINISHPAGE_SHOWREADME_TEXT "Show News"
+!define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\release-notes.html"
+!define MUI_FINISHPAGE_SHOWREADME_TEXT "Open the release notes"
 !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
 ; NSIS runs as Administrator and will run Wireshark as Administrator
 ; if these are enabled.
@@ -168,7 +168,7 @@ Page custom DisplayUSBPcapPage
 
   SetOutPath $INSTDIR
   File "${STAGING_DIR}\${EXTCAP_NAME}.html"
-  SetOutPath $INSTDIR\extcap\wireshark
+  SetOutPath $INSTDIR\extcap
   File "${STAGING_DIR}\extcap\wireshark\${EXTCAP_NAME}.exe"
 
 !macroend
@@ -537,7 +537,6 @@ File "${STAGING_DIR}\libwsutil.dll"
 !include wireshark-manifest.nsh
 
 File "${STAGING_DIR}\COPYING.txt"
-File "${STAGING_DIR}\NEWS.txt"
 File "${STAGING_DIR}\README.txt"
 File "${STAGING_DIR}\wka"
 File "${STAGING_DIR}\pdml2html.xsl"
@@ -677,6 +676,7 @@ File "${STAGING_DIR}\radius\dictionary.arista"
 File "${STAGING_DIR}\radius\dictionary.aruba"
 File "${STAGING_DIR}\radius\dictionary.ascend"
 File "${STAGING_DIR}\radius\dictionary.ascend.illegal"
+File "${STAGING_DIR}\radius\dictionary.ascend.illegal.extended"
 File "${STAGING_DIR}\radius\dictionary.asn"
 File "${STAGING_DIR}\radius\dictionary.audiocodes"
 File "${STAGING_DIR}\radius\dictionary.avaya"
@@ -698,6 +698,7 @@ File "${STAGING_DIR}\radius\dictionary.calix"
 File "${STAGING_DIR}\radius\dictionary.cambium"
 File "${STAGING_DIR}\radius\dictionary.camiant"
 File "${STAGING_DIR}\radius\dictionary.centec"
+File "${STAGING_DIR}\radius\dictionary.checkpoint"
 File "${STAGING_DIR}\radius\dictionary.chillispot"
 File "${STAGING_DIR}\radius\dictionary.ciena"
 File "${STAGING_DIR}\radius\dictionary.cisco"
@@ -751,8 +752,10 @@ File "${STAGING_DIR}\radius\dictionary.huawei"
 File "${STAGING_DIR}\radius\dictionary.iana"
 File "${STAGING_DIR}\radius\dictionary.identity_engines"
 File "${STAGING_DIR}\radius\dictionary.iea"
+File "${STAGING_DIR}\radius\dictionary.infinera"
 File "${STAGING_DIR}\radius\dictionary.infoblox"
 File "${STAGING_DIR}\radius\dictionary.infonet"
+File "${STAGING_DIR}\radius\dictionary.ingate"
 File "${STAGING_DIR}\radius\dictionary.ipunplugged"
 File "${STAGING_DIR}\radius\dictionary.issanni"
 File "${STAGING_DIR}\radius\dictionary.itk"
@@ -767,12 +770,14 @@ File "${STAGING_DIR}\radius\dictionary.localweb"
 File "${STAGING_DIR}\radius\dictionary.lucent"
 File "${STAGING_DIR}\radius\dictionary.manzara"
 File "${STAGING_DIR}\radius\dictionary.meinberg"
+File "${STAGING_DIR}\radius\dictionary.mellanox"
 File "${STAGING_DIR}\radius\dictionary.meraki"
 File "${STAGING_DIR}\radius\dictionary.merit"
 File "${STAGING_DIR}\radius\dictionary.meru"
 File "${STAGING_DIR}\radius\dictionary.microsemi"
 File "${STAGING_DIR}\radius\dictionary.microsoft"
 File "${STAGING_DIR}\radius\dictionary.mikrotik"
+File "${STAGING_DIR}\radius\dictionary.mimosa"
 File "${STAGING_DIR}\radius\dictionary.motorola"
 File "${STAGING_DIR}\radius\dictionary.motorola.illegal"
 File "${STAGING_DIR}\radius\dictionary.motorola.wimax"
@@ -802,6 +807,7 @@ File "${STAGING_DIR}\radius\dictionary.proxim"
 File "${STAGING_DIR}\radius\dictionary.purewave"
 File "${STAGING_DIR}\radius\dictionary.quiconnect"
 File "${STAGING_DIR}\radius\dictionary.quintum"
+File "${STAGING_DIR}\radius\dictionary.rcntec"
 File "${STAGING_DIR}\radius\dictionary.redcreek"
 File "${STAGING_DIR}\radius\dictionary.rfc2865"
 File "${STAGING_DIR}\radius\dictionary.rfc2866"
@@ -913,7 +919,7 @@ File "${STAGING_DIR}\dtds\watcherinfo.dtd"
 SetOutPath $INSTDIR
 
 ; Create the extcap directory
-CreateDirectory $INSTDIR\extcap\wireshark
+CreateDirectory $INSTDIR\extcap
 
 ;
 ; install the protobuf .proto definitions in the protobuf subdirectory
@@ -1012,7 +1018,6 @@ ${If} $0 == "0"
   ${EndIf}
   ${StrRep} $0 '$USBPCAP_UNINSTALL' 'Uninstall.exe' 'USBPcapCMD.exe'
   ${StrRep} $1 '$0' '"' ''
-  SetOutPath $INSTDIR\extcap\wireshark
   CopyFiles  /SILENT $1 $INSTDIR\extcap
   SetRebootFlag true
 ${EndIf}
@@ -1036,21 +1041,13 @@ Section "${PROGRAM_NAME}" SecWiresharkQt
 ; by default, Wireshark.exe is installed
 SetOutPath $INSTDIR
 File "${QT_DIR}\${PROGRAM_NAME_PATH}"
+File /r "${QT_DIR}\translations"
 ; Write an entry for ShellExecute
 WriteRegStr HKEY_LOCAL_MACHINE "Software\Microsoft\Windows\CurrentVersion\App Paths\${PROGRAM_NAME_PATH}" "" '$INSTDIR\${PROGRAM_NAME_PATH}'
 WriteRegStr HKEY_LOCAL_MACHINE "Software\Microsoft\Windows\CurrentVersion\App Paths\${PROGRAM_NAME_PATH}" "Path" '$INSTDIR'
 
 !ifndef SKIP_NSIS_QT_DLLS
 !include wireshark-qt-manifest.nsh
-!endif
-
-${!defineifexist} TRANSLATIONS_FOLDER "${QT_DIR}\translations"
-SetOutPath $INSTDIR
-!ifdef TRANSLATIONS_FOLDER
-  ; Starting from Qt 5.5, *.qm files are put in a translations subfolder
-  File /r "${QT_DIR}\translations"
-!else
-  File "${QT_DIR}\*.qm"
 !endif
 
 ; Is the Start Menu check box checked?
@@ -1094,6 +1091,9 @@ File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\ilbc.dll"
 !ifdef OPUS_FOUND
 File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\opus_dec.dll"
 !endif
+!ifdef AMRNB_FOUND
+File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\amrnb.dll"
+!endif
 
 ; This should be a function or macro
 SetOutPath '$INSTDIR\profiles\Bluetooth'
@@ -1107,6 +1107,7 @@ File "${STAGING_DIR}\profiles\No Reassembly\preferences"
 SetOutPath '$INSTDIR\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan'
 File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\ethercat.dll"
 File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\gryphon.dll"
+File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\ipaddr.dll"
 File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\irda.dll"
 File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\opcua.dll"
 File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\profinet.dll"
@@ -1224,17 +1225,15 @@ Section "-Clear Partial Selected"
 !insertmacro ClearSectionFlag ${SecExtcapGroup} ${SF_PSELECTED}
 SectionEnd
 
-!ifdef DOCBOOK_DIR
 !ifdef DOC_DIR
 Section "-Documentation"
 
 SetOutPath "$INSTDIR\Wireshark User's Guide"
-File /r "${DOCBOOK_DIR}\wsug_html_chunked\*.*"
+File /r "${DOC_DIR}\wsug_html_chunked\*.*"
 
 SetOutPath $INSTDIR
 File "${DOC_DIR}\faq.html"
 SectionEnd
-!endif
 !endif
 
 Section "-Finally"
@@ -1379,13 +1378,13 @@ Delete "$INSTDIR\COPYING*"
 Delete "$INSTDIR\audio\*.*"
 Delete "$INSTDIR\bearer\*.*"
 Delete "$INSTDIR\diameter\*.*"
-Delete "$INSTDIR\extcap\wireshark\androiddump.*"
-Delete "$INSTDIR\extcap\wireshark\ciscodump.*"
-Delete "$INSTDIR\extcap\wireshark\etwdump.*"
-Delete "$INSTDIR\extcap\wireshark\randpktdump.*"
-Delete "$INSTDIR\extcap\wireshark\sshdump.*"
-Delete "$INSTDIR\extcap\wireshark\udpdump.*"
-Delete "$INSTDIR\extcap\wireshark\wifidump.*"
+Delete "$INSTDIR\extcap\androiddump.*"
+Delete "$INSTDIR\extcap\ciscodump.*"
+Delete "$INSTDIR\extcap\etwdump.*"
+Delete "$INSTDIR\extcap\randpktdump.*"
+Delete "$INSTDIR\extcap\sshdump.*"
+Delete "$INSTDIR\extcap\udpdump.*"
+Delete "$INSTDIR\extcap\wifidump.*"
 Delete "$INSTDIR\gpl-2.0-standalone.html"
 Delete "$INSTDIR\Acknowledgements.md"
 Delete "$INSTDIR\generic\*.*"
@@ -1435,7 +1434,7 @@ Delete "$INSTDIR\release-notes.html"
 RMDir "$INSTDIR\accessible"
 RMDir "$INSTDIR\audio"
 RMDir "$INSTDIR\bearer"
-RMDir "$INSTDIR\extcap\wireshark"
+RMDir "$INSTDIR\extcap"
 RMDir "$INSTDIR\extcap"
 RMDir "$INSTDIR\iconengines"
 RMDir "$INSTDIR\imageformats"

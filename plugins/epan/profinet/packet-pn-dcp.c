@@ -29,16 +29,15 @@
 
 #include "config.h"
 
-#include <string.h>
-
 #include <glib.h>
 
 #include <epan/packet.h>
-#include <epan/exceptions.h>
 #include <epan/to_str.h>
 #include <epan/wmem_scopes.h>
 #include <epan/expert.h>
 #include <epan/conversation.h>
+#include <epan/tfs.h>
+#include <wsutil/array.h>
 
 #include "packet-pn.h"
 
@@ -563,8 +562,8 @@ dissect_PNDCP_Suboption_IP(tvbuff_t *tvb, int offset, packet_info *pinfo,
         proto_item_append_text(block_item, ", Gateway: %s", address_to_str(pinfo->pool, &addr));
         break;
     case PNDCP_SUBOPTION_IP_FULL_IP_SUITE:
-        pn_append_info(pinfo, dcp_item, ", MAC");
-        proto_item_append_text(block_item, "IP/MAC");
+        pn_append_info(pinfo, dcp_item, ", Full IP Suite");
+        proto_item_append_text(block_item, "IP/Full IP Suite");
 
         /* BlockInfo? */
         if (((service_id == PNDCP_SERVICE_ID_IDENTIFY) && is_response) ||
@@ -1390,7 +1389,7 @@ dissect_PNDCP_Suboption_Control(tvbuff_t *tvb, int offset, packet_info *pinfo,
             proto_item_append_text(block_item, "Control/Response");
             offset = dissect_PNDCP_Option(tvb, offset, pinfo, tree, block_item, hf_pn_dcp_suboption_control_option,
                 false /* append_col */);
-            block_error = tvb_get_guint8(tvb, offset);
+            block_error = tvb_get_uint8(tvb, offset);
             if (tree) {
                 item = proto_tree_add_uint(tree, hf_pn_dcp_block_error, tvb, offset, 1, block_error);
             }

@@ -67,7 +67,7 @@ FieldFilterEdit::FieldFilterEdit(QWidget *parent) :
 
 void FieldFilterEdit::setDefaultPlaceholderText()
 {
-    placeholder_text_ = QString(tr("Enter a field %1")).arg(UTF8_HORIZONTAL_ELLIPSIS);
+    placeholder_text_ = tr("Enter a field %1").arg(UTF8_HORIZONTAL_ELLIPSIS);
 
     setPlaceholderText(placeholder_text_);
 }
@@ -130,7 +130,7 @@ void FieldFilterEdit::buildCompletionList(const QString &field_word, const QStri
 
         header_field_info *hfinfo = proto_registrar_get_byname(field_word.toUtf8().constData());
         if (hfinfo) {
-            QString cursor_field_msg = QString("%1: %2")
+            QString cursor_field_msg = QStringLiteral("%1: %2")
                     .arg(hfinfo->name)
                     .arg(ftype_pretty_name(hfinfo->type));
             emit pushFilterSyntaxStatus(cursor_field_msg);

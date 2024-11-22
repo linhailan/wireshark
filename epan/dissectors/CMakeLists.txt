@@ -62,6 +62,7 @@ set(PIDL_DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dcerpc-mdssvc.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dcerpc-misc.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dcerpc-nspi.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-dcerpc-rcg.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dcerpc-rfr.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dcerpc-srvsvc.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-dcerpc-winreg.c
@@ -173,6 +174,7 @@ set(CLEAN_ASN1_DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-q932-ros.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-qsig.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ranap.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-rc-v3.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-rnsap.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-roon_discovery.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ros.c
@@ -273,6 +275,7 @@ set(DISSECTOR_PUBLIC_HEADERS
 	packet-afp.h
 	packet-alcap.h
 	packet-amp.h
+	packet-amr.h
 	packet-ansi_a.h
 	packet-ansi_map.h
 	packet-ansi_tcap.h
@@ -360,6 +363,7 @@ set(DISSECTOR_PUBLIC_HEADERS
 	packet-dtls.h
 	packet-dvbci.h
 	packet-e1ap.h
+	packet-eap.h
 	packet-enip.h
 	packet-erf.h
 	packet-e164.h
@@ -399,6 +403,7 @@ set(DISSECTOR_PUBLIC_HEADERS
 	packet-gsm_a_common.h
 	packet-gsm_a_rr.h
 	packet-gsm_map.h
+	packet-gsm_osmux.h
 	packet-gsm_rlcmac.h
 	packet-gsm_sms.h
 	packet-gsmtap.h
@@ -451,6 +456,7 @@ set(DISSECTOR_PUBLIC_HEADERS
 	packet-isobus-parameters.h
 	packet-isup.h
 	packet-its.h
+	packet-iuup.h
 	packet-iwarp-ddp-rdmap.h
 	packet-json.h
 	packet-juniper.h
@@ -839,7 +845,9 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-bthci_evt.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-bthci_iso.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-bthci_sco.c
-	${CMAKE_CURRENT_SOURCE_DIR}/packet-bthci_vendor.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-bthci_vendor_android.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-bthci_vendor_broadcom.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-bthci_vendor_intel.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-bthcrp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-bthfp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-bthid.c
@@ -1467,6 +1475,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-lpd.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-lsc.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-lsd.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-lsdp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ltp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-lustre.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-lwapp.c
@@ -1616,6 +1625,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-nlm.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-nlsp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-nmea0183.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-nmf.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-nntp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-noe.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-nordic_ble.c
@@ -1630,6 +1640,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-nt-tpcp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ntlmssp.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ntp.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-nts-ke.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-null.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-nvme.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-nvme-mi.c

@@ -36,7 +36,7 @@
  * model strings.
  */
 static int
-compare_model_names(gconstpointer a, gconstpointer b, void * user_data _U_)
+compare_model_names(const void *a, const void *b, void * user_data _U_)
 {
     return strcmp((const char *)a, (const char *)b);
 }
@@ -423,13 +423,7 @@ get_cpu_info(GString *str)
         /*
          * We have at least one model name, so add the name(s) to
          * the string.
-         *
-         * If the string is not empty, separate the name(s) from
-         * what precedes it.
          */
-        if (str->len > 0)
-            g_string_append(str, ", with ");
-
         if (num_model_names > 1) {
             /*
              * There's more than one, so put the list inside curly

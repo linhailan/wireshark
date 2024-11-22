@@ -30,11 +30,7 @@
 #include <cli_main.h>
 
 static char* sshdump_extcap_interface;
-#ifdef _WIN32
-#define DEFAULT_SSHDUMP_EXTCAP_INTERFACE "sshdump.exe"
-#else
 #define DEFAULT_SSHDUMP_EXTCAP_INTERFACE "sshdump"
-#endif
 
 #define SSHDUMP_VERSION_MAJOR "1"
 #define SSHDUMP_VERSION_MINOR "2"
@@ -69,7 +65,7 @@ static const struct ws_option longopts[] = {
 	EXTCAP_BASE_OPTIONS,
 	{ "help", ws_no_argument, NULL, OPT_HELP},
 	{ "version", ws_no_argument, NULL, OPT_VERSION},
-	SSH_BASE_OPTIONS,
+	SSH_BASE_PACKET_OPTIONS,
 	{ "remote-capture-command-select", ws_required_argument, NULL, OPT_REMOTE_CAPTURE_COMMAND_SELECT},
 	{ "remote-capture-command", ws_required_argument, NULL, OPT_REMOTE_CAPTURE_COMMAND},
 	{ "remote-sudo", ws_no_argument, NULL, OPT_REMOTE_SUDO },	// Deprecated
@@ -196,7 +192,7 @@ static ssh_channel run_ssh_command(ssh_session sshs, const char* capture_command
 				g_string_append_printf(ifaces_string, "-i %s ", quoted_iface);
 				ifaces_array_num++;
 			}
-			ifaces = g_string_free(ifaces_string, false);
+			ifaces = g_string_free(ifaces_string, FALSE);
 		}
 		quoted_filter = g_shell_quote(cfilter ? cfilter : "");
 		if (count > 0)
@@ -306,7 +302,7 @@ static char* interfaces_list_to_filter(GSList* interfaces, unsigned int remote_p
 		}
 		g_string_append_printf(filter, ") and port %u)", remote_port);
 	}
-	return g_string_free(filter, false);
+	return g_string_free(filter, FALSE);
 }
 
 static int list_config(char *interface, unsigned int remote_port)
@@ -430,6 +426,9 @@ int main(int argc, char *argv[])
 	extcap_log_init("sshdump");
 
 	sshdump_extcap_interface = g_path_get_basename(argv[0]);
+	if (g_str_has_suffix(sshdump_extcap_interface, ".exe")) {
+		sshdump_extcap_interface[strlen(sshdump_extcap_interface) - 4] = '\0';
+	}
 
 	/*
 	 * Get credential information for later use.
@@ -659,7 +658,7 @@ int main(int argc, char *argv[])
 		// given is always using the default SSH port since there's no remote SSH port
 		// given on the command line to get the extcap arguments.
 		// However the remote SSH port used here is the one given on the command line
-		// when the capture us started, which is the indended one.
+		// when the capture us started, which is the intended one.
 		// And this is only happening when no remote filter is specified on the command
 		// line to start the capture.
 		if (remote_filter == NULL)

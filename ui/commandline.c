@@ -53,7 +53,7 @@ commandline_param_info_t global_commandline_info;
 
 capture_options global_capture_opts;
 
-void
+static void
 commandline_print_usage(bool for_help_option) {
     FILE *output;
 
@@ -68,7 +68,9 @@ commandline_print_usage(bool for_help_option) {
         output = stderr;
     }
     fprintf(output, "\n");
-    fprintf(output, "Usage: wireshark [options] ... [ <infile> ]\n");
+    char *namespace_lower = g_ascii_strdown(get_configuration_namespace(), -1);
+    fprintf(output, "Usage: %s [options] ... [ <infile> ]\n", namespace_lower);
+    g_free(namespace_lower);
     fprintf(output, "\n");
 
 #ifdef HAVE_LIBPCAP
@@ -133,7 +135,7 @@ commandline_print_usage(bool for_help_option) {
     fprintf(output, "\n");
     fprintf(output, "Processing:\n");
     fprintf(output, "  -R <read filter>, --read-filter <read filter>\n");
-    fprintf(output, "                           packet filter in Wireshark display filter syntax\n");
+    fprintf(output, "                           packet filter in display filter (wireshark-filter(4)) syntax\n");
     fprintf(output, "  -n                       disable all name resolutions (def: all enabled)\n");
     // Note: the order of the flags here matches the options in the settings dialog e.g. "dsN" only have an effect if "n" is set
     fprintf(output, "  -N <name resolve flags>  enable specific name resolution(s): \"mtndsNvg\"\n");
@@ -196,7 +198,7 @@ commandline_print_usage(bool for_help_option) {
 #ifndef _WIN32
     fprintf(output, "  --display <X display>    X display to use\n");
 #endif
-    fprintf(output, "  --fullscreen             start Wireshark in full screen\n");
+    fprintf(output, "  --fullscreen             start %s in full screen\n", get_configuration_namespace());
 
 #ifdef _WIN32
     destroy_console();
@@ -222,7 +224,7 @@ static const char optstring[] = OPTSTRING;
 #ifndef HAVE_LIBPCAP
 static void print_no_capture_support_error(void)
 {
-    cmdarg_err("This version of Wireshark was not built with support for capturing packets.");
+    cmdarg_err("This version of %s was not built with support for capturing packets.", get_configuration_namespace());
 }
 #endif
 
@@ -385,7 +387,7 @@ void commandline_early_options(int argc, char *argv[])
 
 #ifndef HAVE_LUA
     if (ex_opt_count("lua_script") > 0) {
-        cmdarg_err("This version of Wireshark was not built with support for Lua scripting.");
+        cmdarg_err("This version of %s was not built with support for Lua scripting.", get_configuration_namespace());
         exit(1);
     }
 #endif
@@ -579,7 +581,7 @@ void commandline_other_options(int argc, char *argv[], bool opt_reset)
                 global_commandline_info.jump_backwards = SD_BACKWARD;
                 break;
             case 'g':        /* Go to packet with the given packet number */
-                global_commandline_info.go_to_packet = get_nonzero_guint32(ws_optarg, "go to packet");
+                global_commandline_info.go_to_packet = get_nonzero_uint32(ws_optarg, "go to packet");
                 break;
             case 'J':        /* Jump to the first packet which matches the filter criteria */
                 global_commandline_info.jfilter = ws_optarg;
@@ -646,9 +648,11 @@ void commandline_other_options(int argc, char *argv[], bool opt_reset)
                  part of a tap filter.  Instead, we just add the argument
                  to a list of stat arguments. */
                 if (strcmp("help", ws_optarg) == 0) {
-                  fprintf(stderr, "wireshark: The available statistics for the \"-z\" option are:\n");
-                  list_stat_cmd_args();
-                  exit_application(0);
+                    char *namespace_lower = g_ascii_strdown(get_configuration_namespace(), -1);
+                    fprintf(stderr, "%s: The available statistics for the \"-z\" option are:\n", namespace_lower);
+                    g_free(namespace_lower);
+                    list_stat_cmd_args();
+                    exit_application(0);
                 }
                 if (!process_stat_cmd_arg(ws_optarg)) {
                     cmdarg_err("Invalid -z argument.");
@@ -800,7 +804,7 @@ void commandline_other_options(int argc, char *argv[], bool opt_reset)
 }
 
 /* Local function used by commandline_options_drop */
-static int cl_find_custom(gconstpointer elem_data, gconstpointer search_data) {
+static int cl_find_custom(const void *elem_data, const void *search_data) {
     return memcmp(elem_data, search_data, strlen((char *)search_data));
 }
 
@@ -816,7 +820,7 @@ void commandline_options_drop(const char *module_name, const char *pref_name) {
     opt_prefix = ws_strdup_printf("%s.%s:", module_name, pref_name);
 
     while (NULL != (elem = g_slist_find_custom(global_commandline_info.user_opts,
-                        (gconstpointer)opt_prefix, cl_find_custom))) {
+                        (const void *)opt_prefix, cl_find_custom))) {
         global_commandline_info.user_opts =
                 g_slist_remove_link(global_commandline_info.user_opts, elem);
         g_free(elem->data);
@@ -845,6 +849,43 @@ void commandline_options_reapply(void) {
         if (errmsg != NULL) {
             g_free(errmsg);
             errmsg = NULL;
+        }
+    }
+}
+
+void commandline_options_apply_extcap(void) {
+    char *errmsg = NULL;
+    GSList *entry = NULL;
+    char *pref_arg;
+
+    if (prefs.capture_no_extcap)
+        return;
+
+    for (entry = global_commandline_info.user_opts; entry != NULL; entry = g_slist_next(entry)) {
+        pref_arg = (char *)entry->data;
+        if (g_str_has_prefix(pref_arg, "extcap.")) {
+            switch (prefs_set_pref(pref_arg, &errmsg)) {
+                case PREFS_SET_OK:
+                    break;
+                case PREFS_SET_SYNTAX_ERR:
+                    cmdarg_err("Invalid -o flag \"%s\"%s%s", pref_arg,
+                            errmsg ? ": " : "", errmsg ? errmsg : "");
+                    g_free(errmsg);
+                    exit_application(1);
+                    break;
+                case PREFS_SET_NO_SUCH_PREF:
+                    cmdarg_err("-o flag \"%s\" specifies unknown preference/recent value",
+                               pref_arg);
+                    exit_application(1);
+                    break;
+                case PREFS_SET_OBSOLETE:
+                    cmdarg_err("-o flag \"%s\" specifies obsolete preference",
+                               pref_arg);
+                    exit_application(1);
+                    break;
+                default:
+                    ws_assert_not_reached();
+            }
         }
     }
 }

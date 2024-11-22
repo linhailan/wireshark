@@ -18,13 +18,12 @@
 #include "sttype-field.h"
 #include "sttype-slice.h"
 #include "sttype-op.h"
-#include "sttype-set.h"
 #include "sttype-function.h"
 #include "sttype-pointer.h"
 #include "sttype-number.h"
 
 #include <epan/exceptions.h>
-#include <epan/packet.h>
+#include <epan/tfs.h>
 
 #include <wsutil/ws_assert.h>
 #include <wsutil/wslog.h>
@@ -1040,10 +1039,6 @@ check_relation_LHS_FIELD(dfwork_t *dfw, stnode_op_t st_op,
 					stnode_todisplay(st_arg2), ftype_pretty_name(ftype2));
 		}
 	}
-	else if (type2 == STTYPE_UNPARSED) {
-		resolve_unparsed(dfw, st_arg2, true);
-		ASSERT_STTYPE_NOT_REACHED(type2);
-	}
 	else {
 		ASSERT_STTYPE_NOT_REACHED(type2);
 	}
@@ -1107,10 +1102,6 @@ check_relation_LHS_FVALUE(dfwork_t *dfw, stnode_op_t st_op,
 			FAIL(dfw, st_arg2, "%s (type=%s) cannot participate in specified comparison.",
 					stnode_todisplay(st_arg2), ftype_pretty_name(ftype2));
 		}
-	}
-	else if (type2 == STTYPE_UNPARSED) {
-		resolve_unparsed(dfw, st_arg2, true);
-		ASSERT_STTYPE_NOT_REACHED(type2);
 	}
 	else {
 		ASSERT_STTYPE_NOT_REACHED(type2);
@@ -1237,10 +1228,6 @@ check_relation_LHS_SLICE(dfwork_t *dfw, stnode_op_t st_op _U_,
 					stnode_todisplay(st_arg2), ftype_pretty_name(ftype2));
 		}
 	}
-	else if (type2 == STTYPE_UNPARSED) {
-		resolve_unparsed(dfw, st_arg2, true);
-		ASSERT_STTYPE_NOT_REACHED(type2);
-	}
 	else {
 		ASSERT_STTYPE_NOT_REACHED(type2);
 	}
@@ -1273,7 +1260,7 @@ check_relation_LHS_FUNCTION(dfwork_t *dfw, stnode_op_t st_op _U_,
 
 		if (!compatible_ftypes(ftype1, ftype2)) {
 			FAIL(dfw, st_arg2, "Function %s and %s are not of compatible types.",
-					sttype_function_name(st_arg2), stnode_todisplay(st_arg2));
+					sttype_function_name(st_arg1), stnode_todisplay(st_arg2));
 		}
 		/* Do this check even though you'd think that if
 		 * they're compatible, then can_func() would pass. */
@@ -1350,10 +1337,6 @@ check_relation_LHS_FUNCTION(dfwork_t *dfw, stnode_op_t st_op _U_,
 			FAIL(dfw, st_arg2, "%s (type=%s) cannot participate in specified comparison.",
 					stnode_todisplay(st_arg2), ftype_pretty_name(ftype2));
 		}
-	}
-	else if (type2 == STTYPE_UNPARSED) {
-		resolve_unparsed(dfw, st_arg2, true);
-		ASSERT_STTYPE_NOT_REACHED(type2);
 	}
 	else {
 		ASSERT_STTYPE_NOT_REACHED(type2);
@@ -1456,10 +1439,6 @@ check_relation_LHS_ARITHMETIC(dfwork_t *dfw, stnode_op_t st_op _U_,
 			FAIL(dfw, st_arg2, "%s (type=%s) cannot participate in specified comparison.",
 					stnode_todisplay(st_arg2), ftype_pretty_name(ftype2));
 		}
-	}
-	else if (type2 == STTYPE_UNPARSED) {
-		resolve_unparsed(dfw, st_arg2, true);
-		ASSERT_STTYPE_NOT_REACHED(type2);
 	}
 	else {
 		ASSERT_STTYPE_NOT_REACHED(type2);
@@ -1639,6 +1618,7 @@ check_relation_in(dfwork_t *dfw, stnode_t *st_node _U_,
 	nodelist = stnode_data(st_arg2);
 	while (nodelist) {
 		node_left = nodelist->data;
+		resolve_unparsed(dfw, node_left, false);
 
 		/* Don't let a range on the RHS affect the LHS field. */
 		if (stnode_type_id(node_left) == STTYPE_SLICE) {
@@ -1650,6 +1630,7 @@ check_relation_in(dfwork_t *dfw, stnode_t *st_node _U_,
 		ws_assert(nodelist);
 		node_right = nodelist->data;
 		if (node_right) {
+			resolve_unparsed(dfw, node_right, false);
 			check_relation_LHS_FIELD(dfw, STNODE_OP_GE, ftype_can_cmp,
 					false, st_node, st_arg1, node_left);
 			check_relation_LHS_FIELD(dfw, STNODE_OP_LE, ftype_can_cmp,
@@ -1968,7 +1949,7 @@ check_arithmetic_LHS_TIME(dfwork_t *dfw, stnode_op_t st_op, stnode_t *st_node,
 			}
 			ftype2 = check_arithmetic(dfw, st_arg2, FT_SCALAR);
 			if (!FT_IS_SCALAR(ftype2)) {
-				FAIL(dfw, st_node, "Right hand side must be an integer ou float type, not %s.", ftype_pretty_name(ftype2));
+				FAIL(dfw, st_node, "Right hand side must be an integer or float type, not %s.", ftype_pretty_name(ftype2));
 			}
 			break;
 		default:

@@ -21,11 +21,11 @@ shopt -s extglob
 DARWIN_MAJOR_VERSION=$(uname -r | sed 's/\([0-9]*\).*/\1/')
 
 #
-# The minimum supported version of Qt is 5.11, so the minimum supported version
-# of macOS is OS X 10.11 (El Capitan), aka Darwin 15.0.
+# The minimum supported version of Qt is 5.15, so the minimum supported version
+# of macOS is OS X 10.13 (High Sierra), aka Darwin 17.0.
 #
-if [[ $DARWIN_MAJOR_VERSION -lt 15 ]]; then
-    echo "This script does not support any versions of macOS before El Capitan" 1>&2
+if [[ $DARWIN_MAJOR_VERSION -lt 17 ]]; then
+    echo "This script does not support any versions of macOS before High Sierra" 1>&2
     exit 1
 fi
 
@@ -93,7 +93,7 @@ NINJA_SHA256=89a287444b5b3e98f88a945afa50ce937b8ffd1dcc59c555ad9b1baf855298c9
 # The following libraries and tools are required even to build only TShark.
 #
 GETTEXT_VERSION=0.22.5
-GLIB_VERSION=2.76.6
+GLIB_VERSION=2.80.3
 if [ "$GLIB_VERSION" ]; then
     GLIB_MAJOR_VERSION="$( expr $GLIB_VERSION : '\([0-9][0-9]*\).*' )"
     GLIB_MINOR_VERSION="$( expr $GLIB_VERSION : '[0-9][0-9]*\.\([0-9][0-9]*\).*' )"
@@ -171,18 +171,19 @@ fi
 # scripts to work with 5.1 through 5.4, as long as they only use Lua
 # features present in all versions)
 LUA_VERSION=5.4.6
-SNAPPY_VERSION=1.1.10
-ZSTD_VERSION=1.5.5
+SNAPPY_VERSION=1.2.1
+ZSTD_VERSION=1.5.6
 ZLIBNG_VERSION=2.1.6
-LIBXML2_VERSION=2.11.5
-LZ4_VERSION=1.9.4
+LIBXML2_VERSION=2.11.9 # Matches vcpkg
+LIBXML2_SHA256=780157a1efdb57188ec474dca87acaee67a3a839c2525b2214d318228451809f
+LZ4_VERSION=1.10.0
 SBC_VERSION=2.0
-CARES_VERSION=1.19.1
-LIBSSH_VERSION=0.10.5
+CARES_VERSION=1.31.0
+LIBSSH_VERSION=0.11.1
 # mmdbresolve
-MAXMINDDB_VERSION=1.4.3
-NGHTTP2_VERSION=1.56.0
-NGHTTP3_VERSION=0.15.0
+MAXMINDDB_VERSION=1.9.1
+NGHTTP2_VERSION=1.62.1
+NGHTTP3_VERSION=1.1.0
 SPANDSP_VERSION=0.0.6
 SPEEXDSP_VERSION=1.2.1
 if [ "$SPANDSP_VERSION" ]; then
@@ -199,8 +200,9 @@ OPENCORE_AMR_SHA256=483eb4061088e2b34b358e47540b5d495a96cd468e361050fae615b1809d
 OPUS_VERSION=1.4
 
 # Falco libs (libsinsp and libscap) and their dependencies. Unset for now.
-#FALCO_LIBS_VERSION=0.17.1
+#FALCO_LIBS_VERSION=0.18.1
 if [ "$FALCO_LIBS_VERSION" ] ; then
+    FALCO_LIBS_SHA256=1812e8236c4cb51d3fe5dd066d71be99f25da7ed22d8feeeebeed09bdc26325f
     JSONCPP_VERSION=1.9.5
     ONETBB_VERSION=2021.11.0
     # 2023-06-01 and later require Abseil.
@@ -225,6 +227,7 @@ else
 fi
 BROTLI_VERSION=1.0.9
 # minizip
+MINIZIPNG_VERSION=4.0.7
 ZLIB_VERSION=1.3
 # Uncomment to enable automatic updates using Sparkle
 #SPARKLE_VERSION=2.2.2
@@ -510,7 +513,7 @@ uninstall_libtool() {
         echo "Uninstalling GNU libtool:"
         cd libtool-$installed_libtool_version
         $DO_MV "$installation_prefix/bin/glibtool" "$installation_prefix/bin/libtool"
-        $DO_MV "$installation_prefix/glibtoolize" "$installation_prefix/bin/libtoolize"
+        $DO_MV "$installation_prefix/bin/glibtoolize" "$installation_prefix/bin/libtoolize"
         $DO_MAKE_UNINSTALL
         make distclean
         cd ..
@@ -1141,13 +1144,10 @@ install_qt() {
         5)
             case $QT_MINOR_VERSION in
 
-            0|1|2|3|4|5|6|7|8|9|10)
+            0|1|2|3|4|5|6|7|8|9|10|11|12|13|14)
                 echo "Qt $QT_VERSION" is too old 1>&2
                 ;;
 
-            11|12|13|14)
-                QT_VOLUME=qt-opensource-mac-x64-$QT_VERSION
-                ;;
             *)
                 echo "The Qt Company no longer provides open source offline installers for Qt $QT_VERSION" 1>&2
                 ;;
@@ -1200,11 +1200,11 @@ uninstall_qt() {
             5*)
                 case $installed_qt_minor_version in
 
-                0|1|2|3|4|5|6|7|8)
+                0|1|2|3|4|5|6|7|8|9|10|11)
                     echo "Qt $installed_qt_version" is too old 1>&2
                     ;;
 
-                9|10|11|12|13|14)
+                12|13|14)
                     installed_qt_volume=qt-opensource-mac-x64-$installed_qt_version.dmg
                     ;;
                 esac
@@ -1774,7 +1774,7 @@ install_zlibng() {
         cd zlib-ng-$ZLIBNG_VERSION
         mkdir build
         cd build
-        "${DO_CMAKE[@]}" .. 
+        "${DO_CMAKE[@]}" ..
         make "${MAKE_BUILD_OPTS[@]}"
         $DO_MAKE_INSTALL
         cd ../..
@@ -1806,12 +1806,13 @@ uninstall_zlibng() {
     fi
 }
 install_libxml2() {
-    if [ "$LIBXML2_VERSION" -a ! -f libxml2-$LIBXML2_VERSION-done ] ; then
+    if [ "$LIBXML2_VERSION" ] && [ ! -f libxml2-$LIBXML2_VERSION-done ] ; then
         echo "Downloading, building, and installing libxml2:"
         LIBXML2_MAJOR_VERSION="$( expr "$LIBXML2_VERSION" : '\([0-9][0-9]*\).*' )"
         LIBXML2_MINOR_VERSION="$( expr "$LIBXML2_VERSION" : '[0-9][0-9]*\.\([0-9][0-9]*\).*' )"
         LIBXML2_MAJOR_MINOR_VERSION=$LIBXML2_MAJOR_VERSION.$LIBXML2_MINOR_VERSION
-        [ -f libxml2-$LIBXML2_VERSION.tar.gz ] || curl "${CURL_REMOTE_NAME_OPTS[@]}" https://download.gnome.org/sources/libxml2/$LIBXML2_MAJOR_MINOR_VERSION/libxml2-$LIBXML2_VERSION.tar.xz
+        [ -f libxml2-$LIBXML2_VERSION.tar.gz ] || curl "${CURL_REMOTE_NAME_OPTS[@]}" "https://download.gnome.org/sources/libxml2/$LIBXML2_MAJOR_MINOR_VERSION/libxml2-$LIBXML2_VERSION.tar.xz"
+        echo "$LIBXML2_SHA256  libxml2-$LIBXML2_VERSION.tar.xz" | shasum --algorithm 256 --check
         $no_build && echo "Skipping installation" && return
         xzcat libxml2-$LIBXML2_VERSION.tar.xz | tar xf -
         cd "libxml2-$LIBXML2_VERSION"
@@ -1833,18 +1834,18 @@ install_libxml2() {
 uninstall_libxml2() {
     if [ -n "$installed_libxml2_version" ] ; then
         echo "Uninstalling libxml2:"
-        cd libxml2-$installed_libxml2_version
+        cd "libxml2-$installed_libxml2_version"
         $DO_MAKE_UNINSTALL
         make distclean
         cd ..
-        rm libxml2-$installed_libxml2_version-done
+        rm "libxml2-$installed_libxml2_version-done"
 
-        if [ "$#" -eq 1 -a "$1" = "-r" ] ; then
+        if [ "$#" -eq 1 ] && [ "$1" = "-r" ] ; then
             #
             # Get rid of the previously downloaded and unpacked version.
             #
-            rm -rf libxml2-$installed_libxml2_version
-            rm -rf libxml2-$installed_libxml2_version.tar.xz
+            rm -rf "libxml2-$installed_libxml2_version"
+            rm -rf "libxml2-$installed_libxml2_version.tar.xz"
         fi
 
         installed_libxml2_version=""
@@ -2013,7 +2014,8 @@ uninstall_maxminddb() {
 install_c_ares() {
     if [ "$CARES_VERSION" -a ! -f c-ares-$CARES_VERSION-done ] ; then
         echo "Downloading, building, and installing C-Ares API:"
-        [ -f c-ares-$CARES_VERSION.tar.gz ] || curl "${CURL_REMOTE_NAME_OPTS[@]}" https://c-ares.org/download/c-ares-$CARES_VERSION.tar.gz
+        # https://github.com/c-ares/c-ares/releases/download/v1.31.0/c-ares-1.31.0.tar.gz
+        [ -f c-ares-$CARES_VERSION.tar.gz ] || curl "${CURL_REMOTE_NAME_OPTS[@]}" https://github.com/c-ares/c-ares/releases/download/v$CARES_VERSION/c-ares-$CARES_VERSION.tar.gz
         $no_build && echo "Skipping installation" && return
         gzcat c-ares-$CARES_VERSION.tar.gz | tar xf -
         cd c-ares-$CARES_VERSION
@@ -2057,6 +2059,7 @@ install_libssh() {
         $no_build && echo "Skipping installation" && return
         xzcat libssh-$LIBSSH_VERSION.tar.xz | tar xf -
         cd "libssh-$LIBSSH_VERSION"
+        patch -p1 < "${topdir}/tools/macos-setup-patches/libssh-werror.patch"
         mkdir build
         cd build
         "${DO_CMAKE[@]}" -DWITH_GCRYPT=1 ..
@@ -2567,8 +2570,9 @@ install_falco_libs() {
     if [ "$FALCO_LIBS_VERSION" ] && [ ! -f "falco-libs-$FALCO_LIBS_VERSION-done" ] ; then
         echo "Downloading, building, and installing libsinsp and libscap:"
         [ -f "falco-libs-$FALCO_LIBS_VERSION.tar.gz" ] || curl "${CURL_REMOTE_NAME_OPTS[@]}" --remote-header-name "https://github.com/falcosecurity/libs/archive/refs/tags/$FALCO_LIBS_VERSION.tar.gz"
+        [ -f "falco-libs-$FALCO_LIBS_VERSION.tar.gz" ] || mv "libs-$FALCO_LIBS_VERSION.tar.gz" "falco-libs-$FALCO_LIBS_VERSION.tar.gz"
         $no_build && echo "Skipping installation" && return
-        mv "libs-$FALCO_LIBS_VERSION.tar.gz" "falco-libs-$FALCO_LIBS_VERSION.tar.gz"
+        echo "$FALCO_LIBS_SHA256  falco-libs-$FALCO_LIBS_VERSION.tar.gz" | shasum --algorithm 256 --check
         tar -xf "falco-libs-$FALCO_LIBS_VERSION.tar.gz"
         mv "libs-$FALCO_LIBS_VERSION" "falco-libs-$FALCO_LIBS_VERSION"
         cd "falco-libs-$FALCO_LIBS_VERSION"
@@ -2576,7 +2580,8 @@ install_falco_libs() {
 	patch -p1 < "${topdir}/tools/macos-setup-patches/falco-include-dirs.patch"
         mkdir build_dir
         cd build_dir
-        "${DO_CMAKE[@]}" -DBUILD_SHARED_LIBS=ON -DMINIMAL_BUILD=ON -DCREATE_TEST_TARGETS=OFF \
+        "${DO_CMAKE[@]}" -DFALCOSECURITY_LIBS_VERSION="$FALCO_LIBS_VERSION" \
+            -DBUILD_SHARED_LIBS=ON -DMINIMAL_BUILD=ON -DCREATE_TEST_TARGETS=OFF \
             -DUSE_BUNDLED_DEPS=ON -DUSE_BUNDLED_CARES=OFF -DUSE_BUNDLED_ZLIB=OFF \
             -DUSE_BUNDLED_JSONCPP=OFF -DUSE_BUNDLED_TBB=OFF -DUSE_BUNDLED_RE2=OFF \
             ..
@@ -2778,6 +2783,44 @@ uninstall_minizip() {
     fi
 }
 
+install_minizip_ng() {
+    if [ "$MINIZIPNG_VERSION" ] && [ ! -f minizip-ng-$MINIZIPNG_VERSION-done ] ; then
+        echo "Downloading, building, and installing minizip-ng:"
+        [ -f $MINIZIPNG_VERSION.tar.gz ] || curl "${CURL_REMOTE_NAME_OPTS[@]}" https://github.com/zlib-ng/minizip-ng/archive/refs/tags/$MINIZIPNG_VERSION.tar.gz
+        $no_build && echo "Skipping installation" && return
+        gzcat $MINIZIPNG_VERSION.tar.gz | tar xf -
+        cd minizip-ng-$MINIZIPNG_VERSION
+        mkdir build
+        cd build
+        "${DO_CMAKE[@]}" ..
+        make "${MAKE_BUILD_OPTS[@]}"
+        $DO_MAKE_INSTALL
+        cd ../..
+        touch minizip-ng-$MINIZIPNG_VERSION-done
+    fi
+}
+
+uninstall_minizip_ng() {
+    if [ -n "$installed_minizip_ng_version" ] ; then
+        echo "Uninstalling minizip-ng:"
+        cd minizip-ng-$installed_minizip_ng_version/contrib/minizip
+        $DO_MAKE_UNINSTALL
+        make distclean
+        cd ../../..
+
+        rm minizip-ng-$installed_minizip_ng_version-done
+
+        if [ "$#" -eq 1 ] && [ "$1" = "-r" ] ; then
+            #
+            # Get rid of the previously downloaded and unpacked version.
+            #
+            rm -rf minizip-ng-$installed_minizip_ng_version
+            rm -rf minizip-ng-$installed_minizip_ng_version.tar.gz
+        fi
+
+        installed_minizip_ng_version=""
+    fi
+}
 install_sparkle() {
     if [ "$SPARKLE_VERSION" ] && [ ! -f sparkle-$SPARKLE_VERSION-done ] ; then
         echo "Downloading and installing Sparkle:"
@@ -2988,8 +3031,7 @@ install_all() {
         uninstall_lz4 -r
     fi
 
-    if [ -n "$installed_libxml2_version" -a \
-              "$installed_libxml2_version" != "$LIBXML2_VERSION" ] ; then
+    if [ -n "$installed_libxml2_version" ] && [ "$installed_libxml2_version" != "$LIBXML2_VERSION" ] ; then
         echo "Installed libxml2 version is $installed_libxml2_version"
         if [ -z "$LIBXML2_VERSION" ] ; then
             echo "libxml2 is not requested"
@@ -3312,6 +3354,16 @@ install_all() {
         uninstall_minizip -r
     fi
 
+    if [ -n "$installed_minizip_ng_version" ] && [ "$installed_minizip_ng_version" != "$MINIZIPNG_VERSION" ] ; then
+    echo "Installed minizip-ng version is $installed_minizip_ng_version"
+    if [ -z "$MINIZIPNG_VERSION" ] ; then
+        echo "minizip-ng is not requested"
+    else
+        echo "Requested minizip-ng version is $MINIZIPNG_VERSION"
+    fi
+    uninstall_minizip_ng -r
+    fi
+
     if [ -n "$installed_sparkle_version" -a \
               "$installed_sparkle_version" != "$SPARKLE_VERSION" ] ; then
         echo "Installed Sparkle version is $installed_sparkle_version"
@@ -3369,7 +3421,7 @@ install_all() {
     install_curl
 
     #
-    # Now intall xz: it is the sole download format of glib later than 2.31.2.
+    # Now install xz: it is the sole download format of glib later than 2.31.2.
     #
     install_xz
 
@@ -3499,6 +3551,8 @@ install_all() {
 
     install_minizip
 
+    install_minizip_ng
+
     install_sparkle
 
     install_re2
@@ -3535,6 +3589,8 @@ uninstall_all() {
         uninstall_sparkle
 
         uninstall_minizip
+
+        uninstall_minizip_ng
 
         uninstall_brotli
 
@@ -3832,7 +3888,8 @@ then
     installed_opus_version=$( ls opus-*-done 2>/dev/null | sed 's/opus-\(.*\)-done/\1/' )
     installed_python3_version=$( ls python3-*-done 2>/dev/null | sed 's/python3-\(.*\)-done/\1/' )
     installed_brotli_version=$( ls brotli-*-done 2>/dev/null | sed 's/brotli-\(.*\)-done/\1/' )
-    installed_minizip_version=$( ls minizip-*-done 2>/dev/null | sed 's/minizip-\(.*\)-done/\1/' )
+    installed_minizip_version=$( ls minizip-[0-9.]*-done 2>/dev/null | sed 's/minizip-\(.*\)-done/\1/' )
+    installed_minizip_ng_version=$( ls minizip-ng-*-done 2>/dev/null | sed 's/minizip-ng-\(.*\)-done/\1/' )
     installed_sparkle_version=$( ls sparkle-*-done 2>/dev/null | sed 's/sparkle-\(.*\)-done/\1/' )
 
     cd "$topdir"
@@ -3993,7 +4050,7 @@ then
     #
     # Set the minimum OS version for which to build to the specified
     # minimum target OS version, so we don't, for example, end up using
-    # linker features supported by the OS verson on which we're building
+    # linker features supported by the OS version on which we're building
     # but not by the target version.
     #
     VERSION_MIN_FLAGS="-mmacosx-version-min=$min_osx_target"
@@ -4087,11 +4144,11 @@ echo
 echo "mkdir build; cd build"
 if [ -n "$NINJA_VERSION" ]; then
     echo "cmake -G Ninja .."
-    echo "ninja wireshark_app_bundle logray_app_bundle # (Modify as needed)"
+    echo "ninja wireshark_app_bundle stratoshark_app_bundle # (Modify as needed)"
     echo "ninja install/strip"
 else
     echo "cmake .."
-    echo "make ${MAKE_BUILD_OPTS[*]} wireshark_app_bundle logray_app_bundle # (Modify as needed)"
+    echo "make ${MAKE_BUILD_OPTS[*]} wireshark_app_bundle stratoshark_app_bundle # (Modify as needed)"
     echo "make install/strip"
 fi
 echo

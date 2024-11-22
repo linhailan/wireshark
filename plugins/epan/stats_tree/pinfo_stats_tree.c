@@ -86,7 +86,9 @@ static void uat_plen_record_post_update_cb(void) {
 		{
 			uat_plen_record_t rec;
 
-			convert_ret_t result = range_convert_str(NULL, &rec.packet_range, default_range[i], UINT32_MAX);
+			/* When asserts are disabled, some compilers optimize the assertion
+			 * out of existence, but then complain that result is not used. */
+			_U_ convert_ret_t result = range_convert_str(NULL, &rec.packet_range, default_range[i], UINT32_MAX);
 			ws_assert(result == CVT_NO_ERROR);
 			uat_add_record(plen_uat, &rec, true);
 			wmem_free(NULL, rec.packet_range);
@@ -144,7 +146,7 @@ static void ip_srcdst_stats_tree_init(stats_tree *st,
 	*st_node_src_ptr = stats_tree_create_node(st, st_str_src, 0, STAT_DT_INT, true);
 	/* set flag so this branch will always be sorted to top of tree */
 	stat_node_set_flags(st, st_str_src, 0, false, ST_FLG_SORT_TOP);
-	/* creat another top level node for destination branch */
+	/* create another top level node for destination branch */
 	*st_node_dst_ptr = stats_tree_create_node(st, st_str_dst, 0, STAT_DT_INT, true);
 	/* set flag so this branch will not be expanded by default */
 	stat_node_set_flags(st, st_str_dst, 0, false, ST_FLG_DEF_NOEXPAND);

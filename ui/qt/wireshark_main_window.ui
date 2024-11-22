@@ -229,6 +229,7 @@
      </property>
      <addaction name="actionHelpMPWireshark"/>
      <addaction name="actionHelpMPWireshark_Filter"/>
+     <addaction name="actionHelpMPWireshark_FilterReference"/>
      <addaction name="separator"/>
      <addaction name="actionHelpMPCapinfos"/>
      <addaction name="actionHelpMPDumpcap"/>
@@ -265,6 +266,8 @@
     <addaction name="actionGoLastPacket"/>
     <addaction name="actionGoNextConversationPacket"/>
     <addaction name="actionGoPreviousConversationPacket"/>
+    <addaction name="actionGoFirstConversationPacket"/>
+    <addaction name="actionGoLastConversationPacket"/>
     <addaction name="actionGoNextHistoryPacket"/>
     <addaction name="actionGoPreviousHistoryPacket"/>
     <addaction name="separator"/>
@@ -659,6 +662,7 @@
      <addaction name="actionCopyListAsText"/>
      <addaction name="actionCopyListAsCSV"/>
      <addaction name="actionCopyListAsYAML"/>
+     <addaction name="actionCopyListAsHTML"/>
      <addaction name="separator"/>
      <addaction name="actionCopyAllVisibleItems"/>
      <addaction name="actionCopyAllVisibleSelectedTreeItems"/>
@@ -787,6 +791,7 @@
    <addaction name="actionViewZoomOut"/>
    <addaction name="actionViewNormalSize"/>
    <addaction name="actionViewResizeColumns"/>
+   <addaction name="actionViewResetLayout"/>
   </widget>
   <widget class="MainStatusBar" name="statusBar"/>
   <widget class="QToolBar" name="displayFilterToolBar">
@@ -910,9 +915,6 @@
    <property name="shortcut">
     <string notr="true">F1</string>
    </property>
-   <property name="iconVisibleInMenu">
-    <bool>true</bool>
-   </property>
   </action>
   <action name="actionHelpMPWireshark">
    <property name="text">
@@ -922,6 +924,11 @@
   <action name="actionHelpMPWireshark_Filter">
    <property name="text">
     <string>Display Filters</string>
+   </property>
+  </action>
+  <action name="actionHelpMPWireshark_FilterReference">
+   <property name="text">
+    <string>Display Filter Reference</string>
    </property>
   </action>
   <action name="actionHelpMPTShark">
@@ -1096,6 +1103,22 @@
    </property>
    <property name="shortcut">
     <string notr="true">Ctrl+End</string>
+   </property>
+  </action>
+  <action name="actionGoFirstConversationPacket">
+   <property name="text">
+    <string>First Packet in Conversation</string>
+   </property>
+   <property name="toolTip">
+    <string>Go to the first packet in this conversation</string>
+   </property>
+  </action>
+  <action name="actionGoLastConversationPacket">
+   <property name="text">
+    <string>Last Packet in Conversation</string>
+   </property>
+   <property name="toolTip">
+    <string>Go to the last packet in this conversation</string>
    </property>
   </action>
   <action name="actionViewExpandSubtrees">
@@ -1370,6 +1393,11 @@
   <action name="actionCopyListAsYAML">
    <property name="text">
     <string>As &amp;YAML</string>
+   </property>
+  </action>
+  <action name="actionCopyListAsHTML">
+   <property name="text">
+    <string>As &amp;HTML</string>
    </property>
   </action>
   <action name="actionCopyAllVisibleItems">
@@ -2206,7 +2234,7 @@
     <string>Reset Layout</string>
    </property>
    <property name="toolTip">
-    <string>Reset appearance layout to default size</string>
+    <string>Reset layout to default size</string>
    </property>
    <property name="shortcut">
     <string notr="true">Ctrl+Shift+W</string>

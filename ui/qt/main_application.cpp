@@ -100,9 +100,7 @@
 #endif
 #include <QMimeDatabase>
 
-#if QT_VERSION >= QT_VERSION_CHECK(5, 13, 0)
 #include <QStyleHints>
-#endif
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0) && defined(Q_OS_WIN)
 #include <QStyleFactory>
@@ -304,7 +302,7 @@ void MainApplication::helpTopicAction(topic_action_e action)
     QString url = gchar_free_to_qstring(topic_action_url(action));
 
     if (!url.isEmpty()) {
-        QDesktopServices::openUrl(QUrl(url));
+        QDesktopServices::openUrl(QUrl(QDir::fromNativeSeparators(url)));
     }
 }
 
@@ -467,10 +465,8 @@ void MainApplication::setConfigurationProfile(const char *profile_name, bool wri
     /* Apply new preferences */
     readConfigurationFiles(true);
 
-    /* Should we reapply command line options now or drop them (so that
-     * they don't get reapplied later, e.g. when reloading Lua plugins)?
-     */
-    commandline_options_free();
+    /* Apply command-line preferences */
+    commandline_options_reapply();
     extcap_register_preferences();
 
     /* Switching profile requires reloading the macro list. */
@@ -498,6 +494,7 @@ void MainApplication::setConfigurationProfile(const char *profile_name, bool wri
 #endif
 
     setMonospaceFont(prefs.gui_font_name);
+    ColorUtils::setScheme(prefs.gui_color_scheme);
 
     // Freeze the packet list early to avoid updating column data before doing a
     // full redissection. The packet list will be thawed when redissection is done.
@@ -657,7 +654,8 @@ MainApplication::MainApplication(int &argc,  char **argv) :
     initialized_(false),
     is_reloading_lua_(false),
     if_notifier_(NULL),
-    active_captures_(0)
+    active_captures_(0),
+    refresh_interfaces_pending_(false)
 #ifdef HAVE_LIBPCAP
     , cached_if_list_(NULL)
 #endif
@@ -686,10 +684,6 @@ MainApplication::MainApplication(int &argc,  char **argv) :
     setAttribute(Qt::AA_UseHighDpiPixmaps);
 #endif
 
-#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0) && defined(Q_OS_WIN)
-    setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
-#endif
-
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     setAttribute(Qt::AA_DisableWindowContextHelpButton);
 #endif
@@ -697,9 +691,7 @@ MainApplication::MainApplication(int &argc,  char **argv) :
     // Throw various settings at the wall with the hope that one of them will
     // enable context menu shortcuts QTBUG-69452, QTBUG-109590
     setAttribute(Qt::AA_DontShowShortcutsInContextMenus, false);
-#if QT_VERSION >= QT_VERSION_CHECK(5, 13, 0)
     styleHints()->setShowShortcutsInContextMenus(true);
-#endif
 
     //
     // XXX - this means we try to check for the existence of all files
@@ -802,6 +794,11 @@ MainApplication::MainApplication(int &argc,  char **argv) :
 
     // Application-wide style sheet
     QString app_style_sheet = qApp->styleSheet();
+    app_style_sheet += QStringLiteral(
+        "QMessageBox { "
+        "  messagebox-text-interaction-flags: %1;"
+        "}"
+        ).arg(Qt::TextSelectableByMouse);
     qApp->setStyleSheet(app_style_sheet);
 
     // If our window text is lighter than the window background, assume the theme is dark.
@@ -1081,6 +1078,12 @@ void MainApplication::emitLocalInterfaceEvent(const char *ifname, int added, int
 
 void MainApplication::refreshLocalInterfaces()
 {
+    if (active_captures_ > 0) {
+        refresh_interfaces_pending_ = true;
+        return;
+    }
+
+    refresh_interfaces_pending_ = false;
     extcap_clear_interfaces();
 
 #ifdef HAVE_LIBPCAP
@@ -1091,13 +1094,13 @@ void MainApplication::refreshLocalInterfaces()
 #ifdef HAVE_LIBPCAP
 GList* MainApplication::getInterfaceList() const
 {
-     return interface_list_copy(cached_if_list_);
+    return interface_list_copy(cached_if_list_);
 }
 
 void MainApplication::setInterfaceList(GList *if_list)
 {
-     free_interface_list(cached_if_list_);
-     cached_if_list_ = interface_list_copy(if_list);
+    free_interface_list(cached_if_list_);
+    cached_if_list_ = interface_list_copy(if_list);
 }
 #endif
 
@@ -1210,30 +1213,30 @@ void MainApplication::loadLanguage(const QString newLanguage)
 
     QLocale::setDefault(locale);
     switchTranslator(mainApp->translator,
-            QString("wireshark_%1.qm").arg(localeLanguage), QString(":/i18n/"));
-    if (QFile::exists(QString("%1/%2/wireshark_%3.qm")
+            QStringLiteral("wireshark_%1.qm").arg(localeLanguage), QStringLiteral(":/i18n/"));
+    if (QFile::exists(QStringLiteral("%1/%2/wireshark_%3.qm")
             .arg(get_datafile_dir()).arg("languages").arg(localeLanguage)))
         switchTranslator(mainApp->translator,
-                QString("wireshark_%1.qm").arg(localeLanguage), QString(get_datafile_dir()) + QString("/languages"));
-    if (QFile::exists(QString("%1/wireshark_%3.qm")
+                QStringLiteral("wireshark_%1.qm").arg(localeLanguage), QString(get_datafile_dir()) + QStringLiteral("/languages"));
+    if (QFile::exists(QStringLiteral("%1/wireshark_%3.qm")
             .arg(gchar_free_to_qstring(get_persconffile_path("languages", false))).arg(localeLanguage)))
         switchTranslator(mainApp->translator,
-                QString("wireshark_%1.qm").arg(localeLanguage), gchar_free_to_qstring(get_persconffile_path("languages", false)));
-    if (QFile::exists(QString("%1/qt_%2.qm")
+                QStringLiteral("wireshark_%1.qm").arg(localeLanguage), gchar_free_to_qstring(get_persconffile_path("languages", false)));
+    if (QFile::exists(QStringLiteral("%1/qt_%2.qm")
             .arg(get_datafile_dir()).arg(localeLanguage))) {
         switchTranslator(mainApp->translatorQt,
-                QString("qt_%1.qm").arg(localeLanguage), QString(get_datafile_dir()));
-    } else if (QFile::exists(QString("%1/qt_%2.qm")
+                QStringLiteral("qt_%1.qm").arg(localeLanguage), QString(get_datafile_dir()));
+    } else if (QFile::exists(QStringLiteral("%1/qt_%2.qm")
             .arg(get_datafile_dir()).arg(localeLanguage.left(localeLanguage.lastIndexOf('_'))))) {
         switchTranslator(mainApp->translatorQt,
-                QString("qt_%1.qm").arg(localeLanguage.left(localeLanguage.lastIndexOf('_'))), QString(get_datafile_dir()));
+                QStringLiteral("qt_%1.qm").arg(localeLanguage.left(localeLanguage.lastIndexOf('_'))), QString(get_datafile_dir()));
     } else {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
         QString translationPath = QLibraryInfo::path(QLibraryInfo::TranslationsPath);
 #else
         QString translationPath = QLibraryInfo::location(QLibraryInfo::TranslationsPath);
 #endif
-        switchTranslator(mainApp->translatorQt, QString("qt_%1.qm").arg(localeLanguage), translationPath);
+        switchTranslator(mainApp->translatorQt, QStringLiteral("qt_%1.qm").arg(localeLanguage), translationPath);
     }
 }
 
@@ -1309,6 +1312,9 @@ void MainApplication::captureEventHandler(CaptureEvent ev)
     case CaptureEvent::Fixed:
         switch (ev.eventType())
         {
+        case CaptureEvent::Prepared:
+            iface_mon_enable(true);
+            break;
         case CaptureEvent::Started:
             active_captures_++;
             emit captureActive(active_captures_);
@@ -1316,6 +1322,9 @@ void MainApplication::captureEventHandler(CaptureEvent ev)
         case CaptureEvent::Finished:
             active_captures_--;
             emit captureActive(active_captures_);
+            if (refresh_interfaces_pending_ && !global_capture_opts.restart) {
+                refreshLocalInterfaces();
+            }
             break;
         default:
             break;

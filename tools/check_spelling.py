@@ -12,8 +12,9 @@ import subprocess
 import argparse
 import signal
 import glob
-from collections import Counter
 
+from spellchecker import SpellChecker
+from collections import Counter
 from html.parser import HTMLParser
 import urllib.request
 
@@ -51,7 +52,6 @@ signal.signal(signal.SIGINT, signal_handler)
 
 
 # Create spellchecker, and augment with some Wireshark words.
-from spellchecker import SpellChecker
 # Set up our dict with words from text file.
 spell = SpellChecker()
 spell.word_frequency.load_text_file('./tools/wireshark_words.txt')
@@ -76,7 +76,7 @@ class File:
 
         filename, extension = os.path.splitext(file)
         # TODO: add '.lua'?  Would also need to check string and comment formats...
-        self.code_file = extension in {'.c', '.cpp', '.h' }
+        self.code_file = extension in {'.c', '.cpp', '.h', '.cnf' }
 
 
         with open(file, 'r', encoding="utf8") as f:
@@ -205,6 +205,9 @@ class File:
             v = v.replace('?', ' ')
             v = v.replace('=', ' ')
             v = v.replace('*', ' ')
+            v = v.replace('%u', '')
+            v = v.replace('%d', '')
+            v = v.replace('%s', '')
             v = v.replace('%', ' ')
             v = v.replace('#', ' ')
             v = v.replace('&', ' ')
@@ -215,9 +218,6 @@ class File:
             v = v.replace("'", ' ')
             v = v.replace('"', ' ')
             v = v.replace('~', ' ')
-            v = v.replace('%u', '')
-            v = v.replace('%d', '')
-            v = v.replace('%s', '')
 
             # Split into words.
             value_words = v.split()
@@ -277,10 +277,15 @@ def removeContractions(code_string):
         code_string = code_string.replace(c.capitalize().replace('’', "'"), "")
     return code_string
 
+def removeURLs(code_string):
+    code_string = re.sub(re.compile(r'https?://(?:[a-zA-Z0-9./_?&=-]+|%[0-9a-fA-F]{2})+', re.DOTALL), "" , code_string)
+    return code_string
+
+
 def removeComments(code_string):
     code_string = re.sub(re.compile(r"/\*.*?\*/", re.DOTALL), "" , code_string) # C-style comment
     # Avoid matching // where it is allowed, e.g.,  https://www... or file:///...
-    code_string = re.sub(re.compile(r"(?<!:)(?<!/)(?<!\")(?<!"")(?<!\"\s\s)(?<!file:/)(?<!\,\s)//.*?\n" ) ,"" , code_string)             # C++-style comment
+    code_string = re.sub(re.compile(r"(?<!:)(?<!/)(?<!\")(?<!\")(?<!\"\s\s)(?<!file:/)(?<!\,\s)//.*?\n" ) ,"" , code_string)             # C++-style comment
     return code_string
 
 def getCommentWords(code_string):
@@ -330,6 +335,8 @@ def findStrings(filename, check_comments=False):
         contents = removeWhitespaceControl(contents)
         contents = removeSingleQuotes(contents)
         contents = removeHexSpecifiers(contents)
+        # These may not be proper words - in any case may be tested by test_dissector_urls.py
+        contents = removeURLs(contents)
 
         # Create file object.
         file = File(filename)
@@ -448,7 +455,7 @@ parser.add_argument('--file', action='append',
                     help='specify individual file to test')
 parser.add_argument('--folder', action='append',
                     help='specify folder to test')
-parser.add_argument('--glob', action='store', default='',
+parser.add_argument('--glob', action='append',
                     help='specify glob to test - should give in "quotes"')
 parser.add_argument('--no-recurse', action='store_true', default='',
                     help='do not recurse inside chosen folder(s)')
@@ -460,6 +467,8 @@ parser.add_argument('--comments', action='store_true',
                     help='check comments in source files')
 parser.add_argument('--no-wikipedia', action='store_true',
                     help='skip checking known bad words from wikipedia - can be slow')
+parser.add_argument('--show-most-common', action='store', default='100',
+                    help='number of most common not-known workds to display')
 
 
 args = parser.parse_args()
@@ -499,7 +508,7 @@ if not args.no_wikipedia:
         parser.feed(content)
         content = parser.content.strip()
 
-        wiki_db = dict(l.lower().split('->', maxsplit=1) for l in content.splitlines())
+        wiki_db = dict(line.lower().split('->', maxsplit=1) for line in content.splitlines())
         del wiki_db['cmo']      # All false positives.
         del wiki_db['ect']      # Too many false positives.
         del wiki_db['thru']     # We'll let that one thru. ;-)
@@ -514,11 +523,11 @@ if not args.no_wikipedia:
                 spell.word_frequency.remove_words([word])
                 #print('Removed', word)
                 removed += 1
-            except:
+            except Exception:
                 pass
 
         print('Removed', removed, 'known bad words')
-    except:
+    except Exception:
         print('Failed to fetch and/or parse Wikipedia mispellings!')
 
 
@@ -555,17 +564,18 @@ if args.open:
     # Filter files.
     files_staged = list(filter(lambda f : isAppropriateFile(f) and not isGeneratedFile(f), files_staged))
     for f in files_staged:
-        if not f in files:
+        if f not in files:
             files.append(f)
 
 if args.glob:
     # Add specified file(s)
-    for f in glob.glob(args.glob):
-        if not os.path.isfile(f):
-            print('Chosen file', f, 'does not exist.')
-            exit(1)
-        else:
-            files.append(f)
+    for g in args.glob:
+        for f in glob.glob(g):
+            if not os.path.isfile(f):
+                print('Chosen file', f, 'does not exist.')
+                exit(1)
+            else:
+                files.append(f)
 
 if args.folder:
     for folder in args.folder:
@@ -598,6 +608,7 @@ else:
     print('All dissector modules\n')
 
 
+
 # Now check the chosen files.
 for f in files:
     # Check this file.
@@ -610,7 +621,7 @@ for f in files:
 
 # Show the most commonly not-recognised words.
 print('')
-counter = Counter(missing_words).most_common(100)
+counter = Counter(missing_words).most_common(int(args.show_most_common))
 if len(counter) > 0:
     for c in counter:
         print(c[0], ':', c[1])

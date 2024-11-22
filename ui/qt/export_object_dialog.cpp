@@ -222,7 +222,7 @@ void ExportObjectDialog::on_buttonBox_clicked(QAbstractButton *button)
             QMimeDatabase mime_db;
             QMimeType mime_type = mime_db.mimeTypeForFile(temp, QMimeDatabase::MatchContent);
             if (mimeTypeIsPreviewable(mime_type.name())) {
-                QDesktopServices::openUrl(QUrl(QString("file:///").append(temp), QUrl::TolerantMode));
+                QDesktopServices::openUrl(QUrl(QStringLiteral("file:///").append(temp), QUrl::TolerantMode));
             } else {
                 desktop_show_in_folder(temp);
             }
@@ -264,7 +264,7 @@ void ExportObjectDialog::saveCurrentEntry(QString *tempFile)
         GString *safe_filename = eo_massage_str(entry_filename.toUtf8().constData(), EXPORT_OBJECT_MAXFILELEN, 0);
         file_name = WiresharkFileDialog::getSaveFileName(this, mainApp->windowTitleString(tr("Save Object As…")),
                                                 safe_filename->str);
-        g_string_free(safe_filename, true);
+        g_string_free(safe_filename, TRUE);
     } else {
         QString path = QDir::tempPath().append("/").append(entry_filename);
         /* This means, the system must remove the file! */

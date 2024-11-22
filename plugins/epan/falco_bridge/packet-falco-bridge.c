@@ -800,7 +800,7 @@ fd_tap_listener(void *tapdata, packet_info *pinfo,
 
 uint32_t get_fd_stream_count(void)
 {
-    // This effectively disables the "streams" dropdown, which is we don't really care about for the moment in logray.
+    // This effectively disables the "streams" dropdown, which is we don't really care about for the moment in stratoshark.
     return 1;
 }
 
@@ -835,7 +835,7 @@ dissect_falco_bridge(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *
 
     uint32_t source_id = 0;
     if (pinfo->rec->rec_header.syscall_header.event_type == FALCO_PPME_PLUGINEVENT_E) {
-        source_id = tvb_get_guint32(tvb, 8, encoding);
+        source_id = tvb_get_uint32(tvb, 8, encoding);
     }
 
     bridge_info* bi = get_bridge_info(source_id);
@@ -1213,6 +1213,7 @@ dissect_sinsp_plugin(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* 
 
             if ((strcmp(hfinfo->abbrev, "ct.response") == 0 ||
                     strcmp(hfinfo->abbrev, "ct.request") == 0 ||
+                    strcmp(hfinfo->abbrev, "ct.additionaleventdata") == 0 ||
                     strcmp(hfinfo->abbrev, "ct.resources") == 0 ) &&
                     strcmp(sfe->res.str, "null") != 0) {
                tvbuff_t *json_tvb = tvb_new_child_real_data(tvb, sfe->res.str, (unsigned)strlen(sfe->res.str), (unsigned)strlen(sfe->res.str));

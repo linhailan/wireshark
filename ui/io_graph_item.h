@@ -164,8 +164,7 @@ reset_io_graph_items(io_graph_item_t *items, size_t count, int hf_index _U_) {
  * @return Array index on success, -1 on failure.
  *
  * @note pinfo->rel_ts, and hence the index, is not affected by ignoring
- * frames, but is affected by time references. (Ignoring frames before
- * a time reference can be useful, though.)
+ * frames.
  */
 int64_t get_io_graph_index(packet_info *pinfo, int interval);
 
@@ -189,8 +188,9 @@ GString *check_field_unit(const char *field_name, int *hf_index, io_graph_item_u
  * @param cap_file [in] Capture file.
  * @param interval [in] Timing interval in ms.
  * @param cur_idx [in] Current index.
+ * @param asAOT [in] Interpret when possible the value as an Average Over Time.
  */
-double get_io_graph_item(const io_graph_item_t *items, io_graph_item_unit_t val_units, int idx, int hf_index, const capture_file *cap_file, int interval, int cur_idx);
+double get_io_graph_item(const io_graph_item_t *items, io_graph_item_unit_t val_units, int idx, int hf_index, const capture_file *cap_file, int interval, int cur_idx, bool asAOT);
 
 /** Update the values of an io_graph_item_t.
  *

@@ -212,7 +212,7 @@ private:
     void fileAddExtension(QString &file_name, int file_type, wtap_compression_type compression_type);
 #endif // Q_OS_WIN
     bool testCaptureFileClose(QString before_what, FileCloseContext context = Default);
-    void captureStop();
+    void captureStop(bool discard = false);
 
     void findTextCodecs();
 
@@ -235,13 +235,13 @@ private:
     void externalMenuHelper(ext_menu_t * menu, QMenu  * subMenu, int depth);
 
     void setForCaptureInProgress(bool capture_in_progress = false, bool handle_toolbars = false, GArray *ifaces = NULL);
-    QMenu* findOrAddMenu(QMenu *parent_menu, QString& menu_text);
+    QMenu* findOrAddMenu(QMenu *parent_menu, const QStringList& menu_parts);
 
     void captureFileReadStarted(const QString &action);
 
     void addMenuActions(QList<QAction *> &actions, int menu_group);
     void removeMenuActions(QList<QAction *> &actions, int menu_group);
-    void goToConversationFrame(bool go_next);
+    void goToConversationFrame(bool go_next, bool start_current = true);
     void colorizeWithFilter(QByteArray filter, int color_number = -1);
 
 signals:

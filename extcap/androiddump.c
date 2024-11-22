@@ -23,7 +23,6 @@
 #include <wsutil/strtoi.h>
 #include <wsutil/filesystem.h>
 #include <wsutil/privileges.h>
-#include <wsutil/report_message.h>
 #include <wsutil/please_report_bug.h>
 #include <wsutil/wslog.h>
 #include <wsutil/cmdarg_err.h>
@@ -568,11 +567,12 @@ static socket_handle_t adb_connect(const char *server_ip, unsigned short *server
             fd_set fdset;
             FD_ZERO(&fdset);
             FD_SET(sock, &fdset);
-            if ((select(sock+1, NULL, &fdset, NULL, &timeout) != 0) && (FD_ISSET(sock, &fdset))) {
 #ifdef _WIN32
+            if ((select(0, NULL, &fdset, NULL, &timeout) != 0) && (FD_ISSET(sock, &fdset))) {
                 status = 0;
                 break;
 #else
+            if ((select(sock+1, NULL, &fdset, NULL, &timeout) != 0) && (FD_ISSET(sock, &fdset))) {
                 length = sizeof(result);
                 getsockopt(sock, SOL_SOCKET, SO_ERROR, &result, &length);
                 if (result == 0) {
@@ -819,7 +819,12 @@ static int adb_send(socket_handle_t sock, const char *adb_service) {
     size_t   adb_service_length;
 
     adb_service_length = strlen(adb_service);
-    snprintf(buffer, sizeof(buffer), ADB_HEX4_FORMAT, adb_service_length);
+    result = snprintf(buffer, sizeof(buffer), ADB_HEX4_FORMAT, adb_service_length);
+    if ((size_t)result >= sizeof(buffer)) {
+        /* Truncation (or failure somehow) */
+        ws_warning("Service name too long when sending <%s> to ADB daemon", adb_service);
+        return EXIT_CODE_ERROR_WHILE_SENDING_ADB_PACKET_1;
+    }
 
     result = send(sock, buffer, ADB_HEX4_LEN, 0);
     if (result < ADB_HEX4_LEN) {
@@ -2501,18 +2506,6 @@ static int capture_android_tcpdump(char *interface, char *fifo,
 
 int main(int argc, char *argv[]) {
     char            *err_msg;
-    static const struct report_message_routines androiddummp_report_routines = {
-        failure_message,
-        failure_message,
-        open_failure_message,
-        read_failure_message,
-        write_failure_message,
-        cfile_open_failure_message,
-        cfile_dump_open_failure_message,
-        cfile_read_failure_message,
-        cfile_write_failure_message,
-        cfile_close_failure_message
-    };
     int              ret = EXIT_CODE_GENERIC;
     int              option_idx = 0;
     int              result;
@@ -2558,7 +2551,7 @@ int main(int argc, char *argv[]) {
         g_free(err_msg);
     }
 
-    init_report_message("androiddump", &androiddummp_report_routines);
+    init_report_failure_message("androiddump");
 
     extcap_conf = g_new0(extcap_parameters, 1);
 

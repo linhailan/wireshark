@@ -10,9 +10,10 @@
 
 
 #include "config.h"
-#include <glib.h>
 #include <string.h>
+#include <wsutil/array.h>
 #include <epan/packet.h>
+#include <epan/tfs.h>
 
 #include "packet-dcerpc.h"
 #include "packet-dcerpc-nt.h"
@@ -145,8 +146,8 @@ static int browser_dissect_element_BrowserrSrvInfoUnion_info100(tvbuff_t *tvb _U
 static int browser_dissect_element_BrowserrSrvInfoUnion_info100_(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_);
 static int browser_dissect_element_BrowserrSrvInfoUnion_info101(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_);
 static int browser_dissect_element_BrowserrSrvInfoUnion_info101_(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_);
-static int browser_dissect_element_BrowserrSrvInfo_level(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_, guint32 *level);
-static int browser_dissect_element_BrowserrSrvInfo_info(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_, guint32 *level);
+static int browser_dissect_element_BrowserrSrvInfo_level(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_, uint32_t *level);
+static int browser_dissect_element_BrowserrSrvInfo_info(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_, uint32_t *level);
 static int browser_dissect_element_TYPE_1_unknown(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_);
 static int browser_dissect_element_TYPE_2_unknown1(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_);
 static int browser_dissect_element_TYPE_2_unknown2(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_);
@@ -444,7 +445,7 @@ browser_dissect_BrowserrSrvInfoUnion(tvbuff_t *tvb _U_, int offset _U_, packet_i
 	proto_item *item = NULL;
 	proto_tree *tree = NULL;
 	int old_offset;
-	guint32 level;
+	uint32_t level;
 
 	old_offset = offset;
 	if (parent_tree) {
@@ -478,7 +479,7 @@ browser_dissect_BrowserrSrvInfoUnion(tvbuff_t *tvb _U_, int offset _U_, packet_i
 /* IDL: } */
 
 static int
-browser_dissect_element_BrowserrSrvInfo_level(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_, guint32 *level)
+browser_dissect_element_BrowserrSrvInfo_level(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_, uint32_t *level)
 {
 	offset = PIDL_dissect_uint32(tvb, offset, pinfo, tree, di, drep, hf_browser_BrowserrSrvInfo_level, *level);
 
@@ -486,7 +487,7 @@ browser_dissect_element_BrowserrSrvInfo_level(tvbuff_t *tvb _U_, int offset _U_,
 }
 
 static int
-browser_dissect_element_BrowserrSrvInfo_info(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_, guint32 *level)
+browser_dissect_element_BrowserrSrvInfo_info(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_, uint32_t *level)
 {
 	offset = browser_dissect_BrowserrSrvInfoUnion(tvb, offset, pinfo, tree, di, drep, hf_browser_BrowserrSrvInfo_info, *level);
 
@@ -496,7 +497,7 @@ browser_dissect_element_BrowserrSrvInfo_info(tvbuff_t *tvb _U_, int offset _U_, 
 int
 browser_dissect_struct_BrowserrSrvInfo(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *parent_tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_, int hf_index _U_, uint32_t param _U_)
 {
-	guint32 level = 0;
+	uint32_t level = 0;
 	proto_item *item = NULL;
 	proto_tree *tree = NULL;
 	int old_offset;
@@ -1238,7 +1239,7 @@ browser_dissect_element_BrowserrServerEnum_unknown8_(tvbuff_t *tvb _U_, int offs
 static int
 browser_dissect_BrowserrServerEnum_response(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_)
 {
-	guint32 status;
+	uint32_t status;
 
 	di->dcerpc_procedure_name="BrowserrServerEnum";
 	offset = browser_dissect_element_BrowserrServerEnum_info(tvb, offset, pinfo, tree, di, drep);
@@ -1253,7 +1254,7 @@ browser_dissect_BrowserrServerEnum_response(tvbuff_t *tvb _U_, int offset _U_, p
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_browser_werror, &status);
 
 	if (status != 0)
-		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str(status, WERR_errors, "Unknown DOS error 0x%08x"));
+		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str_ext(status, &WERR_errors_ext, "Unknown DOS error 0x%08x"));
 
 	return offset;
 }
@@ -1325,13 +1326,13 @@ browser_dissect_element_BrowserrDebugCall_unknown3(tvbuff_t *tvb _U_, int offset
 static int
 browser_dissect_BrowserrDebugCall_response(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_)
 {
-	guint32 status;
+	uint32_t status;
 
 	di->dcerpc_procedure_name="BrowserrDebugCall";
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_browser_werror, &status);
 
 	if (status != 0)
-		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str(status, WERR_errors, "Unknown DOS error 0x%08x"));
+		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str_ext(status, &WERR_errors_ext, "Unknown DOS error 0x%08x"));
 
 	return offset;
 }
@@ -1409,7 +1410,7 @@ browser_dissect_element_BrowserrQueryOtherDomains_total_entries_(tvbuff_t *tvb _
 static int
 browser_dissect_BrowserrQueryOtherDomains_response(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_)
 {
-	guint32 status;
+	uint32_t status;
 
 	di->dcerpc_procedure_name="BrowserrQueryOtherDomains";
 	offset = browser_dissect_element_BrowserrQueryOtherDomains_info(tvb, offset, pinfo, tree, di, drep);
@@ -1421,7 +1422,7 @@ browser_dissect_BrowserrQueryOtherDomains_response(tvbuff_t *tvb _U_, int offset
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_browser_werror, &status);
 
 	if (status != 0)
-		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str(status, WERR_errors, "Unknown DOS error 0x%08x"));
+		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str_ext(status, &WERR_errors_ext, "Unknown DOS error 0x%08x"));
 
 	return offset;
 }
@@ -1463,13 +1464,13 @@ browser_dissect_element_BrowserrResetNetlogonState_unknown_(tvbuff_t *tvb _U_, i
 static int
 browser_dissect_BrowserrResetNetlogonState_response(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_)
 {
-	guint32 status;
+	uint32_t status;
 
 	di->dcerpc_procedure_name="BrowserrResetNetlogonState";
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_browser_werror, &status);
 
 	if (status != 0)
-		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str(status, WERR_errors, "Unknown DOS error 0x%08x"));
+		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str_ext(status, &WERR_errors_ext, "Unknown DOS error 0x%08x"));
 
 	return offset;
 }
@@ -1529,13 +1530,13 @@ browser_dissect_element_BrowserrDebugTrace_unknown2_(tvbuff_t *tvb _U_, int offs
 static int
 browser_dissect_BrowserrDebugTrace_response(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_)
 {
-	guint32 status;
+	uint32_t status;
 
 	di->dcerpc_procedure_name="BrowserrDebugTrace";
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_browser_werror, &status);
 
 	if (status != 0)
-		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str(status, WERR_errors, "Unknown DOS error 0x%08x"));
+		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str_ext(status, &WERR_errors_ext, "Unknown DOS error 0x%08x"));
 
 	return offset;
 }
@@ -1602,7 +1603,7 @@ browser_dissect_element_BrowserrQueryStatistics_unknown2__(tvbuff_t *tvb _U_, in
 static int
 browser_dissect_BrowserrQueryStatistics_response(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_)
 {
-	guint32 status;
+	uint32_t status;
 
 	di->dcerpc_procedure_name="BrowserrQueryStatistics";
 	offset = browser_dissect_element_BrowserrQueryStatistics_unknown2(tvb, offset, pinfo, tree, di, drep);
@@ -1611,7 +1612,7 @@ browser_dissect_BrowserrQueryStatistics_response(tvbuff_t *tvb _U_, int offset _
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_browser_werror, &status);
 
 	if (status != 0)
-		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str(status, WERR_errors, "Unknown DOS error 0x%08x"));
+		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str_ext(status, &WERR_errors_ext, "Unknown DOS error 0x%08x"));
 
 	return offset;
 }
@@ -1651,13 +1652,13 @@ browser_dissect_element_BrowserrResetStatistics_unknown_(tvbuff_t *tvb _U_, int 
 static int
 browser_dissect_BrowserrResetStatistics_response(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_)
 {
-	guint32 status;
+	uint32_t status;
 
 	di->dcerpc_procedure_name="BrowserrResetStatistics";
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_browser_werror, &status);
 
 	if (status != 0)
-		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str(status, WERR_errors, "Unknown DOS error 0x%08x"));
+		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str_ext(status, &WERR_errors_ext, "Unknown DOS error 0x%08x"));
 
 	return offset;
 }
@@ -1697,13 +1698,13 @@ browser_dissect_element_NetrBrowserStatisticsClear_unknown_(tvbuff_t *tvb _U_, i
 static int
 browser_dissect_NetrBrowserStatisticsClear_response(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_)
 {
-	guint32 status;
+	uint32_t status;
 
 	di->dcerpc_procedure_name="NetrBrowserStatisticsClear";
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_browser_werror, &status);
 
 	if (status != 0)
-		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str(status, WERR_errors, "Unknown DOS error 0x%08x"));
+		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str_ext(status, &WERR_errors_ext, "Unknown DOS error 0x%08x"));
 
 	return offset;
 }
@@ -1769,7 +1770,7 @@ browser_dissect_element_NetrBrowserStatisticsGet_unknown3_(tvbuff_t *tvb _U_, in
 static int
 browser_dissect_NetrBrowserStatisticsGet_response(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_)
 {
-	guint32 status;
+	uint32_t status;
 
 	di->dcerpc_procedure_name="NetrBrowserStatisticsGet";
 	offset = browser_dissect_element_NetrBrowserStatisticsGet_unknown3(tvb, offset, pinfo, tree, di, drep);
@@ -1778,7 +1779,7 @@ browser_dissect_NetrBrowserStatisticsGet_response(tvbuff_t *tvb _U_, int offset 
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_browser_werror, &status);
 
 	if (status != 0)
-		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str(status, WERR_errors, "Unknown DOS error 0x%08x"));
+		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str_ext(status, &WERR_errors_ext, "Unknown DOS error 0x%08x"));
 
 	return offset;
 }
@@ -1871,13 +1872,13 @@ browser_dissect_element_BrowserrSetNetlogonState_unknown4(tvbuff_t *tvb _U_, int
 static int
 browser_dissect_BrowserrSetNetlogonState_response(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_)
 {
-	guint32 status;
+	uint32_t status;
 
 	di->dcerpc_procedure_name="BrowserrSetNetlogonState";
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_browser_werror, &status);
 
 	if (status != 0)
-		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str(status, WERR_errors, "Unknown DOS error 0x%08x"));
+		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str_ext(status, &WERR_errors_ext, "Unknown DOS error 0x%08x"));
 
 	return offset;
 }
@@ -1940,7 +1941,7 @@ browser_dissect_element_BrowserrQueryEmulatedDomains_unknown2_(tvbuff_t *tvb _U_
 static int
 browser_dissect_BrowserrQueryEmulatedDomains_response(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_)
 {
-	guint32 status;
+	uint32_t status;
 
 	di->dcerpc_procedure_name="BrowserrQueryEmulatedDomains";
 	offset = browser_dissect_element_BrowserrQueryEmulatedDomains_unknown2(tvb, offset, pinfo, tree, di, drep);
@@ -1949,7 +1950,7 @@ browser_dissect_BrowserrQueryEmulatedDomains_response(tvbuff_t *tvb _U_, int off
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_browser_werror, &status);
 
 	if (status != 0)
-		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str(status, WERR_errors, "Unknown DOS error 0x%08x"));
+		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str_ext(status, &WERR_errors_ext, "Unknown DOS error 0x%08x"));
 
 	return offset;
 }
@@ -2123,7 +2124,7 @@ browser_dissect_element_BrowserrServerEnumEx_unknown8_(tvbuff_t *tvb _U_, int of
 static int
 browser_dissect_BrowserrServerEnumEx_response(tvbuff_t *tvb _U_, int offset _U_, packet_info *pinfo _U_, proto_tree *tree _U_, dcerpc_info* di _U_, uint8_t *drep _U_)
 {
-	guint32 status;
+	uint32_t status;
 
 	di->dcerpc_procedure_name="BrowserrServerEnumEx";
 	offset = browser_dissect_element_BrowserrServerEnumEx_info(tvb, offset, pinfo, tree, di, drep);
@@ -2135,7 +2136,7 @@ browser_dissect_BrowserrServerEnumEx_response(tvbuff_t *tvb _U_, int offset _U_,
 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep, hf_browser_werror, &status);
 
 	if (status != 0)
-		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str(status, WERR_errors, "Unknown DOS error 0x%08x"));
+		col_append_fstr(pinfo->cinfo, COL_INFO, ", Error: %s", val_to_str_ext(status, &WERR_errors_ext, "Unknown DOS error 0x%08x"));
 
 	return offset;
 }
@@ -2370,7 +2371,7 @@ void proto_register_dcerpc_browser(void)
 	{ &hf_browser_opnum,
 	  { "Operation", "browser.opnum", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},
 	{ &hf_browser_werror,
-	  { "Windows Error", "browser.werror", FT_UINT32, BASE_HEX, VALS(WERR_errors), 0, NULL, HFILL }},
+	  { "Windows Error", "browser.werror", FT_UINT32, BASE_HEX|BASE_EXT_STRING, &WERR_errors_ext, 0, NULL, HFILL }},
 	};
 
 

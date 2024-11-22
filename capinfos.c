@@ -68,7 +68,6 @@
 #include <wsutil/plugins.h>
 #endif
 
-#include <wsutil/report_message.h>
 #include <wsutil/str_util.h>
 #include <wsutil/to_str.h>
 #include <wsutil/file_util.h>
@@ -127,8 +126,8 @@ static bool cap_file_dsb       = true;  /* Report Decryption Secrets Block info 
 
 static bool cap_data_size      = true;  /* Report packet byte size    */
 static bool cap_duration       = true;  /* Report capture duration    */
-static bool cap_start_time     = true;  /* Report capture start time  */
-static bool cap_end_time       = true;  /* Report capture end time    */
+static bool cap_earliest_packet_time = true;  /* Report timestamp of earliest packet */
+static bool cap_latest_packet_time = true;  /* Report timestamp of latest packet */
 static bool time_as_secs; /* Report time values as raw seconds */
 
 static bool cap_data_rate_byte = true;  /* Report data rate bytes/sec */
@@ -190,10 +189,10 @@ typedef struct _capture_info {
     int64_t               filesize;
     uint64_t              packet_bytes;
     bool                  times_known;
-    nstime_t              start_time;
-    int                   start_time_tsprec;
-    nstime_t              stop_time;
-    int                   stop_time_tsprec;
+    nstime_t              earliest_packet_time;
+    int                   earliest_packet_time_tsprec;
+    nstime_t              latest_packet_time;
+    int                   latest_packet_time_tsprec;
     uint32_t              packet_count;
     bool                  snap_set;                 /* If set in capture file header      */
     uint32_t              snaplen;                  /* value from the capture file header */
@@ -240,8 +239,8 @@ enable_all_infos(void)
 
     cap_data_size      = true;
     cap_duration       = true;
-    cap_start_time     = true;
-    cap_end_time       = true;
+    cap_earliest_packet_time = true;
+    cap_latest_packet_time = true;
     cap_order          = true;
 
     cap_data_rate_byte = true;
@@ -271,8 +270,8 @@ disable_all_infos(void)
 
     cap_data_size      = false;
     cap_duration       = false;
-    cap_start_time     = false;
-    cap_end_time       = false;
+    cap_earliest_packet_time = false;
+    cap_latest_packet_time = false;
     cap_order          = false;
 
     cap_data_rate_byte = false;
@@ -423,7 +422,7 @@ relative_time_string(nstime_t *timer, int tsprecision, capture_info *cf_info, bo
     return time_string_buf;
 }
 
-static void print_value(const char *text_p1, gint width, const char *text_p2, double value)
+static void print_value(const char *text_p1, int width, const char *text_p2, double value)
 {
     if (value > 0.0)
         printf("%s%.*f%s\n", text_p1, width, value, text_p2);
@@ -552,10 +551,10 @@ print_stats(const char *filename, capture_info *cf_info)
     if (cf_info->times_known) {
         if (cap_duration) /* XXX - shorten to hh:mm:ss */
             printf("Capture duration:    %s\n", relative_time_string(&cf_info->duration, cf_info->duration_tsprec, cf_info, true));
-        if (cap_start_time)
-            printf("First packet time:   %s\n", absolute_time_string(&cf_info->start_time, cf_info->start_time_tsprec, cf_info));
-        if (cap_end_time)
-            printf("Last packet time:    %s\n", absolute_time_string(&cf_info->stop_time, cf_info->stop_time_tsprec, cf_info));
+        if (cap_earliest_packet_time)
+            printf("Earliest packet time: %s\n", absolute_time_string(&cf_info->earliest_packet_time, cf_info->earliest_packet_time_tsprec, cf_info));
+        if (cap_latest_packet_time)
+            printf("Latest packet time:   %s\n", absolute_time_string(&cf_info->latest_packet_time, cf_info->latest_packet_time_tsprec, cf_info));
         if (cap_data_rate_byte) {
             printf("Data byte rate:      ");
             if (machine_readable) {
@@ -627,44 +626,44 @@ print_stats(const char *filename, capture_info *cf_info)
                     show_option_string("Capture comment:     ", str);
                 }
             }
-
-            if (pkt_comments && cf_info->pkt_cmts != NULL) {
-              for (p = cf_info->pkt_cmts; p != NULL; prev = p, p = p->next, g_free(prev)) {
-                if (machine_readable){
-                  printf("Packet %d Comment:    %s\n", p->recno, g_strescape(p->cmt, NULL));
-                } else {
-                  printf("Packet %d Comment:    %s\n", p->recno, p->cmt);
-                }
-                g_free(p->cmt);
-              }
-            }
-
-            if (cap_file_idb && cf_info->num_interfaces != 0) {
-                unsigned int i;
-                ws_assert(cf_info->num_interfaces == cf_info->idb_info_strings->len);
-                printf     ("Number of interfaces in file: %u\n", cf_info->num_interfaces);
-                for (i = 0; i < cf_info->idb_info_strings->len; i++) {
-                    char *s = g_array_index(cf_info->idb_info_strings, char*, i);
-                    uint32_t packet_count = 0;
-                    if (i < cf_info->interface_packet_counts->len)
-                        packet_count = g_array_index(cf_info->interface_packet_counts, guint32, i);
-                    printf   ("Interface #%u info:\n", i);
-                    printf   ("%s", s);
-                    printf   ("                     Number of packets = %u\n", packet_count);
-                }
-            }
         }
+    }
 
-        if (cap_file_nrb) {
-            if (num_ipv4_addresses != 0)
-                printf   ("Number of resolved IPv4 addresses in file: %u\n", num_ipv4_addresses);
-            if (num_ipv6_addresses != 0)
-                printf   ("Number of resolved IPv6 addresses in file: %u\n", num_ipv6_addresses);
+    if (pkt_comments && cf_info->pkt_cmts != NULL) {
+      for (p = cf_info->pkt_cmts; p != NULL; prev = p, p = p->next, g_free(prev)) {
+        if (machine_readable){
+          printf("Packet %d Comment:    %s\n", p->recno, g_strescape(p->cmt, NULL));
+        } else {
+          printf("Packet %d Comment:    %s\n", p->recno, p->cmt);
         }
-        if (cap_file_dsb) {
-            if (num_decryption_secrets != 0)
-                printf   ("Number of decryption secrets in file: %u\n", num_decryption_secrets);
+        g_free(p->cmt);
+      }
+    }
+
+    if (cap_file_idb && cf_info->num_interfaces != 0) {
+        unsigned int i;
+        ws_assert(cf_info->num_interfaces == cf_info->idb_info_strings->len);
+        printf     ("Number of interfaces in file: %u\n", cf_info->num_interfaces);
+        for (i = 0; i < cf_info->idb_info_strings->len; i++) {
+            char *s = g_array_index(cf_info->idb_info_strings, char*, i);
+            uint32_t packet_count = 0;
+            if (i < cf_info->interface_packet_counts->len)
+                packet_count = g_array_index(cf_info->interface_packet_counts, uint32_t, i);
+            printf   ("Interface #%u info:\n", i);
+            printf   ("%s", s);
+            printf   ("                     Number of packets = %u\n", packet_count);
         }
+    }
+
+    if (cap_file_nrb) {
+        if (num_ipv4_addresses != 0)
+            printf   ("Number of resolved IPv4 addresses in file: %u\n", num_ipv4_addresses);
+        if (num_ipv6_addresses != 0)
+            printf   ("Number of resolved IPv6 addresses in file: %u\n", num_ipv6_addresses);
+    }
+    if (cap_file_dsb) {
+        if (num_decryption_secrets != 0)
+            printf   ("Number of decryption secrets in file: %u\n", num_decryption_secrets);
     }
 }
 
@@ -694,7 +693,7 @@ print_stats_table_header(capture_info *cf_info)
 {
     pkt_cmt *p;
     char    *buf;
-    gsize    buf_len;
+    size_t   buf_len;
 
     putquote();
     printf("File name");
@@ -712,8 +711,8 @@ print_stats_table_header(capture_info *cf_info)
     if (cap_file_size)      print_stats_table_header_label("File size (bytes)");
     if (cap_data_size)      print_stats_table_header_label("Data size (bytes)");
     if (cap_duration)       print_stats_table_header_label("Capture duration (seconds)");
-    if (cap_start_time)     print_stats_table_header_label("Start time");
-    if (cap_end_time)       print_stats_table_header_label("End time");
+    if (cap_earliest_packet_time) print_stats_table_header_label("Start time");
+    if (cap_latest_packet_time) print_stats_table_header_label("End time");
     if (cap_data_rate_byte) print_stats_table_header_label("Data byte rate (bytes/sec)");
     if (cap_data_rate_bit)  print_stats_table_header_label("Data bit rate (bits/sec)");
     if (cap_packet_size)    print_stats_table_header_label("Average packet size (bytes)");
@@ -844,17 +843,17 @@ print_stats_table(const char *filename, capture_info *cf_info)
         putquote();
     }
 
-    if (cap_start_time) {
+    if (cap_earliest_packet_time) {
         putsep();
         putquote();
-        printf("%s", absolute_time_string(&cf_info->start_time, cf_info->start_time_tsprec, cf_info));
+        printf("%s", absolute_time_string(&cf_info->earliest_packet_time, cf_info->earliest_packet_time_tsprec, cf_info));
         putquote();
     }
 
-    if (cap_end_time) {
+    if (cap_latest_packet_time) {
         putsep();
         putquote();
-        printf("%s", absolute_time_string(&cf_info->stop_time, cf_info->stop_time_tsprec, cf_info));
+        printf("%s", absolute_time_string(&cf_info->latest_packet_time, cf_info->latest_packet_time_tsprec, cf_info));
         putquote();
     }
 
@@ -914,7 +913,7 @@ print_stats_table(const char *filename, capture_info *cf_info)
         putquote();
     }
 
-    for (guint section_number = 0;
+    for (unsigned section_number = 0;
             section_number < wtap_file_get_num_shbs(cf_info->wth);
             section_number++) {
         wtap_block_t shb;
@@ -1030,7 +1029,7 @@ count_ipv4_address(const unsigned int addr _U_, const char *name _U_, const bool
 }
 
 static void
-count_ipv6_address(const void *addrp _U_, const char *name _U_, const bool static_entry _U_)
+count_ipv6_address(const ws_in6_addr *addrp _U_, const char *name _U_, const bool static_entry _U_)
 {
     num_ipv6_addresses++;
 }
@@ -1094,10 +1093,10 @@ process_cap_file(const char *filename, bool need_separator)
     Buffer                buf;
     capture_info          cf_info;
     bool                  have_times = true;
-    nstime_t              start_time;
-    int                   start_time_tsprec;
-    nstime_t              stop_time;
-    int                   stop_time_tsprec;
+    nstime_t              earliest_packet_time;
+    int                   earliest_packet_time_tsprec;
+    nstime_t              latest_packet_time;
+    int                   latest_packet_time_tsprec;
     nstime_t              cur_time;
     nstime_t              prev_time;
     bool                  know_order = false;
@@ -1124,10 +1123,10 @@ process_cap_file(const char *filename, bool need_separator)
         printf("\n");
     }
 
-    nstime_set_zero(&start_time);
-    start_time_tsprec = WTAP_TSPREC_UNKNOWN;
-    nstime_set_zero(&stop_time);
-    stop_time_tsprec = WTAP_TSPREC_UNKNOWN;
+    nstime_set_zero(&earliest_packet_time);
+    earliest_packet_time_tsprec = WTAP_TSPREC_UNKNOWN;
+    nstime_set_zero(&latest_packet_time);
+    latest_packet_time_tsprec = WTAP_TSPREC_UNKNOWN;
     nstime_set_zero(&cur_time);
     nstime_set_zero(&prev_time);
 
@@ -1165,22 +1164,22 @@ process_cap_file(const char *filename, bool need_separator)
             prev_time = cur_time;
             cur_time = rec.ts;
             if (packet == 0) {
-                start_time = rec.ts;
-                start_time_tsprec = rec.tsprec;
-                stop_time  = rec.ts;
-                stop_time_tsprec = rec.tsprec;
+                earliest_packet_time = rec.ts;
+                earliest_packet_time_tsprec = rec.tsprec;
+                latest_packet_time  = rec.ts;
+                latest_packet_time_tsprec = rec.tsprec;
                 prev_time  = rec.ts;
             }
             if (nstime_cmp(&cur_time, &prev_time) < 0) {
                 order = NOT_IN_ORDER;
             }
-            if (nstime_cmp(&cur_time, &start_time) < 0) {
-                start_time = cur_time;
-                start_time_tsprec = rec.tsprec;
+            if (nstime_cmp(&cur_time, &earliest_packet_time) < 0) {
+                earliest_packet_time = cur_time;
+                earliest_packet_time_tsprec = rec.tsprec;
             }
-            if (nstime_cmp(&cur_time, &stop_time) > 0) {
-                stop_time = cur_time;
-                stop_time_tsprec = rec.tsprec;
+            if (nstime_cmp(&cur_time, &latest_packet_time) > 0) {
+                latest_packet_time = cur_time;
+                latest_packet_time_tsprec = rec.tsprec;
             }
         } else {
             have_times = false; /* at least one packet has no time stamp */
@@ -1248,7 +1247,7 @@ process_cap_file(const char *filename, bool need_separator)
                     idb_info = NULL;
                 }
                 if (rec.rec_header.packet_header.interface_id < cf_info.num_interfaces) {
-                    g_array_index(cf_info.interface_packet_counts, guint32,
+                    g_array_index(cf_info.interface_packet_counts, uint32_t,
                             rec.rec_header.packet_header.interface_id) += 1;
                 }
                 else {
@@ -1258,7 +1257,7 @@ process_cap_file(const char *filename, bool need_separator)
             else {
                 /* it's for interface_id 0 */
                 if (cf_info.num_interfaces != 0) {
-                    g_array_index(cf_info.interface_packet_counts, guint32, 0) += 1;
+                    g_array_index(cf_info.interface_packet_counts, uint32_t, 0) += 1;
                 }
                 else {
                     cf_info.pkt_interface_id_unknown += 1;
@@ -1345,16 +1344,16 @@ process_cap_file(const char *filename, bool need_separator)
 
     /* File Times */
     cf_info.times_known = have_times;
-    cf_info.start_time = start_time;
-    cf_info.start_time_tsprec = start_time_tsprec;
-    cf_info.stop_time = stop_time;
-    cf_info.stop_time_tsprec = stop_time_tsprec;
-    nstime_delta(&cf_info.duration, &stop_time, &start_time);
-    /* Duration precision is the higher of the start and stop time precisions. */
-    if (cf_info.stop_time_tsprec > cf_info.start_time_tsprec)
-        cf_info.duration_tsprec = cf_info.stop_time_tsprec;
+    cf_info.earliest_packet_time = earliest_packet_time;
+    cf_info.earliest_packet_time_tsprec = earliest_packet_time_tsprec;
+    cf_info.latest_packet_time = latest_packet_time;
+    cf_info.latest_packet_time_tsprec = latest_packet_time_tsprec;
+    nstime_delta(&cf_info.duration, &latest_packet_time, &earliest_packet_time);
+    /* Duration precision is the higher of the earliest and latest packet timestamp precisions. */
+    if (cf_info.latest_packet_time_tsprec > cf_info.earliest_packet_time_tsprec)
+        cf_info.duration_tsprec = cf_info.latest_packet_time_tsprec;
     else
-        cf_info.duration_tsprec = cf_info.start_time_tsprec;
+        cf_info.duration_tsprec = cf_info.earliest_packet_time_tsprec;
     cf_info.know_order = know_order;
     cf_info.order = order;
 
@@ -1366,7 +1365,7 @@ process_cap_file(const char *filename, bool need_separator)
     cf_info.packet_size = 0.0;
 
     if (packet > 0) {
-        double delta_time = nstime_to_sec(&stop_time) - nstime_to_sec(&start_time);
+        double delta_time = nstime_to_sec(&latest_packet_time) - nstime_to_sec(&earliest_packet_time);
         if (delta_time > 0.0) {
             cf_info.data_rate   = (double)bytes  / delta_time; /* Data rate per second */
             cf_info.packet_rate = (double)packet / delta_time; /* packet rate per second */
@@ -1413,10 +1412,10 @@ print_usage(FILE *output)
     fprintf(output, "\n");
     fprintf(output, "Time infos:\n");
     fprintf(output, "  -u display the capture duration (in seconds)\n");
-    fprintf(output, "  -a display the capture start time\n");
-    fprintf(output, "  -e display the capture end time\n");
+    fprintf(output, "  -a display the timestamp of the earliest packet\n");
+    fprintf(output, "  -e display the timestamp of the latest packet\n");
     fprintf(output, "  -o display the capture file chronological status (True/False)\n");
-    fprintf(output, "  -S display start and end times as seconds\n");
+    fprintf(output, "  -S display earliest and latest packet timestamps as seconds\n");
     fprintf(output, "\n");
     fprintf(output, "Statistic infos:\n");
     fprintf(output, "  -y display average data rate (in bytes/sec)\n");
@@ -1485,18 +1484,6 @@ int
 main(int argc, char *argv[])
 {
     char  *configuration_init_error;
-    static const struct report_message_routines capinfos_report_routines = {
-        failure_message,
-        failure_message,
-        open_failure_message,
-        read_failure_message,
-        write_failure_message,
-        cfile_open_failure_message,
-        cfile_dump_open_failure_message,
-        cfile_read_failure_message,
-        cfile_write_failure_message,
-        cfile_close_failure_message
-    };
     bool need_separator = false;
     int    opt;
     int    overall_error_status = EXIT_SUCCESS;
@@ -1531,9 +1518,6 @@ main(int argc, char *argv[])
     /* Get the decimal point. */
     decimal_point = g_strdup(localeconv()->decimal_point);
 
-    /* Initialize the version information. */
-    ws_init_version_info("Capinfos", NULL, NULL);
-
 #ifdef _WIN32
     create_app_running_mutex();
 #endif /* _WIN32 */
@@ -1555,7 +1539,10 @@ main(int argc, char *argv[])
         g_free(configuration_init_error);
     }
 
-    init_report_message("capinfos", &capinfos_report_routines);
+    /* Initialize the version information. */
+    ws_init_version_info("Capinfos", NULL, NULL);
+
+    init_report_failure_message("capinfos");
 
     wtap_init(true);
 
@@ -1601,12 +1588,12 @@ main(int argc, char *argv[])
 
             case 'a':
                 if (report_all_infos) disable_all_infos();
-                cap_start_time = true;
+                cap_earliest_packet_time = true;
                 break;
 
             case 'e':
                 if (report_all_infos) disable_all_infos();
-                cap_end_time = true;
+                cap_latest_packet_time = true;
                 break;
 
             case 'S':

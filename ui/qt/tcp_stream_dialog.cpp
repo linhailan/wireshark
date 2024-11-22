@@ -563,7 +563,7 @@ void TCPStreamDialog::fillGraph(bool reset_axes, bool set_focus)
     disconnect(sp->yAxis, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged), sp->yAxis2, QOverload<const QCPRange&>::of(&QCPAxis::setRange));
 
     if (!cap_file_) {
-        QString dlg_title = QString(tr("No Capture Data"));
+        QString dlg_title = tr("No Capture Data");
         setWindowTitle(dlg_title);
         title_->setText(dlg_title);
         sp->setEnabled(false);
@@ -814,7 +814,7 @@ void TCPStreamDialog::resetAxes()
 
 void TCPStreamDialog::fillStevens()
 {
-    QString dlg_title = QString(tr("Sequence Numbers (Stevens)")) + streamDescription();
+    QString dlg_title = tr("Sequence Numbers (Stevens)") + streamDescription();
     setWindowTitle(dlg_title);
     title_->setText(dlg_title);
 
@@ -839,7 +839,7 @@ void TCPStreamDialog::fillStevens()
 
 void TCPStreamDialog::fillTcptrace()
 {
-    QString dlg_title = QString(tr("Sequence Numbers (tcptrace)")) + streamDescription();
+    QString dlg_title = tr("Sequence Numbers (tcptrace)") + streamDescription();
     setWindowTitle(dlg_title);
     title_->setText(dlg_title);
 
@@ -1204,11 +1204,11 @@ goodput_adjust_for_sacks(uint32_t *seglen, uint32_t last_ack,
 
 void TCPStreamDialog::fillThroughput()
 {
-    QString dlg_title = QString(tr("Throughput")) + streamDescription();
+    QString dlg_title = tr("Throughput") + streamDescription();
 #ifdef MA_1_SECOND
     dlg_title.append(tr(" (MA)"));
 #else
-    dlg_title.append(QString(tr(" (%1 Segment MA)")).arg(moving_avg_period_));
+    dlg_title.append(tr(" (%1 Segment MA)").arg(moving_avg_period_));
 #endif
     setWindowTitle(dlg_title);
     title_->setText(dlg_title);
@@ -1476,7 +1476,7 @@ rtt_selectively_ack_range(QVector<double>& x_vals, bool bySeqNumber,
 
 void TCPStreamDialog::fillRoundTripTime()
 {
-    QString dlg_title = QString(tr("Round Trip Time")) + streamDescription();
+    QString dlg_title = tr("Round Trip Time") + streamDescription();
     setWindowTitle(dlg_title);
     title_->setText(dlg_title);
 
@@ -1577,7 +1577,7 @@ void TCPStreamDialog::fillRoundTripTime()
 
 void TCPStreamDialog::fillWindowScale()
 {
-    QString dlg_title = QString(tr("Window Scaling")) + streamDescription();
+    QString dlg_title = tr("Window Scaling") + streamDescription();
     setWindowTitle(dlg_title);
     title_->setText(dlg_title);
 
@@ -1593,6 +1593,10 @@ void TCPStreamDialog::fillWindowScale()
     QVector<double> rel_time, win_size;
     QVector<double> cwnd_time, cwnd_size;
     uint32_t last_ack = 0;
+
+    /* highest expected SEQ seen so far */
+    uint32_t max_next_seq = 0;
+
     bool found_first_ack = false;
     for (struct segment *seg = graph_.segments; seg != NULL; seg = seg->next) {
         double ts = seg->rel_secs + seg->rel_usecs / 1000000.0;
@@ -1600,12 +1604,17 @@ void TCPStreamDialog::fillWindowScale()
         // The receive window that applies to this flow comes
         //   from packets in the opposite direction
         if (compareHeaders(seg)) {
-            // compute bytes_in_flight for cwnd graph
+            /* compute bytes_in_flight for cwnd graph,
+             * by comparing the highest next SEQ to the latest ACK
+             */
             uint32_t end_seq = seg->th_seq + seg->th_seglen;
+            if(end_seq > max_next_seq) {
+                max_next_seq = end_seq;
+            }
             if (found_first_ack &&
                 tcp_seq_eq_or_after(end_seq, last_ack)) {
                 cwnd_time.append(ts - ts_offset_);
-                cwnd_size.append((double)(end_seq - last_ack));
+                cwnd_size.append((double)(max_next_seq - last_ack));
             }
         } else {
             // packet in opposite direction - has advertised rwin
@@ -1915,7 +1924,7 @@ void TCPStreamDialog::on_buttonBox_accepted()
     QString bmp_filter = tr("Windows Bitmap (*.bmp)");
     // Gaze upon my beautiful graph with lossy artifacts!
     QString jpeg_filter = tr("JPEG File Interchange Format (*.jpeg *.jpg)");
-    QString filter = QString("%1;;%2;;%3;;%4")
+    QString filter = QStringLiteral("%1;;%2;;%3;;%4")
             .arg(pdf_filter)
             .arg(png_filter)
             .arg(bmp_filter)

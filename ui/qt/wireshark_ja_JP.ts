@@ -44,8 +44,8 @@
         <translation>フォルダ</translation>
     </message>
     <message>
-        <source>Filter by path</source>
-        <translation>パスでフィルタ</translation>
+        <source>Search Folders</source>
+        <translation>フォルダを検索</translation>
     </message>
     <message>
         <source>Plugins</source>
@@ -80,12 +80,16 @@
         <translation>ライセンス</translation>
     </message>
     <message>
-        <source>About Logray</source>
-        <translation>Lograyについて</translation>
+        <source>About Stratoshark</source>
+        <translation>Stratosharkについて</translation>
     </message>
     <message>
-        <source>Logray</source>
-        <translation>Logray</translation>
+        <source>Stratoshark</source>
+        <translation>Stratoshark</translation>
+    </message>
+    <message>
+        <source>&lt;h3&gt;System Call and Event Log Analyzer&lt;/h3&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>The directory does not exist</source>
@@ -889,10 +893,6 @@
         <translation>読込フィルタ:</translation>
     </message>
     <message>
-        <source>Compress with g&amp;zip</source>
-        <translation>gzip形式で圧縮(&amp;z)</translation>
-    </message>
-    <message>
         <source>Open Capture File</source>
         <oldsource>Wireshark: Open Capture File</oldsource>
         <translation>キャプチャファイルを開く</translation>
@@ -1203,10 +1203,10 @@
 </translation>
     </message>
     <message>
-        <source>Created by Logray %1
+        <source>Created by Stratoshark %1
 
 </source>
-        <translation>Logray %1 によって作成されました
+        <translation>Stratoshark %1 により作成
 
 </translation>
     </message>
@@ -1851,12 +1851,24 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>出現位置:</translation>
     </message>
     <message>
-        <source>Resolve Names:</source>
-        <translation>名前解決:</translation>
+        <source>Display as:</source>
+        <translation>として表示:</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;p&gt;Show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;p&gt;raw(無加工)のフィールド値の代わりに人が読むことのできる文字列を表示します。有効な文字列を含むフィールドを持つカスタム列へ適用する場合にのみ適用できます。&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;p&gt;Values will show the raw values for fields.&lt;p&gt;Strings will show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings and custom columns which can be resolved to strings.&lt;p&gt;Details will show the values using the same format as in Packet Details. Only applicable to custom columns.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;p&gt;値はフィールドの生の値を表示します。&lt;p&gt;文字列はフィールドの生の値の代わりに人が読める文字列を表示します。文字列を持つフィールドのカスタム列および文字列に解決できるカスタム列にのみ適用されます。&lt;p&gt; 詳細には、パケット詳細で使用されているのと同じ形式で値が表示されます。カスタム列にのみ適用されます。&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>Values</source>
+        <translation>値</translation>
+    </message>
+    <message>
+        <source>Strings</source>
+        <translation>文字列</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation>詳細</translation>
     </message>
     <message>
         <source>Missing fields.</source>
@@ -1894,8 +1906,12 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>フィールド出現位置</translation>
     </message>
     <message>
-        <source>Resolved</source>
-        <translation>解決済</translation>
+        <source>Display Format</source>
+        <translation>表示形式</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;Values will show the raw values for fields.&lt;p&gt;Strings will show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings and custom columns which can be resolved to strings.&lt;p&gt;Details will show the values using the same format as in Packet Details. Only applicable to custom columns.&lt;/html&gt;</source>
+        <translation>&lt;html&gt; 値はフィールドの生の値を表示します。&lt;p&gt; 文字列はフィールドの生の値の代わりに人が読める文字列を表示します。 文字列を持つフィールドのカスタム列および文字列に解決できるカスタム列にのみ適用されます&lt;p&gt; 詳細には、パケット詳細で使用されているのと同じ形式で値が表示されます。カスタム列にのみ適用されます。&lt;/html&gt;</translation>
     </message>
     <message>
         <source>Width</source>
@@ -1904,10 +1920,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Alignment</source>
         <translation>揃え</translation>
-    </message>
-    <message>
-        <source>&lt;html&gt;Show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings.&lt;/html&gt;</source>
-        <translation>&lt;html&gt;123raw(無加工)のフィールド値の代わりに人が読むことのできる文字列を表示します。有効な文字列を含むフィールドを持つカスタム列へ適用する場合にのみ適用できます。&lt;/html&gt;</translation>
     </message>
     <message>
         <source>New Column</source>
@@ -1938,29 +1950,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
-    <name>ColumnTypeDelegate</name>
-    <message>
-        <source>Default</source>
-        <translation>デフォルト</translation>
-    </message>
-    <message>
-        <source>Left</source>
-        <translation>左</translation>
-    </message>
-    <message>
-        <source>Center</source>
-        <translation>中央</translation>
-    </message>
-    <message>
-        <source>Right</source>
-        <translation>右</translation>
-    </message>
-    <message>
-        <source>Unknown</source>
-        <translation>不明</translation>
-    </message>
-</context>
-<context>
     <name>CompiledFilterOutput</name>
     <message>
         <source>Compiled Filter Output</source>
@@ -1973,6 +1962,25 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Copy filter text to the clipboard.</source>
         <translation>フィルタテキストをクリップボードにコピーします</translation>
+    </message>
+</context>
+<context>
+    <name>CompressionGroupBox</name>
+    <message>
+        <source>Compression options</source>
+        <translation>圧縮オプション</translation>
+    </message>
+    <message>
+        <source>&amp;Uncompressed</source>
+        <translation>非圧縮(&amp;U)</translation>
+    </message>
+    <message>
+        <source>Compress with g&amp;zip</source>
+        <translation>gzip形式で圧縮(&amp;z)</translation>
+    </message>
+    <message>
+        <source>Compress with &amp;LZ4</source>
+        <translation>LZ4形式で圧縮(&amp;L)</translation>
     </message>
 </context>
 <context>
@@ -2716,6 +2724,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>端末の地図を保存します</translation>
     </message>
     <message>
+        <source>Hide aggregated</source>
+        <translation>集約されたものを非表示</translation>
+    </message>
+    <message>
+        <source>Hide IPv4 aggregated endpoints (see subnets file &amp; IPv4 preferences)</source>
+        <translation>IPv4 集約された終端を非表示 (サブネットファイルとIPv4設定を参照)</translation>
+    </message>
+    <message>
         <source>Failed to save map file %1.</source>
         <translation>地図ファイル %1 を保存できませんでした</translation>
     </message>
@@ -3002,6 +3018,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Display filter:</source>
         <translation>表示フィルタ:</translation>
+    </message>
+    <message>
+        <source>Export PDUs</source>
+        <translation>PDUをエクスポート</translation>
     </message>
 </context>
 <context>
@@ -3799,6 +3819,18 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Geraldさんが作成したpangram すべての文字を１文字使う回文 Lazy badgers move unique waxy jellyfish packets.</translation>
     </message>
     <message>
+        <source>Color Scheme:</source>
+        <translation>配色:</translation>
+    </message>
+    <message>
+        <source>Light Mode</source>
+        <translation>ライトモード</translation>
+    </message>
+    <message>
+        <source>Dark Mode</source>
+        <translation>ダークモード</translation>
+    </message>
+    <message>
         <source>Font</source>
         <translation>フォント</translation>
     </message>
@@ -4114,10 +4146,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>自動アップデート</translation>
     </message>
     <message>
-        <source>Enable legend</source>
-        <translation>凡例を有効化</translation>
-    </message>
-    <message>
         <source>Reset Graph</source>
         <translation>グラフをリセット</translation>
     </message>
@@ -4251,6 +4279,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>T</translation>
     </message>
     <message>
+        <source>Toggle X-axis between relative time and time of day</source>
+        <translation>X軸を相対時間と時刻で切り替えます</translation>
+    </message>
+    <message>
+        <source>Toggle Y-axis between logarithmic and linear scale</source>
+        <translation>Y軸を対数スケールと線形スケールで切り替える</translation>
+    </message>
+    <message>
         <source>Crosshairs</source>
         <translation>十字カーソル</translation>
     </message>
@@ -4261,6 +4297,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Space</source>
         <translation>スペース</translation>
+    </message>
+    <message>
+        <source>Legend</source>
+        <translation>凡例</translation>
+    </message>
+    <message>
+        <source>Toggle legend</source>
+        <translation>凡例の表示を切り替える</translation>
     </message>
     <message>
         <source>Zoom In X Axis</source>
@@ -4501,6 +4545,30 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>%1 Intervals </source>
         <translation>%1 インターバル</translation>
+    </message>
+    <message>
+        <source>Move to top left</source>
+        <translation>左上に移動</translation>
+    </message>
+    <message>
+        <source>Move to top center</source>
+        <translation>中央上に移動</translation>
+    </message>
+    <message>
+        <source>Move to top right</source>
+        <translation>右上に移動</translation>
+    </message>
+    <message>
+        <source>Move to bottom left</source>
+        <translation>左下に移動</translation>
+    </message>
+    <message>
+        <source>Move to bottom center</source>
+        <translation>中央下に移動</translation>
+    </message>
+    <message>
+        <source>Move to bottom right</source>
+        <translation>右下に移動</translation>
     </message>
     <message>
         <source>Portable Document Format (*.pdf)</source>
@@ -6884,6 +6952,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>一番最近に使ったフォルダ</translation>
     </message>
     <message>
+        <source>The current working directory</source>
+        <translation>現在の稼働ディレクトリ</translation>
+    </message>
+    <message>
         <source>Show up to</source>
         <translation>ここまで表示</translation>
     </message>
@@ -7314,6 +7386,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>フィールド値を表示</translation>
     </message>
     <message>
+        <source>Refresh</source>
+        <translation>更新</translation>
+    </message>
+    <message>
         <source>Save Diagram As…</source>
         <translation>…としてダイアグラムを保存</translation>
     </message>
@@ -7467,10 +7543,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 <context>
     <name>PacketList</name>
     <message>
-        <source>Protocol Preferences</source>
-        <translation>プロトコル設定</translation>
-    </message>
-    <message>
         <source>Summary as Text</source>
         <translation>テキストとしての概要</translation>
     </message>
@@ -7481,6 +7553,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>…as YAML</source>
         <translation>YAMLとして…</translation>
+    </message>
+    <message>
+        <source>…as HTML</source>
+        <translation>HTMLとして…</translation>
     </message>
     <message>
         <source>Decode As…</source>
@@ -7522,16 +7598,28 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>内容にあわせて揃える</translation>
     </message>
     <message>
+        <source>&lt;html&gt;Values will show the raw values for fields.&lt;p&gt;Strings will show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings and custom columns which can be resolved to strings.&lt;p&gt;Details will show the values using the same format as in Packet Details. Only applicable to custom columns.&lt;/html&gt;</source>
+        <translation>&lt;html&gt; 値はフィールドの生の値を表示します。&lt;p&gt; 文字列はフィールドの生の値の代わりに人が読める文字列を表示します。 文字列を持つフィールドのカスタム列および文字列に解決できるカスタム列にのみ適用されます&lt;p&gt; 詳細には、パケット詳細で使用されているのと同じ形式で値が表示されます。カスタム列にのみ適用されます。&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>Display as Values</source>
+        <translation>値として表示</translation>
+    </message>
+    <message>
+        <source>Display as Strings</source>
+        <translation>文字列として表示</translation>
+    </message>
+    <message>
+        <source>Display as packet Details</source>
+        <translation>パケット詳細として表示</translation>
+    </message>
+    <message>
         <source>Column Preferences…</source>
         <translation>列の設定…</translation>
     </message>
     <message>
         <source>Resize Column to Width…</source>
         <translation>内容に合わせて列幅を揃える…</translation>
-    </message>
-    <message>
-        <source>Resolve Names</source>
-        <translation>名前を解決</translation>
     </message>
     <message>
         <source>Remove this Column</source>
@@ -7736,6 +7824,16 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Preferences</source>
         <translation>設定</translation>
+    </message>
+    <message>
+        <source>Copy</source>
+        <translation type="unfinished">コピー</translation>
+    </message>
+    <message numerus="yes">
+        <source>Copy Row(s)</source>
+        <translation type="unfinished">
+            <numerusform>行をコピー</numerusform>
+        </translation>
     </message>
 </context>
 <context>
@@ -8745,8 +8843,32 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>DRB-%1</translation>
     </message>
     <message>
+        <source>Left</source>
+        <translation>左</translation>
+    </message>
+    <message>
+        <source>Center</source>
+        <translation>中央</translation>
+    </message>
+    <message>
+        <source>Right</source>
+        <translation>右</translation>
+    </message>
+    <message>
         <source>Unknown</source>
         <translation>不明</translation>
+    </message>
+    <message>
+        <source>Values</source>
+        <translation>値</translation>
+    </message>
+    <message>
+        <source>Strings</source>
+        <translation>文字列</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation>詳細</translation>
     </message>
     <message>
         <source>UE Id</source>
@@ -8777,8 +8899,9 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>無効な表示フィルタ</translation>
     </message>
     <message>
-        <source>The filter expression %1 isn&apos;t a valid display filter. (%2).</source>
-        <translation>%1 フィルターの書式は有効な表示フィルタではありません (%2)</translation>
+        <source>The filter expression &quot;%1&quot; isn&apos;t a valid display filter.
+(%2).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Error</source>
@@ -8863,6 +8986,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>AVERAGE</source>
         <translation>平均</translation>
+    </message>
+    <message>
+        <source>THROUGHPUT</source>
+        <translation>スループット</translation>
     </message>
     <message>
         <source>LOAD</source>
@@ -11330,6 +11457,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 <context>
     <name>ShortcutListModel</name>
     <message>
+        <source>Display Filter Input</source>
+        <translation>表示フィルタ入力</translation>
+    </message>
+    <message>
+        <source>Jump to display filter input box</source>
+        <translation>表示フィルタ入力ボックスへジャンプ</translation>
+    </message>
+    <message>
         <source>Shortcut</source>
         <translation>ショートカット</translation>
     </message>
@@ -11354,7 +11489,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Decode as</source>
-        <translation>としてでコード</translation>
+        <translation>としてデコード</translation>
     </message>
     <message>
         <source>Show as</source>
@@ -11472,7 +11607,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Decoded as %1.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 としてデコードされました</translation>
     </message>
     <message>
         <source>Save Selected Packet Bytes As…</source>
@@ -11480,13 +11615,12 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>compressed %1</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 を圧縮しました</translation>
     </message>
     <message numerus="yes">
         <source>Using %Ln byte(s).</source>
-        <oldsource>Displaying %Ln byte(s).</oldsource>
-        <translation type="unfinished">
-            <numerusform>%Ln バイトを表示中</numerusform>
+        <translation>
+            <numerusform>%Ln バイトを利用</numerusform>
         </translation>
     </message>
     <message>
@@ -11585,6 +11719,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Display filter:</source>
         <translation>表示フィルタ:</translation>
+    </message>
+    <message>
+        <source>Strip Headers</source>
+        <translation>ヘッダーを除去</translation>
     </message>
 </context>
 <context>
@@ -12981,16 +13119,16 @@ a:hover {
         <translation>あなたはWiresharkを使ってインターネットを互いにつなぐ膠をキャプチャしています</translation>
     </message>
     <message>
-        <source>You are sniffing the glue that holds your system together using Logray </source>
-        <translation>あなたはLograyを使ってシステムを互いに繋ぐ膠をキャプチャしています</translation>
+        <source>You are sniffing the glue that holds your system together using Stratoshark </source>
+        <translation>あなたはStratosharkを使ってシステムを互いに繋ぐ膠をキャプチャしています</translation>
+    </message>
+    <message>
+        <source>You are running Stratoshark </source>
+        <translation>Stratosharkを起動中です </translation>
     </message>
     <message>
         <source>You are running Wireshark </source>
         <translation>Wiresharkを起動中</translation>
-    </message>
-    <message>
-        <source>You are running Logray </source>
-        <translation>Lograyを起動中です </translation>
     </message>
     <message>
         <source> You receive automatic updates.</source>
@@ -13066,14 +13204,6 @@ a:hover {
     <message>
         <source>802.11 Preferences</source>
         <translation>802.11設定</translation>
-    </message>
-    <message>
-        <source>AirPcap Control Panel</source>
-        <translation>AirPcapコントロールパネル</translation>
-    </message>
-    <message>
-        <source>Open the AirPcap Control Panel</source>
-        <translation>AirPcapコントロールパネルを開く</translation>
     </message>
     <message>
         <source>Unable to set channel or offset.</source>
@@ -13267,10 +13397,6 @@ a:hover {
     <message>
         <source>No files found</source>
         <translation>ファイルが見つかりませんでした</translation>
-    </message>
-    <message>
-        <source>&amp;Contents</source>
-        <translation>目次(&amp;C)</translation>
     </message>
     <message>
         <source>TShark</source>
@@ -13536,10 +13662,6 @@ a:hover {
     <message>
         <source>Wireless Toolbar</source>
         <translation>無線ツールバー</translation>
-    </message>
-    <message>
-        <source>Help contents</source>
-        <translation>ヘルプ目次</translation>
     </message>
     <message>
         <source>FAQs</source>
@@ -14130,10 +14252,6 @@ a:hover {
         <translation>レイアウトをリセット</translation>
     </message>
     <message>
-        <source>Reset appearance layout to default size</source>
-        <translation>外観のレイアウトをデフォルトのサイズにリセットします</translation>
-    </message>
-    <message>
         <source>Seconds Since First Captured Packet</source>
         <translation>最初にキャプチャしたパケットからの経過時間</translation>
     </message>
@@ -14306,8 +14424,36 @@ a:hover {
         <translation>無線(&amp;W)</translation>
     </message>
     <message>
+        <source>&amp;User&apos;s Guide</source>
+        <translation>&amp;ユーザーズガイド</translation>
+    </message>
+    <message>
+        <source>Wireshark User&apos;s Guide</source>
+        <translation>ワイヤーシャークユーザーズガイド</translation>
+    </message>
+    <message>
         <source>Display Filters</source>
         <translation>表示フィルタ</translation>
+    </message>
+    <message>
+        <source>Display Filter Reference</source>
+        <translation>表示フィルタ参照</translation>
+    </message>
+    <message>
+        <source>First Packet in Conversation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Go to the first packet in this conversation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Last Packet in Conversation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Go to the last packet in this conversation</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Capture &amp;Filters…</source>
@@ -14328,6 +14474,10 @@ a:hover {
     <message>
         <source>As &amp;YAML</source>
         <translation>YAMLとして(&amp;Y)</translation>
+    </message>
+    <message>
+        <source>As &amp;HTML</source>
+        <translation>HTMLとして(&amp;H)</translation>
     </message>
     <message>
         <source>All Visible Items</source>
@@ -14492,6 +14642,10 @@ a:hover {
     <message>
         <source>Normal Size</source>
         <translation>標準サイズ</translation>
+    </message>
+    <message>
+        <source>Reset layout to default size</source>
+        <translation>デフォルトサイズにレイアウトをリセット</translation>
     </message>
     <message>
         <source>Resize Columns</source>
@@ -14988,16 +15142,8 @@ a:hover {
         <translation>ファイルを結合する前に変更を保存する必要があります</translation>
     </message>
     <message>
-        <source>Invalid Display Filter</source>
-        <translation>無効な表示フィルタ</translation>
-    </message>
-    <message>
         <source>Invalid Read Filter</source>
         <translation>無効な読込フィルタ</translation>
-    </message>
-    <message>
-        <source>The filter expression %1 isn&apos;t a valid read filter. (%2).</source>
-        <translation>フィルタ式 %1 は有効な読込みフィルタではありません(%2)</translation>
     </message>
     <message>
         <source> before importing a capture</source>
@@ -15036,6 +15182,11 @@ a:hover {
     <message>
         <source>Unable to drop files during capture.</source>
         <translation>キャプチャ中にファイルをドロップできません</translation>
+    </message>
+    <message>
+        <source>The filter expression &quot;%1&quot; isn&apos;t a valid read filter.
+(%2).</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Unknown file type returned by merge dialog.</source>

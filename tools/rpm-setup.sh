@@ -83,7 +83,6 @@ BASIC_LIST="
 	libpcap-devel
 	pcre2-devel
 	python3
-	zlib-devel
 	"
 
 ADDITIONAL_LIST="
@@ -92,7 +91,6 @@ ADDITIONAL_LIST="
 	libssh-devel
 	libxml2-devel
 	lz4
-	minizip-devel
 	perl
 	perl-Parse-Yapp
 	python3-pytest
@@ -170,17 +168,14 @@ add_packages() {
 add_package BASIC_LIST glib2 || add_package BASIC_LIST libglib-2_0-0 ||
 echo "Required package glib2|libglib-2_0-0 is unavailable" >&2
 
-add_package BASIC_LIST lua53-devel || add_package BASIC_LIST lua-devel ||
-echo "Required package lua53-devel|lua-devel is unavailable" >&2
-
-add_package BASIC_LIST lua53 || add_package BASIC_LIST lua ||
-echo "Required package lua53|lua is unavailable" >&2
+add_package BASIC_LIST lua-devel || add_package BASIC_LIST lua54-devel || add_package BASIC_LIST lua53-devel ||
+echo "Required package lua-devel|lua54-devel|lua53-devel is unavailable" >&2
 
 add_package BASIC_LIST libpcap || add_package BASIC_LIST libpcap1 ||
 echo "Required package libpcap|libpcap1 is unavailable" >&2
 
-add_package BASIC_LIST zlib || add_package BASIC_LIST libz1 ||
-echo "Required package zlib|libz1 is unavailable" >&2
+add_package BASIC_LIST zlib-ng-compat-devel || add_package BASIC_LIST zlib-devel ||
+echo "Optional package zlib-ng-compat-devel|zlib-devel is unavailable" >&2
 
 add_package BASIC_LIST c-ares-devel || add_package BASIC_LIST libcares-devel ||
 echo "Required package c-ares-devel|libcares-devel is unavailable" >&2
@@ -218,7 +213,7 @@ then
 	# OpenSUSE additionally has a separate Qt5PrintSupport package.
 	add_package BASIC_LIST qt5-qtmultimedia-devel ||
 	add_packages BASIC_LIST libqt5-qtmultimedia-devel libQt5PrintSupport-devel ||
-	echo "Required Qt5 Mutlimedia and/or Qt5 Print Support is unavailable" >&2
+	echo "Required Qt5 Multimedia and/or Qt5 Print Support is unavailable" >&2
 
 	# This is only required on OpenSUSE
 	add_package BASIC_LIST libqt5-qtsvg-devel ||
@@ -239,26 +234,41 @@ fi
 
 if [ $ADD_QT6 -ne 0 ]
 then
-	# Fedora Qt6 packages required from a minimal installation
-	QT6_LIST=(qt6-qtbase-devel
-			qt6-qttools-devel
-			qt6-qt5compat-devel
-			qt6-qtmultimedia-devel
-			libxkbcommon-devel)
+	# See CMakeLists.txt in the root directory for a list of
+	# Qt6 modules required for a minimal installation
+	# Base and Multimedia pull in most of the other required modules
+	# RH/Fedora and SUSE use slightly different pkg names for modules
+	QT6_LIST=(base
+			tools
+			multimedia)
 
-	for pkg in "${QT6_LIST[@]}"
+	for module in "${QT6_LIST[@]}"
 	do
-		add_package BASIC_LIST "$pkg" ||
-		echo "Qt6 dependency $pkg is unavailable" >&2
+		add_package BASIC_LIST "qt6-qt${module}-devel" ||
+		add_package BASIC_LIST "qt6-${module}-devel" ||
+		echo "Required Qt6 Module $module is unavailable" >&2
 	done
 
+	# qt6-linguist: RHEL, Fedora
+	# qt6-linguist-devel: OpenSUSE
+	add_package BASIC_LIST qt6-linguist ||
+	add_package BASIC_LIST qt6-linguist-devel ||
+	echo "Required Qt6 module LinguistTools is unavailable" >&2
+
+	add_package BASIC_LIST qt6-qt5compat-devel ||
+	echo "Required Qt6 module Qt5Compat is unavailable"
+
+	add_package BASIC_LIST libxkbcommon-devel ||
+	echo "Required Qt6 dependency libxkbcommon-devel is unavailable"
+
 	add_package ADDITIONAL_LIST qt6-qtimageformats ||
-	echo "Optional Qt6 Image Formats is unavailable" >&2
+	add_package ADDITIONAL_LIST qt6-imageformats ||
+	echo "Optional Qt6 module Image Formats is unavailable" >&2
 fi
 
 # This in only required on OpenSUSE
 add_packages BASIC_LIST hicolor-icon-theme xdg-utils ||
-echo "Required OpenSUSE packages hicolor-icon-theme and xdg-utils are unavailable. Not required for other distirbutions." >&2
+echo "Required OpenSUSE packages hicolor-icon-theme and xdg-utils are unavailable. Not required for other distributions." >&2
 
 # This in only required (and available) on OpenSUSE
 add_package BASIC_LIST update-desktop-files ||
@@ -323,8 +333,8 @@ echo "Optional package opus-devel|libopus-devel is unavailable" >&2
 add_package ADDITIONAL_LIST bcg729-devel ||
 echo "Optional package bcg729-devel is unavailable" >&2
 
-add_package ADDITIONAL_LIST zlib-ng-devel ||
-echo "Optional package zlib-ng-devel is unavailable" >&2
+add_package ADDITIONAL_LIST minizip-ng-compat-devel || add_package ADDITIONAL_LIST minizip-devel ||
+echo "Optional package minizip-ng-compat-devel|minizip-devel is unavailable" >&2
 
 # RHEL 8 / CentOS 8 are missing the -devel packages for sbc and libsmi due to
 # RH deciding not to ship all -devel packages.

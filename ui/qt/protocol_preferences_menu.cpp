@@ -112,11 +112,11 @@ public:
         QAction(parent),
         pref_(pref)
     {
-        setText(QString("%1" UTF8_HORIZONTAL_ELLIPSIS).arg(prefs_get_title(pref_)));
+        setText(QStringLiteral("%1%2").arg(prefs_get_title(pref_), UTF8_HORIZONTAL_ELLIPSIS));
     }
 
     void showUatDialog() {
-        UatDialog *uat_dlg = new UatDialog(qobject_cast<QWidget*>(parent()), prefs_get_uat_value(pref_));
+        UatDialog *uat_dlg = new UatDialog(mainApp->mainWindow(), prefs_get_uat_value(pref_));
         connect(uat_dlg, SIGNAL(destroyed(QObject*)), mainApp, SLOT(flushAppSignals()));
         uat_dlg->setWindowModality(Qt::ApplicationModal);
         uat_dlg->setAttribute(Qt::WA_DeleteOnClose);
@@ -139,7 +139,7 @@ public:
     {
         QString title = prefs_get_title(pref_);
 
-        title.append(QString(": %1" UTF8_HORIZONTAL_ELLIPSIS).arg(gchar_free_to_qstring(prefs_pref_to_str(pref_, pref_current))));
+        title.append(QStringLiteral(": %1%2").arg(gchar_free_to_qstring(prefs_pref_to_str(pref_, pref_current)), UTF8_HORIZONTAL_ELLIPSIS));
 
         setText(title);
     }
@@ -165,7 +165,8 @@ add_prefs_menu_item(pref_t *pref, void *menu_ptr)
 }
 
 
-ProtocolPreferencesMenu::ProtocolPreferencesMenu()
+ProtocolPreferencesMenu::ProtocolPreferencesMenu(QWidget *parent) :
+    QMenu(parent)
 {
     setTitle(tr("Protocol Preferences"));
     setModule(NULL);
@@ -327,7 +328,7 @@ void ProtocolPreferencesMenu::addMenuItem(preference *pref)
     }
     default:
         // A type we currently don't handle. Just open the prefs dialog.
-        QString title = QString("%1" UTF8_HORIZONTAL_ELLIPSIS).arg(prefs_get_title(pref));
+        QString title = QStringLiteral("%1%2").arg(prefs_get_title(pref), UTF8_HORIZONTAL_ELLIPSIS);
         QAction *mpa = addAction(title);
         connect(mpa, SIGNAL(triggered(bool)), this, SLOT(modulePreferencesTriggered()));
         break;

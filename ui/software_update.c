@@ -19,7 +19,7 @@
  * Version 0 of the update URI path has the following elements:
  * - The update path prefix (fixed, "update")
  * - The schema version (fixed, 0)
- * - The application name (variable, "Wireshark" or "Logray")
+ * - The application name (variable, "Wireshark" or "Stratoshark")
  * - The application version ("<major>.<minor>.<micro>")
  * - The operating system (variable, one of "Windows" or "macOS")
  * - The architecture name (variable, one of "x86", "x86-64", or "arm64")
@@ -89,7 +89,7 @@ static char *get_appcast_update_url(software_update_channel_e chan) {
                     SU_OSNAME,
                     SU_ARCH,
                     chan_name);
-    return g_string_free(update_url_str, false);
+    return g_string_free(update_url_str, FALSE);
 }
 
 #ifdef _WIN32

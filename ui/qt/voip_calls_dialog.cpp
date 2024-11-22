@@ -378,7 +378,7 @@ void VoipCallsDialog::tapDraw(void *tapinfo_ptr)
     }
 }
 
-int VoipCallsDialog::compareCallNums(gconstpointer a, gconstpointer b)
+int VoipCallsDialog::compareCallNums(const void *a, const void *b)
 {
     const voip_calls_info_t *call_a = (const voip_calls_info_t *)a;
     const voip_calls_info_t *call_b = (const voip_calls_info_t *)b;
@@ -481,14 +481,14 @@ void VoipCallsDialog::prepareFilter()
     while (cur_ga_item && cur_ga_item->data) {
         seq_analysis_item_t *ga_item = gxx_list_data(seq_analysis_item_t*, cur_ga_item);
         if (selected_calls.contains(ga_item->conv_num)) {
-            frame_numbers += QString("%1,").arg(ga_item->frame_number);
+            frame_numbers += QStringLiteral("%1,").arg(ga_item->frame_number);
         }
         cur_ga_item = gxx_list_next(cur_ga_item);
     }
 
     if (!frame_numbers.isEmpty()) {
         frame_numbers.chop(1);
-        filter_str = QString("frame.number in {%1} or rtp.setup-frame in {%1}").arg(frame_numbers);
+        filter_str = QStringLiteral("frame.number in {%1} or rtp.setup-frame in {%1}").arg(frame_numbers);
     }
 
 #if 0
@@ -505,7 +505,7 @@ void VoipCallsDialog::prepareFilter()
     if (filter_length < max_filter_length) {
         gtk_editable_insert_text(GTK_EDITABLE(main_display_filter_widget), filter_string_fwd->str, -1, &pos);
     } else {
-        g_string_free(filter_string_fwd, true);
+        g_string_free(filter_string_fwd, TRUE);
         filter_string_fwd = g_string_new(filter_prepend);
 
         g_string_append_printf(filter_string_fwd, "(");
@@ -709,7 +709,7 @@ void VoipCallsDialog::copyAsCSV()
         foreach (QVariant v, streamRowData(row)) {
             QString strval = v.toString();
             // XXX should quotes (") in strval be stripped/sanitized?
-            rdsl << QString("\"%1\"").arg(strval);
+            rdsl << QStringLiteral("\"%1\"").arg(strval);
         }
         stream << rdsl.join(",") << '\n';
     }

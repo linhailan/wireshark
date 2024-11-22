@@ -44,8 +44,8 @@
         <translation>Cartelle</translation>
     </message>
     <message>
-        <source>Filter by path</source>
-        <translation>Filtro per percorso</translation>
+        <source>Search Folders</source>
+        <translation>Cerca cartelle</translation>
     </message>
     <message>
         <source>Plugins</source>
@@ -80,12 +80,16 @@
         <translation>Licenza</translation>
     </message>
     <message>
-        <source>About Logray</source>
-        <translation>Informazioni su Logray</translation>
+        <source>About Stratoshark</source>
+        <translation>Informazioni su Stratoshark</translation>
     </message>
     <message>
-        <source>Logray</source>
-        <translation>Logray</translation>
+        <source>Stratoshark</source>
+        <translation>Stratoshark</translation>
+    </message>
+    <message>
+        <source>&lt;h3&gt;System Call and Event Log Analyzer&lt;/h3&gt;</source>
+        <translation>&lt;h3&gt;Analizzatore delle chiamate di sistema e del registro degli eventi&lt;/h3&gt;</translation>
     </message>
     <message>
         <source>The directory does not exist</source>
@@ -893,10 +897,6 @@
         <translation>Filtro di lettura:</translation>
     </message>
     <message>
-        <source>Compress with g&amp;zip</source>
-        <translation>Comprimi con g&amp;zip</translation>
-    </message>
-    <message>
         <source>Open Capture File</source>
         <oldsource>Wireshark: Open Capture File</oldsource>
         <translation>Apri un file di cattura</translation>
@@ -1210,10 +1210,10 @@
 </translation>
     </message>
     <message>
-        <source>Created by Logray %1
+        <source>Created by Stratoshark %1
 
 </source>
-        <translation>Creato da Logray %1
+        <translation>Creato da Stratoshark %1
 
 </translation>
     </message>
@@ -1859,12 +1859,24 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Occorrenza:</translation>
     </message>
     <message>
-        <source>Resolve Names:</source>
-        <translation>Risolvi nomi:</translation>
+        <source>Display as:</source>
+        <translation>Visualizza come:</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;p&gt;Show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;p&gt;Mostra stringhe comprensibili invece che i valori grezzi dei campi. Applicabile solo alle colonne personalizzate con campi che hanno stringhe con valori.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;p&gt;Values will show the raw values for fields.&lt;p&gt;Strings will show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings and custom columns which can be resolved to strings.&lt;p&gt;Details will show the values using the same format as in Packet Details. Only applicable to custom columns.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;p&gt;I valori mostreranno i valori grezzi per i campi. &lt;p&gt;Le stringhe mostreranno stringhe leggibili dall&apos;uomo anziché valori grezzi per i campi. Applicabile solo alle colonne personalizzate con campi che hanno stringhe di valore e colonne personalizzate che possono essere risolte in stringhe. &lt;p&gt;I dettagli mostreranno i valori utilizzando lo stesso formato di Dettagli pacchetto. Applicabile solo alle colonne personalizzate.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>Values</source>
+        <translation>Valori</translation>
+    </message>
+    <message>
+        <source>Strings</source>
+        <translation>Stringhe</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation>Dettagli</translation>
     </message>
     <message>
         <source>Missing fields.</source>
@@ -1902,8 +1914,12 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Occorrenze del campo</translation>
     </message>
     <message>
-        <source>Resolved</source>
-        <translation>Risolto</translation>
+        <source>Display Format</source>
+        <translation>Formato di visualizzazione</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;Values will show the raw values for fields.&lt;p&gt;Strings will show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings and custom columns which can be resolved to strings.&lt;p&gt;Details will show the values using the same format as in Packet Details. Only applicable to custom columns.&lt;/html&gt;</source>
+        <translation>&lt;html&gt;I valori mostreranno i valori grezzi per i campi. &lt;p&gt;Le stringhe mostreranno stringhe leggibili dall&apos;uomo anziché valori grezzi per i campi. Applicabile solo alle colonne personalizzate con campi che hanno stringhe di valore e colonne personalizzate che possono essere risolte in stringhe. &lt;p&gt;I dettagli mostreranno i valori utilizzando lo stesso formato di Dettagli pacchetto. Applicabile solo alle colonne personalizzate.&lt;/html&gt;</translation>
     </message>
     <message>
         <source>Width</source>
@@ -1912,10 +1928,6 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Alignment</source>
         <translation>Allineamento</translation>
-    </message>
-    <message>
-        <source>&lt;html&gt;Show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings.&lt;/html&gt;</source>
-        <translation>&lt;html&gt;Mostra stringhe comprensibili invece che i valori grezzi dei campi. Applicabile solo alle colonne personalizzate con campi che hanno stringhe con valori.&lt;/html&gt;</translation>
     </message>
     <message>
         <source>New Column</source>
@@ -1946,29 +1958,6 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
 </context>
 <context>
-    <name>ColumnTypeDelegate</name>
-    <message>
-        <source>Default</source>
-        <translation>Predefinito</translation>
-    </message>
-    <message>
-        <source>Left</source>
-        <translation>Sinistra</translation>
-    </message>
-    <message>
-        <source>Center</source>
-        <translation>Centro</translation>
-    </message>
-    <message>
-        <source>Right</source>
-        <translation>Destra</translation>
-    </message>
-    <message>
-        <source>Unknown</source>
-        <translation>Sconosciuto</translation>
-    </message>
-</context>
-<context>
     <name>CompiledFilterOutput</name>
     <message>
         <source>Compiled Filter Output</source>
@@ -1981,6 +1970,25 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Copy filter text to the clipboard.</source>
         <translation>Copia il testo del filtro negli appunti.</translation>
+    </message>
+</context>
+<context>
+    <name>CompressionGroupBox</name>
+    <message>
+        <source>Compression options</source>
+        <translation>Opzioni di compressione</translation>
+    </message>
+    <message>
+        <source>&amp;Uncompressed</source>
+        <translation>&amp;Non compresso</translation>
+    </message>
+    <message>
+        <source>Compress with g&amp;zip</source>
+        <translation>Comprimi con g&amp;zip</translation>
+    </message>
+    <message>
+        <source>Compress with &amp;LZ4</source>
+        <translation>Comprimi con &amp;LZ4</translation>
     </message>
 </context>
 <context>
@@ -2724,6 +2732,14 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Salva mappa dei terminatori</translation>
     </message>
     <message>
+        <source>Hide aggregated</source>
+        <translation>Nascondi aggregati</translation>
+    </message>
+    <message>
+        <source>Hide IPv4 aggregated endpoints (see subnets file &amp; IPv4 preferences)</source>
+        <translation>Nascondi i terminatori IPv4 aggregati (vedi file di sottoreti e preferenze IPv4)</translation>
+    </message>
+    <message>
         <source>Failed to save map file %1.</source>
         <translation>Impossibile salvare il file di mappa %1.</translation>
     </message>
@@ -3010,6 +3026,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Display filter:</source>
         <translation>Filtro di visualizzazione:</translation>
+    </message>
+    <message>
+        <source>Export PDUs</source>
+        <translation>Esporta PDU</translation>
     </message>
 </context>
 <context>
@@ -3817,6 +3837,18 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Quel vituperabile xenofobo zelante sposta pacchetti mentre assaggia il whisky ed esclama: alleluja!</translation>
     </message>
     <message>
+        <source>Color Scheme:</source>
+        <translation>Schema di colori:</translation>
+    </message>
+    <message>
+        <source>Light Mode</source>
+        <translation>Modalità chiara</translation>
+    </message>
+    <message>
+        <source>Dark Mode</source>
+        <translation>Modalità scura</translation>
+    </message>
+    <message>
         <source>Font</source>
         <translation>Carattere</translation>
     </message>
@@ -4132,10 +4164,6 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Aggiornamento automatico</translation>
     </message>
     <message>
-        <source>Enable legend</source>
-        <translation>Abilita la legenda</translation>
-    </message>
-    <message>
         <source>Reset Graph</source>
         <translation>Ripristina il grafico</translation>
     </message>
@@ -4269,6 +4297,14 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>T</translation>
     </message>
     <message>
+        <source>Toggle X-axis between relative time and time of day</source>
+        <translation>Commuta l&apos;asse X tra tempo relativo e ora del giorno</translation>
+    </message>
+    <message>
+        <source>Toggle Y-axis between logarithmic and linear scale</source>
+        <translation>Commuta l&apos;asse Y tra scala logaritmica e lineare</translation>
+    </message>
+    <message>
         <source>Crosshairs</source>
         <translation>Reticolo</translation>
     </message>
@@ -4279,6 +4315,14 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Space</source>
         <translation>Spazio</translation>
+    </message>
+    <message>
+        <source>Legend</source>
+        <translation>Legenda</translation>
+    </message>
+    <message>
+        <source>Toggle legend</source>
+        <translation>Commuta la legenda</translation>
     </message>
     <message>
         <source>Zoom In X Axis</source>
@@ -4519,6 +4563,30 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>%1 Intervals </source>
         <translation>%1 intervalli</translation>
+    </message>
+    <message>
+        <source>Move to top left</source>
+        <translation>Sposta in alto a sinistra</translation>
+    </message>
+    <message>
+        <source>Move to top center</source>
+        <translation>Sposta in alto al centro</translation>
+    </message>
+    <message>
+        <source>Move to top right</source>
+        <translation>Sposta in alto a destra</translation>
+    </message>
+    <message>
+        <source>Move to bottom left</source>
+        <translation>Sposta in basso a sinistra</translation>
+    </message>
+    <message>
+        <source>Move to bottom center</source>
+        <translation>Sposta in basso al centro</translation>
+    </message>
+    <message>
+        <source>Move to bottom right</source>
+        <translation>Sposta in basso a destra</translation>
     </message>
     <message>
         <source>Portable Document Format (*.pdf)</source>
@@ -6903,6 +6971,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>La cartella usata più di recente</translation>
     </message>
     <message>
+        <source>The current working directory</source>
+        <translation>La cartella di lavoro attuale</translation>
+    </message>
+    <message>
         <source>Show up to</source>
         <translation>Mostra fino a</translation>
     </message>
@@ -7333,6 +7405,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Mostra i valori dei campi</translation>
     </message>
     <message>
+        <source>Refresh</source>
+        <translation>Aggiorna</translation>
+    </message>
+    <message>
         <source>Save Diagram As…</source>
         <translation>Salva diagramma come...</translation>
     </message>
@@ -7488,10 +7564,6 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
 <context>
     <name>PacketList</name>
     <message>
-        <source>Protocol Preferences</source>
-        <translation>Preferenze di protocollo</translation>
-    </message>
-    <message>
         <source>Summary as Text</source>
         <translation>Riepilogo come testo</translation>
     </message>
@@ -7502,6 +7574,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>…as YAML</source>
         <translation>…come YAML</translation>
+    </message>
+    <message>
+        <source>…as HTML</source>
+        <translation>…come HTML</translation>
     </message>
     <message>
         <source>Decode As…</source>
@@ -7543,16 +7619,28 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Ridimensiona al contenuto</translation>
     </message>
     <message>
+        <source>&lt;html&gt;Values will show the raw values for fields.&lt;p&gt;Strings will show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings and custom columns which can be resolved to strings.&lt;p&gt;Details will show the values using the same format as in Packet Details. Only applicable to custom columns.&lt;/html&gt;</source>
+        <translation>&lt;html&gt;I valori mostreranno i valori grezzi per i campi.&lt;p&gt;Le stringhe mostreranno stringhe leggibili dall&apos;uomo anziché valori grezzi per i campi. Applicabile solo alle colonne personalizzate con campi che hanno stringhe di valore e colonne personalizzate che possono essere risolte in stringhe.&lt;p&gt;I dettagli mostreranno i valori usando lo stesso formato di Dettagli pacchetto. Applicabile solo alle colonne personalizzate.&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>Display as Values</source>
+        <translation>Visualizza come valori</translation>
+    </message>
+    <message>
+        <source>Display as Strings</source>
+        <translation>Visualizza come stringhe</translation>
+    </message>
+    <message>
+        <source>Display as packet Details</source>
+        <translation>Visualizza come dettagli del pacchetto</translation>
+    </message>
+    <message>
         <source>Column Preferences…</source>
         <translation>Preferenze delle colonne...</translation>
     </message>
     <message>
         <source>Resize Column to Width…</source>
         <translation>Ridimensiona colonna alla larghezza...</translation>
-    </message>
-    <message>
-        <source>Resolve Names</source>
-        <translation>Risolvi nomi</translation>
     </message>
     <message>
         <source>Remove this Column</source>
@@ -7757,6 +7845,17 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Preferences</source>
         <translation>Preferenze</translation>
+    </message>
+    <message>
+        <source>Copy</source>
+        <translation type="unfinished">Copia</translation>
+    </message>
+    <message numerus="yes">
+        <source>Copy Row(s)</source>
+        <translation type="unfinished">
+            <numerusform>Copia riga</numerusform>
+            <numerusform>Copia righe</numerusform>
+        </translation>
     </message>
 </context>
 <context>
@@ -8773,8 +8872,32 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>DRB-%1</translation>
     </message>
     <message>
+        <source>Left</source>
+        <translation>Sinistra</translation>
+    </message>
+    <message>
+        <source>Center</source>
+        <translation>Centro</translation>
+    </message>
+    <message>
+        <source>Right</source>
+        <translation>Destra</translation>
+    </message>
+    <message>
         <source>Unknown</source>
         <translation>Sconosciuto</translation>
+    </message>
+    <message>
+        <source>Values</source>
+        <translation>Valori</translation>
+    </message>
+    <message>
+        <source>Strings</source>
+        <translation>Stringhe</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation>Dettagli</translation>
     </message>
     <message>
         <source>UE Id</source>
@@ -8805,8 +8928,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Filtro di visualizzazione non valido</translation>
     </message>
     <message>
-        <source>The filter expression %1 isn&apos;t a valid display filter. (%2).</source>
-        <translation>L&apos;espressione %1 non è un filtro di visualizzazione valido. (%2).</translation>
+        <source>The filter expression &quot;%1&quot; isn&apos;t a valid display filter.
+(%2).</source>
+        <translation>L&apos;espressione &quot;%1&quot; non è un filtro di visualizzazione valido.
+(%2).</translation>
     </message>
     <message>
         <source>Error</source>
@@ -8891,6 +9016,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>AVERAGE</source>
         <translation>MEDIA</translation>
+    </message>
+    <message>
+        <source>THROUGHPUT</source>
+        <translation>THROUGHPUT</translation>
     </message>
     <message>
         <source>LOAD</source>
@@ -11360,6 +11489,14 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
 <context>
     <name>ShortcutListModel</name>
     <message>
+        <source>Display Filter Input</source>
+        <translation>Immissione del filtro di visualizzazione</translation>
+    </message>
+    <message>
+        <source>Jump to display filter input box</source>
+        <translation>Passa all&apos;immissione del filtro di visualizzazione.</translation>
+    </message>
+    <message>
         <source>Shortcut</source>
         <translation>Scorciatoia</translation>
     </message>
@@ -11503,7 +11640,7 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>Decoded as %1.</source>
-        <translation type="unfinished"></translation>
+        <translation>Decodificato come %1.</translation>
     </message>
     <message>
         <source>Save Selected Packet Bytes As…</source>
@@ -11511,14 +11648,13 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>compressed %1</source>
-        <translation type="unfinished"></translation>
+        <translation>compressi %1</translation>
     </message>
     <message numerus="yes">
         <source>Using %Ln byte(s).</source>
-        <oldsource>Displaying %Ln byte(s).</oldsource>
-        <translation type="unfinished">
-            <numerusform>Visualizzazione di %Ln byte.</numerusform>
-            <numerusform>Visualizzazione di %Ln byte.</numerusform>
+        <translation>
+            <numerusform>Utilizzo di %Ln byte.</numerusform>
+            <numerusform>Utilizzo di %Ln byte.</numerusform>
         </translation>
     </message>
     <message>
@@ -11617,6 +11753,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Display filter:</source>
         <translation>Filtro di visualizzazione:</translation>
+    </message>
+    <message>
+        <source>Strip Headers</source>
+        <translation>Rimuovi intestazioni</translation>
     </message>
 </context>
 <context>
@@ -13009,16 +13149,16 @@ a:hover {
         <translation>Stai annusando la colla che tiene insieme Internet con Wireshark</translation>
     </message>
     <message>
-        <source>You are sniffing the glue that holds your system together using Logray </source>
-        <translation>Questo è il collante che tiene insieme il tuo sistema usando Logray</translation>
+        <source>You are sniffing the glue that holds your system together using Stratoshark </source>
+        <translation>Questo è il collante che tiene insieme il tuo sistema usando Stratoshark</translation>
+    </message>
+    <message>
+        <source>You are running Stratoshark </source>
+        <translation>Stai eseguendo Stratoshark</translation>
     </message>
     <message>
         <source>You are running Wireshark </source>
         <translation>Stai eseguendo Wireshark </translation>
-    </message>
-    <message>
-        <source>You are running Logray </source>
-        <translation>Stai eseguendo Logray</translation>
     </message>
     <message>
         <source> You receive automatic updates.</source>
@@ -13094,14 +13234,6 @@ a:hover {
     <message>
         <source>802.11 Preferences</source>
         <translation>Preferenze 802.11</translation>
-    </message>
-    <message>
-        <source>AirPcap Control Panel</source>
-        <translation>Pannello di controllo AirPcap</translation>
-    </message>
-    <message>
-        <source>Open the AirPcap Control Panel</source>
-        <translation>Apri il pannello di controllo AirPcap</translation>
     </message>
     <message>
         <source>Unable to set channel or offset.</source>
@@ -13295,10 +13427,6 @@ a:hover {
     <message>
         <source>No files found</source>
         <translation>File non trovati</translation>
-    </message>
-    <message>
-        <source>&amp;Contents</source>
-        <translation>&amp;Contenuti</translation>
     </message>
     <message>
         <source>TShark</source>
@@ -13564,10 +13692,6 @@ a:hover {
     <message>
         <source>Wireless Toolbar</source>
         <translation>Barra degli strumenti wireless</translation>
-    </message>
-    <message>
-        <source>Help contents</source>
-        <translation>Contenuti della guida</translation>
     </message>
     <message>
         <source>FAQs</source>
@@ -14158,10 +14282,6 @@ a:hover {
         <translation>Ripristina disposizione</translation>
     </message>
     <message>
-        <source>Reset appearance layout to default size</source>
-        <translation>Ripristina la disposizione dell&apos;aspetto alla dimensione predefinita</translation>
-    </message>
-    <message>
         <source>Seconds Since First Captured Packet</source>
         <translation>Secondi dal primo pacchetto catturato</translation>
     </message>
@@ -14334,8 +14454,36 @@ a:hover {
         <translation>&amp;Wireless</translation>
     </message>
     <message>
+        <source>&amp;User&apos;s Guide</source>
+        <translation>Manuale &amp;utente</translation>
+    </message>
+    <message>
+        <source>Wireshark User&apos;s Guide</source>
+        <translation>Manuale utente di Wireshark</translation>
+    </message>
+    <message>
         <source>Display Filters</source>
         <translation>Filtri di visualizzazione</translation>
+    </message>
+    <message>
+        <source>Display Filter Reference</source>
+        <translation>Riferimento del filtro di visualizzazione</translation>
+    </message>
+    <message>
+        <source>First Packet in Conversation</source>
+        <translation>Primo pacchetto in conversazione</translation>
+    </message>
+    <message>
+        <source>Go to the first packet in this conversation</source>
+        <translation>Vai al primo pacchetto in questa conversazione</translation>
+    </message>
+    <message>
+        <source>Last Packet in Conversation</source>
+        <translation>Ultimo pacchetto in conversazione</translation>
+    </message>
+    <message>
+        <source>Go to the last packet in this conversation</source>
+        <translation>Vai all&apos;ultimo pacchetto in questa conversazione</translation>
     </message>
     <message>
         <source>Capture &amp;Filters…</source>
@@ -14356,6 +14504,10 @@ a:hover {
     <message>
         <source>As &amp;YAML</source>
         <translation>Come &amp;YAML</translation>
+    </message>
+    <message>
+        <source>As &amp;HTML</source>
+        <translation>Come &amp;HTML</translation>
     </message>
     <message>
         <source>All Visible Items</source>
@@ -14520,6 +14672,10 @@ a:hover {
     <message>
         <source>Normal Size</source>
         <translation>Dimensione normale</translation>
+    </message>
+    <message>
+        <source>Reset layout to default size</source>
+        <translation>Ripristina la disposizione alla dimensione predefinita </translation>
     </message>
     <message>
         <source>Resize Columns</source>
@@ -15016,16 +15172,8 @@ a:hover {
         <translation>Le modifiche devono essere salvate prima di unire.</translation>
     </message>
     <message>
-        <source>Invalid Display Filter</source>
-        <translation>Filtro di visualizzazione non valido</translation>
-    </message>
-    <message>
         <source>Invalid Read Filter</source>
         <translation>Filtro di lettura non valido</translation>
-    </message>
-    <message>
-        <source>The filter expression %1 isn&apos;t a valid read filter. (%2).</source>
-        <translation>L&apos;espressione %1 non è un filtro di lettura valido. (%2).</translation>
     </message>
     <message>
         <source> before importing a capture</source>
@@ -15064,6 +15212,12 @@ a:hover {
     <message>
         <source>Unable to drop files during capture.</source>
         <translation>Impossibile scartare file durante la cattura.</translation>
+    </message>
+    <message>
+        <source>The filter expression &quot;%1&quot; isn&apos;t a valid read filter.
+(%2).</source>
+        <translation>L&apos;espressione &quot;%1&quot; non è un filtro di lettura valido.
+(%2).</translation>
     </message>
     <message>
         <source>Unknown file type returned by merge dialog.</source>

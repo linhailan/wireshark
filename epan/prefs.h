@@ -32,8 +32,8 @@ extern "C" {
 #define TAP_UPDATE_DEFAULT_INTERVAL 3000
 #define ST_DEF_BURSTRES 5
 #define ST_DEF_BURSTLEN 100
-#define ST_MAX_BURSTRES 600000 /* somewhat arbirary limit of 10 minutes */
-#define ST_MAX_BURSTBUCKETS 100 /* somewhat arbirary limit - more buckets degrade performance */
+#define ST_MAX_BURSTRES 600000 /* somewhat arbitrary limit of 10 minutes */
+#define ST_MAX_BURSTBUCKETS 100 /* somewhat arbitrary limit - more buckets degrade performance */
 #define DEF_GUI_DECIMAL_PLACES1 2
 #define DEF_GUI_DECIMAL_PLACES2 4
 #define DEF_GUI_DECIMAL_PLACES3 6
@@ -65,6 +65,7 @@ char string_to_name_resolve(const char *string, struct _e_addr_resolve *name_res
  */
 #define FO_STYLE_LAST_OPENED    0 /* start in last directory we looked at */
 #define FO_STYLE_SPECIFIED      1 /* start in specified directory */
+#define FO_STYLE_CWD            2 /* start in current working directory at startup */
 
 /*
  * Toolbar styles.
@@ -81,6 +82,10 @@ char string_to_name_resolve(const char *string, struct _e_addr_resolve *name_res
 #define COLOR_STYLE_GRADIENT    2
 
 #define COLOR_STYLE_ALPHA       0.25
+
+#define COLOR_SCHEME_DEFAULT    0
+#define COLOR_SCHEME_LIGHT      1
+#define COLOR_SCHEME_DARK       2
 
 /*
  * Types of layout of summary/details/hex panes.
@@ -135,6 +140,19 @@ typedef enum {
     ELIDE_NONE
 } elide_mode_e;
 
+typedef enum {
+    COPY_FORMAT_TEXT,
+    COPY_FORMAT_CSV,
+    COPY_FORMAT_YAML,
+    COPY_FORMAT_HTML
+} copy_format_e;
+
+typedef enum {
+    ABS_TIME_ASCII_NEVER,
+    ABS_TIME_ASCII_TREE,
+    ABS_TIME_ASCII_COLUMN,
+    ABS_TIME_ASCII_ALWAYS,
+} abs_time_format_e;
 
 /*
  * Update channel.
@@ -152,6 +170,7 @@ typedef struct _e_prefs {
   bool         restore_filter_after_following_stream;
   int          gui_toolbar_main_style;
   char        *gui_font_name;
+  int          gui_color_scheme;
   color_t      gui_active_fg;
   color_t      gui_active_bg;
   int          gui_active_style;
@@ -216,6 +235,7 @@ typedef struct _e_prefs {
   unsigned     tap_update_interval;
   bool         display_hidden_proto_items;
   bool         display_byte_fields_with_spaces;
+  abs_time_format_e display_abs_time_ascii;
   bool         enable_incomplete_dissectors_check;
   bool         incomplete_dissectors_check_debug;
   bool         strict_conversation_tracking_heuristics;
@@ -236,6 +256,8 @@ typedef struct _e_prefs {
   bool         gui_show_selected_packet;
   bool         gui_show_file_load_time;
   elide_mode_e gui_packet_list_elide_mode;
+  copy_format_e gui_packet_list_copy_format_options_for_keyboard_shortcut;
+  bool         gui_packet_list_copy_text_with_aligned_columns;
   bool         gui_packet_list_show_related;
   bool         gui_packet_list_show_minimap;
   bool         gui_packet_list_sortable;
@@ -999,8 +1021,8 @@ bool prefs_get_preference_obsolete(pref_t *pref);
 prefs_set_pref_e prefs_set_preference_obsolete(pref_t *pref);
 
 /**
- * Get current preference uint value. This allows the preference structure
- * to remain hidden from those that doesn't really need it
+ * Get current preference uint or bool value. This allows the preference
+ * structure to remain hidden from those that don't really need it.
  *
  * @param module_name the preference module name. Usually the same as the protocol
  *                    name, e.g. "tcp".

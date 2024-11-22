@@ -50,6 +50,9 @@
 
 #define FALCODUMP_PLUGIN_PLACEHOLDER "<plugin name>"
 
+#define SINSP_CHECK_VERSION(major, minor, micro) \
+    (((SINSP_VERSION_MAJOR << 16) + (SINSP_VERSION_MINOR << 8) + SINSP_VERSION_MICRO) >= ((major << 16) + (minor << 8) + micro))
+
 // We load our plugins and fetch their configs before we set our log level.
 // #define DEBUG_JSON_PARSING
 // #define DEBUG_SINSP
@@ -125,7 +128,7 @@ struct plugin_configuration {
         json_dumper_finish(&dumper);
         std::string config_blob = dumper.output_string->str;
         ws_debug("configuration: %s", dumper.output_string->str);
-        g_string_free(dumper.output_string, true);
+        g_string_free(dumper.output_string, TRUE);
         return config_blob;
     }
 };
@@ -751,7 +754,6 @@ get_bool_value(const char *bool_str)
         case 'F':
         case '0':
             return false;
-            break;
         default:
             return true;
     }
@@ -765,7 +767,7 @@ static int show_syscall_config(void)
         "{call=--include-capture-processes}"
         "{display=Include capture processes}"
         "{type=boolean}"
-        "{tooltip=Include system calls made by any capture processes (falcodump, dumpcap, and Logray)}"
+        "{tooltip=Include system calls made by any capture processes (falcodump, dumpcap, and Stratoshark)}"
         "{required=false}"
         "{group=Capture}\n"
 
@@ -802,7 +804,7 @@ static const std::string syscall_capture_filter(const struct syscall_configurati
     }
 
     if (!syscall_config.include_capture_processes) {
-        // We want to exclude Logray and any of its children, including
+        // We want to exclude Stratoshark and any of its children, including
         // this one (falcodump).
 
         std::string pid, comm, _s, ppid;
@@ -816,10 +818,10 @@ static const std::string syscall_capture_filter(const struct syscall_configurati
         }
         stat_stream.close();
 
-        // If our parent is Logray, exclude it and its direct children.
+        // If our parent is Stratoshark, exclude it and its direct children.
         std::ifstream pstat_stream("/proc/" + ppid + "/stat");
         pstat_stream >> _s >> comm;
-        if (comm == "(logray)") {
+        if (comm == "(stratoshark)") {
             // XXX Use proc.apid instead?
             process_filter = "proc.pid != " + ppid + " and proc.ppid != " + ppid;
         }
@@ -936,7 +938,7 @@ int main(int argc, char **argv)
      * Attempt to get the pathname of the directory containing the
      * executable file.
      */
-    configuration_init_error = configuration_init(argv[0], "Logray");
+    configuration_init_error = configuration_init(argv[0], "Stratoshark");
     if (configuration_init_error != NULL) {
         ws_warning("Can't get pathname of directory containing the extcap program: %s.",
                 configuration_init_error);
@@ -1180,7 +1182,11 @@ int main(int argc, char **argv)
                     ws_warning("%s", init_err.c_str());
                     goto end;
                 }
+#if SINSP_CHECK_VERSION(0, 18, 0)
+                inspector.open_plugin(extcap_conf->interface, plugin_source, sinsp_plugin_platform::SINSP_PLATFORM_HOSTINFO);
+#else
                 inspector.open_plugin(extcap_conf->interface, plugin_source);
+#endif
                 // scap_dump_open handles "-"
             } catch (sinsp_exception &e) {
                 ws_warning("%s", e.what());

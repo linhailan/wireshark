@@ -3,7 +3,7 @@ include::../attributes.adoc[]
 :doctype: manpage
 :stylesheet: ws.css
 :linkcss:
-:copycss: ../docbook/{stylesheet}
+:copycss: {css_dir}/{stylesheet}
 
 == NAME
 
@@ -47,6 +47,13 @@ __outfile__
 [ *-I* <bytes to ignore> ]
 [ *--skip-radiotap-header* ]
 [ *--set-unused* ]
+__infile__
+__outfile__
+
+[manarg]
+*editcap*
+*--extract-secrets*
+[ *-V* ]
 __infile__
 __outfile__
 
@@ -97,6 +104,13 @@ the same way *Editcap* handles this.
 *Editcap* can write the file in several output formats. The *-F*
 flag can be used to specify the format in which to write the capture
 file; *editcap -F* provides a list of the available output formats.
+*Editcap* can also compress the output file. The *--compress* option
+can specify the compression type. If that option is not given, then the desired
+compression method, if any, is deduced from the extension of __outfile__;
+e.g., if the output filename has the .gz extension, then the gzip format is used.
+
+*Editcap* can also be used to extract embedded decryption secrets from file
+formats like *pcapng* that contain them, in lieu of writing a capture file.
 
 == OPTIONS
 
@@ -452,13 +466,27 @@ additional configuration in protocol preferences.
 
 The file format is described by <secrets type> which can be one of:
 
-__tls__  TLS Key Log as described at https://udn.realityripple.com/docs/Mozilla/Projects/NSS/Key_Log_Format +
-__wg__   WireGuard Key Log, see https://gitlab.com/wireshark/wireshark/-/wikis/WireGuard#key-log-format
+__opcua__  OPC UA Key Log, see https://ietf-opsawg-wg.github.io/draft-ietf-opsawg-pcap/draft-ietf-opsawg-pcapng.html#name-decryption-secrets-block +
+__ssh__  SSH Key Log, see {wireshark-wiki-url}SSH#key-log-format +
+__tls__  TLS Key Log, see https://tlswg.org/sslkeylogfile/draft-ietf-tls-keylogfile.html +
+__wg__   WireGuard Key Log, see {wireshark-wiki-url}WireGuard#key-log-format
 
 This option may be specified multiple times. The available options for
 <secrets type> can be listed with *--inject-secrets help*.
 --
 
+--extract-secrets::
++
+--
+Extracts each Decryption Secrets Block (DSB) contained within __infile__.
+If there is only one, it is written to __outfile__ instead of a capture file.
+If there is more than one, they are each written to unique output files named
+with an infix _nnnnn before the file extension of __outfile__ in a manner
+similar to the *-c* flag (unless writing to standard output.)
+
+Incompatible with other options except for *-V*.
+
+--
 --discard-all-secrets::
 +
 --
@@ -500,6 +528,14 @@ for bonded interfaces on Linux for example.
 Discard all packet comments from the input file when writing the output
 file. Does not discard comments added by *-a* in the same
 command line.
+--
+
+--compress <type>::
++
+--
+Compress the output file using the type compression format.
+*--compress* with no argument provides a list of the compression formats supported
+for writing. The type given takes precedence over the extension of __outfile__.
 --
 
 include::diagnostic-options.adoc[]

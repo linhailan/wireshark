@@ -18,8 +18,6 @@
 extern "C" {
 #endif /* __cplusplus */
 
-extern void commandline_print_usage(bool for_help_option);
-
 extern void commandline_early_options(int argc, char *argv[]);
 
 /* Command-line options that don't have direct API calls to handle the data */
@@ -57,6 +55,8 @@ extern void commandline_other_options(int argc, char *argv[], bool opt_reset);
 extern void commandline_options_drop(const char *module_name, const char *pref_name);
 
 extern void commandline_options_reapply(void);
+
+extern void commandline_options_apply_extcap(void);
 
 extern void commandline_options_free(void);
 

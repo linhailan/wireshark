@@ -12,14 +12,14 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <math.h>
 
+#include <epan/prefs.h>
 #include <epan/to_str.h>
 #include <wsutil/time_util.h>
 #include <wsutil/ws_strptime.h>
 #include <wsutil/safe-math.h>
-
+#include <wsutil/array.h>
 
 static enum ft_result
 cmp_order(const fvalue_t *a, const fvalue_t *b, int *cmp)
@@ -437,41 +437,22 @@ value_get(fvalue_t *fv)
 }
 
 static char *
-abs_time_to_ftrepr_dfilter(wmem_allocator_t *scope,
-			const nstime_t *nstime, bool use_utc)
-{
-	struct tm *tm;
-	char datetime_format[128];
-	char nsecs_buf[32];
-
-	if (use_utc) {
-		tm = gmtime(&nstime->secs);
-		if (tm != NULL)
-			strftime(datetime_format, sizeof(datetime_format), "\"%Y-%m-%d %H:%M:%S%%sZ\"", tm);
-		else
-			snprintf(datetime_format, sizeof(datetime_format), "Not representable");
-	}
-	else {
-		tm = localtime(&nstime->secs);
-		/* Displaying the timezone could be made into a preference. */
-		if (tm != NULL)
-			strftime(datetime_format, sizeof(datetime_format), "\"%Y-%m-%d %H:%M:%S%%s%z\"", tm);
-		else
-			snprintf(datetime_format, sizeof(datetime_format), "Not representable");
-	}
-
-	if (nstime->nsecs == 0)
-		return wmem_strdup_printf(scope, datetime_format, "");
-
-	snprintf(nsecs_buf, sizeof(nsecs_buf), ".%09d", nstime->nsecs);
-
-	return wmem_strdup_printf(scope, datetime_format, nsecs_buf);
-}
-
-static char *
 absolute_val_to_repr(wmem_allocator_t *scope, const fvalue_t *fv, ftrepr_t rtype, int field_display)
 {
-	char *rep;
+	int flags = ABS_TIME_TO_STR_SHOW_ZONE;
+	/*
+	 * There could be a preference not to show the time zone for local
+	 * time. (I.e., to use ABS_TIME_TO_STR_SHOW_UTC_ONLY instead.)
+	 */
+
+	/*
+	 * Backwards compatibility preference. Note below we'll always use
+	 * ISO 8601 when generating a filter, although filters do support
+	 * the older format.
+	 */
+	if (prefs.display_abs_time_ascii != ABS_TIME_ASCII_ALWAYS) {
+		flags |= ABS_TIME_TO_STR_ISO8601;
+	}
 
 	if (field_display == BASE_NONE)
 		field_display = ABSOLUTE_TIME_LOCAL;
@@ -479,21 +460,25 @@ absolute_val_to_repr(wmem_allocator_t *scope, const fvalue_t *fv, ftrepr_t rtype
 	switch (rtype) {
 		case FTREPR_DISPLAY:
 		case FTREPR_JSON:
-			rep = abs_time_to_str_ex(scope, &fv->value.time,
-					field_display, ABS_TIME_TO_STR_SHOW_ZONE);
+		case FTREPR_RAW:
 			break;
 
 		case FTREPR_DFILTER:
-			if (field_display == ABSOLUTE_TIME_UNIX) {
-				rep = abs_time_to_unix_str(scope, &fv->value.time);
+			/*
+			 * Display filters don't handle DOY or the special NULL
+			 * NTP time representation. Normalize.
+			 */
+			switch (field_display) {
+			case BASE_NONE:
+			case ABSOLUTE_TIME_LOCAL:
+			case ABSOLUTE_TIME_UNIX:
+			case ABSOLUTE_TIME_UTC:
+				break;
+			default:
+				field_display = ABSOLUTE_TIME_UTC;
 			}
-			else {
-				/* Only ABSOLUTE_TIME_LOCAL and ABSOLUTE_TIME_UTC
-				 * are supported. Normalize the field_display value. */
-				if (field_display != ABSOLUTE_TIME_LOCAL)
-					field_display = ABSOLUTE_TIME_UTC;
-				rep = abs_time_to_ftrepr_dfilter(scope, &fv->value.time, field_display != ABSOLUTE_TIME_LOCAL);
-			}
+			flags |= ABS_TIME_TO_STR_ADD_DQUOTES;
+			flags |= ABS_TIME_TO_STR_ISO8601;
 			break;
 
 		default:
@@ -501,7 +486,7 @@ absolute_val_to_repr(wmem_allocator_t *scope, const fvalue_t *fv, ftrepr_t rtype
 			break;
 	}
 
-	return rep;
+	return abs_time_to_str_ex(scope, &fv->value.time, field_display, flags);
 }
 
 static char *
@@ -594,16 +579,25 @@ time_subtract(fvalue_t *dst, const fvalue_t *a, const fvalue_t *b, char **err_pt
 static void
 _nstime_mul_int(nstime_t *res, nstime_t a, int64_t val, jmp_buf env)
 {
+	// XXX - To handle large (64-bit) val, use 128-bit integers
+	// to hold intermediate results
+	int64_t tmp_nsecs;
+	ws_safe_mul_jmp(&tmp_nsecs, a.nsecs, val, env);
+	res->nsecs = (int)(tmp_nsecs % NS_PER_S);
 	ws_safe_mul_jmp(&res->secs, a.secs, (time_t)val, env);
-	ws_safe_mul_jmp(&res->nsecs, a.nsecs, (int)val, env);
+	res->secs += (time_t)(tmp_nsecs / NS_PER_S);
 	check_ns_wraparound(res, env);
 }
 
 static void
 _nstime_mul_float(nstime_t *res, nstime_t a, double val, jmp_buf env)
 {
-	res->secs = (time_t)(a.secs * val);
-	res->nsecs = (int)(a.nsecs * val);
+	double tmp_secs, tmp_nsecs;
+	double tmp_time = nstime_to_sec(&a) * val;
+	tmp_nsecs = modf(tmp_time, &tmp_secs);
+
+	res->secs = (time_t)(tmp_secs);
+	res->nsecs = (int)(round(tmp_nsecs * NS_PER_S));
 	check_ns_wraparound(res, env);
 }
 
@@ -612,7 +606,7 @@ time_multiply(fvalue_t *dst, const fvalue_t *a, const fvalue_t *b, char **err_pt
 {
 	jmp_buf env;
 	if (setjmp(env) != 0) {
-		*err_ptr = ws_strdup_printf("time_subtract: overflow");
+		*err_ptr = ws_strdup_printf("time_multiply: overflow");
 		return FT_ERROR;
 	}
 
@@ -632,20 +626,6 @@ time_multiply(fvalue_t *dst, const fvalue_t *a, const fvalue_t *b, char **err_pt
 	return FT_OK;
 }
 
-static void
-_nstime_div_int(nstime_t *res, nstime_t a, int64_t val, jmp_buf env)
-{
-	ws_safe_div_jmp(&res->secs, a.secs, (time_t)val, env);
-	ws_safe_div_jmp(&res->nsecs, a.nsecs, (int)val, env);
-}
-
-static void
-_nstime_div_float(nstime_t *res, nstime_t a, double val)
-{
-	res->secs = (time_t)(a.secs / val);
-	res->nsecs = (int)(a.nsecs / val);
-}
-
 static enum ft_result
 time_divide(fvalue_t *dst, const fvalue_t *a, const fvalue_t *b, char **err_ptr)
 {
@@ -662,7 +642,8 @@ time_divide(fvalue_t *dst, const fvalue_t *a, const fvalue_t *b, char **err_ptr)
 			*err_ptr = ws_strdup_printf("time_divide: division by zero");
 			return FT_ERROR;
 		}
-		_nstime_div_int(&dst->value.time, a->value.time, val, env);
+		// Integer division is annoying, this is acceptable
+		_nstime_mul_float(&dst->value.time, a->value.time, 1 / (double)val, env);
 	}
 	else if (ft_b == FT_DOUBLE) {
 		double val = fvalue_get_floating((fvalue_t *)b);
@@ -670,7 +651,7 @@ time_divide(fvalue_t *dst, const fvalue_t *a, const fvalue_t *b, char **err_ptr)
 			*err_ptr = ws_strdup_printf("time_divide: division by zero");
 			return FT_ERROR;
 		}
-		_nstime_div_float(&dst->value.time, a->value.time, val);
+		_nstime_mul_float(&dst->value.time, a->value.time, 1 / val, env);
 	}
 	else {
 		ws_critical("Invalid RHS ftype: %s", ftype_pretty_name(ft_b));

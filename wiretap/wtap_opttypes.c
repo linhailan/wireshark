@@ -1762,21 +1762,21 @@ static void nrb_free_mand(wtap_block_t block)
 }
 
 #if 0
-static void *copy_hashipv4(gconstpointer src, void *user_data _U_
+static void *copy_hashipv4(const void *src, void *user_data _U_
 {
     hashipv4_t *src_ipv4 = (hashipv4_t*)src;
     hashipv4_t *dst = g_new0(hashipv4_t, 1);
     dst->addr = src_ipv4->addr;
-    (void) g_strlcpy(dst->name, src_ipv4->name, MAXNAMELEN);
+    (void) g_strlcpy(dst->name, src_ipv4->name, MAXDNSNAMELEN);
     return dst;
 }
 
-static void *copy_hashipv4(gconstpointer src, void *user_data _U_
+static void *copy_hashipv4(const void *src, void *user_data _U_
 {
     hashipv6_t *src_ipv6 = (hashipv6_t*)src;
     hashipv6_t *dst = g_new0(hashipv6_t, 1);
     dst->addr = src_ipv4->addr;
-    (void) g_strlcpy(dst->name, src_ipv4->name, MAXNAMELEN);
+    (void) g_strlcpy(dst->name, src_ipv4->name, MAXDNSNAMELEN);
     return dst;
 }
 
