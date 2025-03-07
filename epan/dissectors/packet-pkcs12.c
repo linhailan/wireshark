@@ -1,7 +1,7 @@
 /* Do not modify this file. Changes will be overwritten.                      */
 /* Generated automatically by the ASN.1 to Wireshark dissector compiler       */
 /* packet-pkcs12.c                                                            */
-/* asn2wrs.py -b -q -L -p pkcs12 -c ./pkcs12.cnf -s ./packet-pkcs12-template -D . -O ../.. pkcs12.asn */
+/* asn2wrs.py -b -q -L -p pkcs12 -c ./pkcs12.cnf -s ./packet-pkcs12-template -D . -O ../.. pkcs12.asn PKCS5v2-1.asn */
 
 /* packet-pkcs12.c
  * Routines for PKCS#12: Personal Information Exchange packet dissection
@@ -73,10 +73,11 @@ static int hf_pkcs12_PKCS8ShroudedKeyBag_PDU;     /* PKCS8ShroudedKeyBag */
 static int hf_pkcs12_CertBag_PDU;                 /* CertBag */
 static int hf_pkcs12_CRLBag_PDU;                  /* CRLBag */
 static int hf_pkcs12_SecretBag_PDU;               /* SecretBag */
+static int hf_pkcs12_Pkcs_12PbeParams_PDU;        /* Pkcs_12PbeParams */
+static int hf_pkcs12_PBKDF2_params_PDU;           /* PBKDF2_params */
 static int hf_pkcs12_PBEParameter_PDU;            /* PBEParameter */
-static int hf_pkcs12_PBKDF2Params_PDU;            /* PBKDF2Params */
-static int hf_pkcs12_PBES2Params_PDU;             /* PBES2Params */
-static int hf_pkcs12_PBMAC1Params_PDU;            /* PBMAC1Params */
+static int hf_pkcs12_PBES2_params_PDU;            /* PBES2_params */
+static int hf_pkcs12_PBMAC1_params_PDU;           /* PBMAC1_params */
 static int hf_pkcs12_version;                     /* T_version */
 static int hf_pkcs12_authSafe;                    /* ContentInfo */
 static int hf_pkcs12_macData;                     /* MacData */
@@ -99,10 +100,10 @@ static int hf_pkcs12_attrId;                      /* T_attrId */
 static int hf_pkcs12_attrValues;                  /* T_attrValues */
 static int hf_pkcs12_attrValues_item;             /* T_attrValues_item */
 static int hf_pkcs12_salt;                        /* OCTET_STRING */
-static int hf_pkcs12_iterationCount;              /* INTEGER */
 static int hf_pkcs12_saltChoice;                  /* T_saltChoice */
 static int hf_pkcs12_specified;                   /* OCTET_STRING */
 static int hf_pkcs12_otherSource;                 /* AlgorithmIdentifier */
+static int hf_pkcs12_iterationCount;              /* INTEGER */
 static int hf_pkcs12_keyLength;                   /* INTEGER_1_MAX */
 static int hf_pkcs12_prf;                         /* AlgorithmIdentifier */
 static int hf_pkcs12_keyDerivationFunc;           /* AlgorithmIdentifier */
@@ -121,11 +122,12 @@ static int ett_pkcs12_CRLBag;
 static int ett_pkcs12_SecretBag;
 static int ett_pkcs12_PKCS12Attribute;
 static int ett_pkcs12_T_attrValues;
-static int ett_pkcs12_PBEParameter;
-static int ett_pkcs12_PBKDF2Params;
+static int ett_pkcs12_Pkcs_12PbeParams;
+static int ett_pkcs12_PBKDF2_params;
 static int ett_pkcs12_T_saltChoice;
-static int ett_pkcs12_PBES2Params;
-static int ett_pkcs12_PBMAC1Params;
+static int ett_pkcs12_PBEParameter;
+static int ett_pkcs12_PBES2_params;
+static int ett_pkcs12_PBMAC1_params;
 
 static void append_oid(wmem_allocator_t *pool, proto_tree *tree, const char *oid)
 {
@@ -439,7 +441,7 @@ dissect_pkcs12_OCTET_STRING(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset
 static int
 dissect_pkcs12_INTEGER(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
   offset = dissect_ber_integer(implicit_tag, actx, tree, tvb, offset, hf_index,
-                                                (hf_index == hf_pkcs12_iterationCount ? &iteration_count : NULL));
+                                                (hf_index == hf_pkcs12_iterations ? &iteration_count : NULL));
 
   return offset;
 }
@@ -751,19 +753,19 @@ dissect_pkcs12_SecretBag(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U
 }
 
 
-static const ber_sequence_t PBEParameter_sequence[] = {
+static const ber_sequence_t Pkcs_12PbeParams_sequence[] = {
   { &hf_pkcs12_salt         , BER_CLASS_UNI, BER_UNI_TAG_OCTETSTRING, BER_FLAGS_NOOWNTAG, dissect_pkcs12_OCTET_STRING },
-  { &hf_pkcs12_iterationCount, BER_CLASS_UNI, BER_UNI_TAG_INTEGER, BER_FLAGS_NOOWNTAG, dissect_pkcs12_INTEGER },
+  { &hf_pkcs12_iterations   , BER_CLASS_UNI, BER_UNI_TAG_INTEGER, BER_FLAGS_NOOWNTAG, dissect_pkcs12_INTEGER },
   { NULL, 0, 0, 0, NULL }
 };
 
 static int
-dissect_pkcs12_PBEParameter(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+dissect_pkcs12_Pkcs_12PbeParams(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
 	/* initialise the encryption parameters */
 	PBE_reset_parameters();
 
   offset = dissect_ber_sequence(implicit_tag, actx, tree, tvb, offset,
-                                   PBEParameter_sequence, hf_index, ett_pkcs12_PBEParameter);
+                                   Pkcs_12PbeParams_sequence, hf_index, ett_pkcs12_Pkcs_12PbeParams);
 
   return offset;
 }
@@ -801,7 +803,7 @@ dissect_pkcs12_INTEGER_1_MAX(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offse
 }
 
 
-static const ber_sequence_t PBKDF2Params_sequence[] = {
+static const ber_sequence_t PBKDF2_params_sequence[] = {
   { &hf_pkcs12_saltChoice   , BER_CLASS_ANY/*choice*/, -1/*choice*/, BER_FLAGS_NOOWNTAG|BER_FLAGS_NOTCHKTAG, dissect_pkcs12_T_saltChoice },
   { &hf_pkcs12_iterationCount, BER_CLASS_UNI, BER_UNI_TAG_INTEGER, BER_FLAGS_NOOWNTAG, dissect_pkcs12_INTEGER },
   { &hf_pkcs12_keyLength    , BER_CLASS_UNI, BER_UNI_TAG_INTEGER, BER_FLAGS_OPTIONAL|BER_FLAGS_NOOWNTAG, dissect_pkcs12_INTEGER_1_MAX },
@@ -810,39 +812,54 @@ static const ber_sequence_t PBKDF2Params_sequence[] = {
 };
 
 static int
-dissect_pkcs12_PBKDF2Params(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+dissect_pkcs12_PBKDF2_params(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
   offset = dissect_ber_sequence(implicit_tag, actx, tree, tvb, offset,
-                                   PBKDF2Params_sequence, hf_index, ett_pkcs12_PBKDF2Params);
+                                   PBKDF2_params_sequence, hf_index, ett_pkcs12_PBKDF2_params);
 
   return offset;
 }
 
 
-static const ber_sequence_t PBES2Params_sequence[] = {
+static const ber_sequence_t PBEParameter_sequence[] = {
+  { &hf_pkcs12_salt         , BER_CLASS_UNI, BER_UNI_TAG_OCTETSTRING, BER_FLAGS_NOOWNTAG, dissect_pkcs12_OCTET_STRING },
+  { &hf_pkcs12_iterationCount, BER_CLASS_UNI, BER_UNI_TAG_INTEGER, BER_FLAGS_NOOWNTAG, dissect_pkcs12_INTEGER },
+  { NULL, 0, 0, 0, NULL }
+};
+
+static int
+dissect_pkcs12_PBEParameter(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_ber_sequence(implicit_tag, actx, tree, tvb, offset,
+                                   PBEParameter_sequence, hf_index, ett_pkcs12_PBEParameter);
+
+  return offset;
+}
+
+
+static const ber_sequence_t PBES2_params_sequence[] = {
   { &hf_pkcs12_keyDerivationFunc, BER_CLASS_UNI, BER_UNI_TAG_SEQUENCE, BER_FLAGS_NOOWNTAG, dissect_x509af_AlgorithmIdentifier },
   { &hf_pkcs12_encryptionScheme, BER_CLASS_UNI, BER_UNI_TAG_SEQUENCE, BER_FLAGS_NOOWNTAG, dissect_x509af_AlgorithmIdentifier },
   { NULL, 0, 0, 0, NULL }
 };
 
 static int
-dissect_pkcs12_PBES2Params(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+dissect_pkcs12_PBES2_params(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
   offset = dissect_ber_sequence(implicit_tag, actx, tree, tvb, offset,
-                                   PBES2Params_sequence, hf_index, ett_pkcs12_PBES2Params);
+                                   PBES2_params_sequence, hf_index, ett_pkcs12_PBES2_params);
 
   return offset;
 }
 
 
-static const ber_sequence_t PBMAC1Params_sequence[] = {
+static const ber_sequence_t PBMAC1_params_sequence[] = {
   { &hf_pkcs12_keyDerivationFunc, BER_CLASS_UNI, BER_UNI_TAG_SEQUENCE, BER_FLAGS_NOOWNTAG, dissect_x509af_AlgorithmIdentifier },
   { &hf_pkcs12_messageAuthScheme, BER_CLASS_UNI, BER_UNI_TAG_SEQUENCE, BER_FLAGS_NOOWNTAG, dissect_x509af_AlgorithmIdentifier },
   { NULL, 0, 0, 0, NULL }
 };
 
 static int
-dissect_pkcs12_PBMAC1Params(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+dissect_pkcs12_PBMAC1_params(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
   offset = dissect_ber_sequence(implicit_tag, actx, tree, tvb, offset,
-                                   PBMAC1Params_sequence, hf_index, ett_pkcs12_PBMAC1Params);
+                                   PBMAC1_params_sequence, hf_index, ett_pkcs12_PBMAC1_params);
 
   return offset;
 }
@@ -898,6 +915,20 @@ static int dissect_SecretBag_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, prot
   offset = dissect_pkcs12_SecretBag(false, tvb, offset, &asn1_ctx, tree, hf_pkcs12_SecretBag_PDU);
   return offset;
 }
+static int dissect_Pkcs_12PbeParams_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, true, pinfo);
+  offset = dissect_pkcs12_Pkcs_12PbeParams(false, tvb, offset, &asn1_ctx, tree, hf_pkcs12_Pkcs_12PbeParams_PDU);
+  return offset;
+}
+static int dissect_PBKDF2_params_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+  int offset = 0;
+  asn1_ctx_t asn1_ctx;
+  asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, true, pinfo);
+  offset = dissect_pkcs12_PBKDF2_params(false, tvb, offset, &asn1_ctx, tree, hf_pkcs12_PBKDF2_params_PDU);
+  return offset;
+}
 static int dissect_PBEParameter_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
   int offset = 0;
   asn1_ctx_t asn1_ctx;
@@ -905,25 +936,18 @@ static int dissect_PBEParameter_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, p
   offset = dissect_pkcs12_PBEParameter(false, tvb, offset, &asn1_ctx, tree, hf_pkcs12_PBEParameter_PDU);
   return offset;
 }
-static int dissect_PBKDF2Params_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+static int dissect_PBES2_params_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
   int offset = 0;
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, true, pinfo);
-  offset = dissect_pkcs12_PBKDF2Params(false, tvb, offset, &asn1_ctx, tree, hf_pkcs12_PBKDF2Params_PDU);
+  offset = dissect_pkcs12_PBES2_params(false, tvb, offset, &asn1_ctx, tree, hf_pkcs12_PBES2_params_PDU);
   return offset;
 }
-static int dissect_PBES2Params_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
+static int dissect_PBMAC1_params_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
   int offset = 0;
   asn1_ctx_t asn1_ctx;
   asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, true, pinfo);
-  offset = dissect_pkcs12_PBES2Params(false, tvb, offset, &asn1_ctx, tree, hf_pkcs12_PBES2Params_PDU);
-  return offset;
-}
-static int dissect_PBMAC1Params_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_) {
-  int offset = 0;
-  asn1_ctx_t asn1_ctx;
-  asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, true, pinfo);
-  offset = dissect_pkcs12_PBMAC1Params(false, tvb, offset, &asn1_ctx, tree, hf_pkcs12_PBMAC1Params_PDU);
+  offset = dissect_pkcs12_PBMAC1_params(false, tvb, offset, &asn1_ctx, tree, hf_pkcs12_PBMAC1_params_PDU);
   return offset;
 }
 
@@ -1030,20 +1054,24 @@ void proto_register_pkcs12(void) {
       { "SecretBag", "pkcs12.SecretBag_element",
         FT_NONE, BASE_NONE, NULL, 0,
         NULL, HFILL }},
+    { &hf_pkcs12_Pkcs_12PbeParams_PDU,
+      { "Pkcs-12PbeParams", "pkcs12.Pkcs_12PbeParams_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
+    { &hf_pkcs12_PBKDF2_params_PDU,
+      { "PBKDF2-params", "pkcs12.PBKDF2_params_element",
+        FT_NONE, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
     { &hf_pkcs12_PBEParameter_PDU,
       { "PBEParameter", "pkcs12.PBEParameter_element",
         FT_NONE, BASE_NONE, NULL, 0,
         NULL, HFILL }},
-    { &hf_pkcs12_PBKDF2Params_PDU,
-      { "PBKDF2Params", "pkcs12.PBKDF2Params_element",
+    { &hf_pkcs12_PBES2_params_PDU,
+      { "PBES2-params", "pkcs12.PBES2_params_element",
         FT_NONE, BASE_NONE, NULL, 0,
         NULL, HFILL }},
-    { &hf_pkcs12_PBES2Params_PDU,
-      { "PBES2Params", "pkcs12.PBES2Params_element",
-        FT_NONE, BASE_NONE, NULL, 0,
-        NULL, HFILL }},
-    { &hf_pkcs12_PBMAC1Params_PDU,
-      { "PBMAC1Params", "pkcs12.PBMAC1Params_element",
+    { &hf_pkcs12_PBMAC1_params_PDU,
+      { "PBMAC1-params", "pkcs12.PBMAC1_params_element",
         FT_NONE, BASE_NONE, NULL, 0,
         NULL, HFILL }},
     { &hf_pkcs12_version,
@@ -1134,10 +1162,6 @@ void proto_register_pkcs12(void) {
       { "salt", "pkcs12.salt",
         FT_BYTES, BASE_NONE, NULL, 0,
         "OCTET_STRING", HFILL }},
-    { &hf_pkcs12_iterationCount,
-      { "iterationCount", "pkcs12.iterationCount",
-        FT_INT32, BASE_DEC, NULL, 0,
-        "INTEGER", HFILL }},
     { &hf_pkcs12_saltChoice,
       { "salt", "pkcs12.saltChoice",
         FT_UINT32, BASE_DEC, VALS(pkcs12_T_saltChoice_vals), 0,
@@ -1150,6 +1174,10 @@ void proto_register_pkcs12(void) {
       { "otherSource", "pkcs12.otherSource_element",
         FT_NONE, BASE_NONE, NULL, 0,
         "AlgorithmIdentifier", HFILL }},
+    { &hf_pkcs12_iterationCount,
+      { "iterationCount", "pkcs12.iterationCount",
+        FT_INT32, BASE_DEC, NULL, 0,
+        "INTEGER", HFILL }},
     { &hf_pkcs12_keyLength,
       { "keyLength", "pkcs12.keyLength",
         FT_UINT64, BASE_DEC, NULL, 0,
@@ -1186,11 +1214,12 @@ void proto_register_pkcs12(void) {
     &ett_pkcs12_SecretBag,
     &ett_pkcs12_PKCS12Attribute,
     &ett_pkcs12_T_attrValues,
-    &ett_pkcs12_PBEParameter,
-    &ett_pkcs12_PBKDF2Params,
+    &ett_pkcs12_Pkcs_12PbeParams,
+    &ett_pkcs12_PBKDF2_params,
     &ett_pkcs12_T_saltChoice,
-    &ett_pkcs12_PBES2Params,
-    &ett_pkcs12_PBMAC1Params,
+    &ett_pkcs12_PBEParameter,
+    &ett_pkcs12_PBES2_params,
+    &ett_pkcs12_PBMAC1_params,
   };
   static ei_register_info ei[] = {
       { &ei_pkcs12_octet_string_expected, { "pkcs12.octet_string_expected", PI_PROTOCOL, PI_WARN, "BER Error: OCTET STRING expected", EXPFILL }},
@@ -1236,24 +1265,31 @@ void proto_reg_handoff_pkcs12(void) {
   register_ber_oid_dissector("1.2.840.113549.1.12.10.1.5", dissect_CRLBag_PDU, proto_pkcs12, "crlBag");
   register_ber_oid_dissector("1.2.840.113549.1.12.10.1.6", dissect_SafeContents_PDU, proto_pkcs12, "safeContentsBag");
   register_ber_oid_dissector("2.16.840.1.113730.3.1.216", dissect_PFX_PDU, proto_pkcs12, "pkcs-9-at-PKCS12");
-  register_ber_oid_dissector("1.2.840.113549.1.12.1.1", dissect_PBEParameter_PDU, proto_pkcs12, "pbeWithSHAAnd128BitRC4");
-  register_ber_oid_dissector("1.2.840.113549.1.12.1.2", dissect_PBEParameter_PDU, proto_pkcs12, "pbeWithSHAAnd40BitRC4");
-  register_ber_oid_dissector("1.2.840.113549.1.12.1.3", dissect_PBEParameter_PDU, proto_pkcs12, "pbeWithSHAAnd3-KeyTripleDES-CBC");
-  register_ber_oid_dissector("1.2.840.113549.1.12.1.4", dissect_PBEParameter_PDU, proto_pkcs12, "pbeWithSHAAnd2-KeyTripleDES-CBC");
-  register_ber_oid_dissector("1.2.840.113549.1.12.1.5", dissect_PBEParameter_PDU, proto_pkcs12, "pbeWithSHAAnd128BitRC2-CBC");
-  register_ber_oid_dissector("1.2.840.113549.1.12.1.6", dissect_PBEParameter_PDU, proto_pkcs12, "pbeWithSHAAnd40BitRC2-CBC");
+  register_ber_oid_dissector("1.2.840.113549.1.12.1.1", dissect_Pkcs_12PbeParams_PDU, proto_pkcs12, "pbeWithSHAAnd128BitRC4");
+  register_ber_oid_dissector("1.2.840.113549.1.12.1.2", dissect_Pkcs_12PbeParams_PDU, proto_pkcs12, "pbeWithSHAAnd40BitRC4");
+  register_ber_oid_dissector("1.2.840.113549.1.12.1.3", dissect_Pkcs_12PbeParams_PDU, proto_pkcs12, "pbeWithSHAAnd3-KeyTripleDES-CBC");
+  register_ber_oid_dissector("1.2.840.113549.1.12.1.4", dissect_Pkcs_12PbeParams_PDU, proto_pkcs12, "pbeWithSHAAnd2-KeyTripleDES-CBC");
+  register_ber_oid_dissector("1.2.840.113549.1.12.1.5", dissect_Pkcs_12PbeParams_PDU, proto_pkcs12, "pbeWithSHAAnd128BitRC2-CBC");
+  register_ber_oid_dissector("1.2.840.113549.1.12.1.6", dissect_Pkcs_12PbeParams_PDU, proto_pkcs12, "pbeWithSHAAnd40BitRC2-CBC");
   register_ber_oid_dissector("1.2.840.113549.1.5.1", dissect_PBEParameter_PDU, proto_pkcs12, "pbeWithMD2AndDES-CBC");
   register_ber_oid_dissector("1.2.840.113549.1.5.3", dissect_PBEParameter_PDU, proto_pkcs12, "pbeWithMD5AndDES-CBC");
   register_ber_oid_dissector("1.2.840.113549.1.5.4", dissect_PBEParameter_PDU, proto_pkcs12, "pbeWithMD2AndRC2-CBC");
   register_ber_oid_dissector("1.2.840.113549.1.5.6", dissect_PBEParameter_PDU, proto_pkcs12, "pbeWithMD5AndRC2-CBC");
   register_ber_oid_dissector("1.2.840.113549.1.5.10", dissect_PBEParameter_PDU, proto_pkcs12, "pbeWithSHA1AndDES-CBC");
   register_ber_oid_dissector("1.2.840.113549.1.5.11", dissect_PBEParameter_PDU, proto_pkcs12, "pbeWithSHA1AndRC2-CBC");
-  register_ber_oid_dissector("1.2.840.113549.1.5.12", dissect_PBKDF2Params_PDU, proto_pkcs12, "id-PBKDF2");
-  register_ber_oid_dissector("1.2.840.113549.1.5.13", dissect_PBES2Params_PDU, proto_pkcs12, "id-PBES2");
-  register_ber_oid_dissector("1.2.840.113549.1.5.14", dissect_PBMAC1Params_PDU, proto_pkcs12, "id-PBMAC1");
+  register_ber_oid_dissector("1.2.840.113549.1.5.12", dissect_PBKDF2_params_PDU, proto_pkcs12, "id-PBKDF2");
+  register_ber_oid_dissector("1.2.840.113549.1.5.13", dissect_PBES2_params_PDU, proto_pkcs12, "id-PBES2");
+  register_ber_oid_dissector("1.2.840.113549.1.5.14", dissect_PBMAC1_params_PDU, proto_pkcs12, "id-PBMAC1");
 
 
 	register_ber_oid_dissector("1.2.840.113549.1.9.22.1", dissect_X509Certificate_OCTETSTRING_PDU, proto_pkcs12, "x509Certificate");
 
+	register_ber_oid_dissector("1.2.840.113549.2.7", dissect_ber_oid_NULL_callback, proto_pkcs12, "id-hmacWithSHA1");
+	register_ber_oid_dissector("1.2.840.113549.2.8", dissect_ber_oid_NULL_callback, proto_pkcs12, "id-hmacWithSHA224");
+	register_ber_oid_dissector("1.2.840.113549.2.9", dissect_ber_oid_NULL_callback, proto_pkcs12, "id-hmacWithSHA256");
+	register_ber_oid_dissector("1.2.840.113549.2.10", dissect_ber_oid_NULL_callback, proto_pkcs12, "id-hmacWithSHA384");
+	register_ber_oid_dissector("1.2.840.113549.2.11", dissect_ber_oid_NULL_callback, proto_pkcs12, "id-hmacWithSHA512");
+	register_ber_oid_dissector("1.2.840.113549.2.12", dissect_ber_oid_NULL_callback, proto_pkcs12, "id-hmacWithSHA512-224");
+	register_ber_oid_dissector("1.2.840.113549.2.13", dissect_ber_oid_NULL_callback, proto_pkcs12, "id-hmacWithSHA512-256");
 }
 

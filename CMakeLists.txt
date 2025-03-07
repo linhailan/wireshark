@@ -3841,6 +3841,7 @@ endif()
 
 
 string(REPLACE "-" "_" RPM_VERSION "${PROJECT_VERSION}")
+string(REPLACE "-" "_" STRATOSHARK_RPM_VERSION "${STRATOSHARK_VERSION}")
 configure_file(packaging/rpm/wireshark.spec.in ${CMAKE_BINARY_DIR}/packaging/rpm/SPECS/wireshark.spec)
 if(RPMBUILD_EXECUTABLE)
 	foreach(_rpm_dir BUILD RPMS SOURCES SPECS SRPMS)
@@ -3922,6 +3923,9 @@ if(RPMBUILD_EXECUTABLE)
 	else()
 		list(APPEND _rpmbuild_with_args --with qt5 --without qt6)
 	endif()
+	if(SINSP_FOUND AND BUILD_stratoshark AND BUILD_falcodump)
+		list(APPEND _rpmbuild_with_args --with stratoshark)
+	endif()
 	if (MAXMINDDB_FOUND)
 		list(APPEND _rpmbuild_with_args --with mmdbresolve)
 	endif()
@@ -3961,6 +3965,12 @@ if(RPMBUILD_EXECUTABLE)
 	if (BROTLI_FOUND)
 		list(APPEND _rpmbuild_with_args --with brotli)
 	endif()
+	if (ZSTD_FOUND)
+		list(APPEND _rpmbuild_with_args --with zstd)
+	endif()
+	if (LIBSSH_FOUND)
+		list(APPEND _rpmbuild_with_args --with libssh)
+	endif()
 	if(ASCIIDOCTOR_FOUND AND XSLTPROC_EXECUTABLE)
 		list(APPEND _rpmbuild_with_args --with guides)
 	endif()
@@ -3983,7 +3993,7 @@ if(RPMBUILD_EXECUTABLE)
 			-ba SPECS/wireshark.spec
 		DEPENDS copy-dist
 		WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/packaging/rpm"
-		COMMENT "Create a rpm from the current git commit."
+		COMMENT "Create an RPM package from the current git commit."
 	)
 endif()
 

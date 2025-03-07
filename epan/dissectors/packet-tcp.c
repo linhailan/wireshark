@@ -1399,7 +1399,7 @@ char *tcp_follow_conv_filter(epan_dissect_t *edt _U_, packet_info *pinfo, unsign
      * Eventually the endpoint API should support storing multiple
      * endpoints and TCP should be changed to use the endpoint API.
      */
-    conv = find_conversation_strat(pinfo, CONVERSATION_TCP, 0);
+    conv = find_conversation_strat(pinfo, CONVERSATION_TCP, 0, false);
     if (((pinfo->net_src.type == AT_IPv4 && pinfo->net_dst.type == AT_IPv4) ||
         (pinfo->net_src.type == AT_IPv6 && pinfo->net_dst.type == AT_IPv6))
         && (pinfo->ptype == PT_TCP) &&
@@ -4747,6 +4747,7 @@ again:
             /* The above code only finds retransmission if the PDU boundaries and the seq coincide
              * If we have sequence analysis active use the TCP_A_RETRANSMISSION flag.
              * XXXX Could the above code be improved?
+             * XXX - Should we only do this if tcp_no_subdissector_on_error is true?
              */
             if(tcpd->ta) {
                 /* If we have an unfinished MSP that this segment belongs to
@@ -5953,7 +5954,7 @@ dissect_tcpopt_mss(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
     struct tcp_analysis *tcpd;
 
     /* find the conversation for this TCP session and its stored data */
-    conversation_t *stratconv = find_conversation_strat(pinfo, CONVERSATION_TCP, 0);
+    conversation_t *stratconv = find_conversation_strat(pinfo, CONVERSATION_TCP, 0, false);
     tcpd=get_tcp_conversation_data_idempotent(stratconv);
 
     item = proto_tree_add_item(tree, proto_tcp_option_mss, tvb, offset, -1, ENC_NA);
@@ -5996,7 +5997,7 @@ dissect_tcpopt_wscale(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void*
     struct tcp_analysis *tcpd;
 
     /* find the conversation for this TCP session and its stored data */
-    conversation_t *stratconv = find_conversation_strat(pinfo, CONVERSATION_TCP, 0);
+    conversation_t *stratconv = find_conversation_strat(pinfo, CONVERSATION_TCP, 0, false);
     tcpd=get_tcp_conversation_data_idempotent(stratconv);
 
     wscale_pi = proto_tree_add_item(tree, proto_tcp_option_wscale, tvb, offset, -1, ENC_NA);
@@ -6056,7 +6057,7 @@ dissect_tcpopt_sack(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* d
      */
     if(tcp_analyze_seq) {
         /* find the conversation for this TCP session and its stored data */
-        conversation_t *stratconv = find_conversation_strat(pinfo, CONVERSATION_TCP, 0);
+        conversation_t *stratconv = find_conversation_strat(pinfo, CONVERSATION_TCP, 0, false);
         tcpd=get_tcp_conversation_data_idempotent(stratconv);
 
         if (tcpd) {
@@ -7011,7 +7012,7 @@ dissect_tcpopt_scps(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* d
     uint8_t     connid;
     int         offset = 0, optlen = tvb_reported_length(tvb);
 
-    conversation_t *stratconv = find_conversation_strat(pinfo, CONVERSATION_TCP, 0);
+    conversation_t *stratconv = find_conversation_strat(pinfo, CONVERSATION_TCP, 0, false);
     tcpd=get_tcp_conversation_data_idempotent(stratconv);
 
     /* check direction and get ua lists */
@@ -7241,7 +7242,7 @@ dissect_tcpopt_snack(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
     if (!tcp_option_len_check(length_item, pinfo, tvb_reported_length(tvb), TCPOLEN_SNACK))
         return tvb_captured_length(tvb);
 
-    conversation_t *stratconv = find_conversation_strat(pinfo, CONVERSATION_TCP, 0);
+    conversation_t *stratconv = find_conversation_strat(pinfo, CONVERSATION_TCP, 0, false);
     tcpd=get_tcp_conversation_data_idempotent(stratconv);
 
     /* The SNACK option reports missing data with a granularity of segments. */
@@ -7860,19 +7861,6 @@ decode_tcp_ports(tvbuff_t *tvb, int offset, packet_info *pinfo,
         }
     }
 
-    if (tcp_no_subdissector_on_error && !(tcp_desegment && tcp_reassemble_out_of_order) &&
-        tcpd && tcpd->ta && tcpd->ta->flags & (TCP_A_RETRANSMISSION | TCP_A_FAST_RETRANSMISSION |
-            TCP_A_SPURIOUS_RETRANSMISSION | TCP_A_OUT_OF_ORDER)) {
-        /* Don't try to dissect a retransmission high chance that it will mess
-         * subdissectors for protocols that require in-order delivery of the
-         * PDUs. (i.e. DCE/RPCoverHTTP and encryption)
-         * If OoO reassembly is enabled and if this segment was previously lost,
-         * then this retransmission could have finished reassembly, so continue.
-         * XXX should this option be removed? "tcp_reassemble_out_of_order"
-         * should have addressed the above in-order requirement.
-         */
-        return false;
-    }
     next_tvb = tvb_new_subset_remaining(tvb, offset);
 
     save_desegment_offset = pinfo->desegment_offset;
@@ -8054,15 +8042,36 @@ process_tcp_payload(tvbuff_t *tvb, volatile int offset, packet_info *pinfo,
         if(is_tcp_segment) {
             /*qqq   see if it is an unaligned PDU */
             if(tcpd && tcp_analyze_seq && (!tcp_desegment)) {
+                /* XXX - Is it correct to check tcp_desegment? We know we
+                 * didn't try to desegment. tcp_desegment could be true but
+                 * other reasons prevented desegmentation, e.g. a bad checksum.
+                 * Should we do these routines anyway?
+                 */
                 if(seq || nxtseq) {
                     offset=scan_for_next_pdu(tvb, tcp_tree, pinfo, offset,
                         seq, nxtseq, tcpd->fwd->multisegment_pdus);
                 }
+                if (tcp_no_subdissector_on_error && tcpd->ta && tcpd->ta->flags &
+                    (TCP_A_RETRANSMISSION | TCP_A_FAST_RETRANSMISSION |
+                    TCP_A_SPURIOUS_RETRANSMISSION | TCP_A_OUT_OF_ORDER)) {
+                    /* Don't try to dissect a retransmission, as there's a high
+                     * chance that it will mess up subdissectors for protocols
+                     * that require in-order delivery of the PDUs. (e.g.,
+                     * DCE/RPCoverHTTP and encryption)
+                     *
+                     * If desegmentation was performed, we already did a version
+                     * of this check that doesn't ignore retransmitted or out of
+                     * order segments that complete a multisegment PDU.
+                     * XXX should this option be removed? "tcp_reassemble_out_of_order"
+                     * should have addressed the above in-order requirement.
+                     */
+                    offset = -1;
+                }
             }
         }
-        /* if offset is -1 this means that this segment is known
-         * to be fully inside a previously detected pdu
-         * so we don't even need to try to dissect it either.
+        /* if offset is -1 this means that this segment is known to be
+         * fully inside a previously detected pdu, or is a retransmission or
+         * out of order, so we don't even need to try to dissect it either.
          */
         if( (offset!=-1) &&
             decode_tcp_ports(tvb, offset, pinfo, tree, src_port,
@@ -8307,7 +8316,7 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
      * extends the conversation found. This extension is done later.
      */
 
-    conv = find_conversation_strat(pinfo, CONVERSATION_TCP, 0);
+    conv = find_conversation_strat(pinfo, CONVERSATION_TCP, 0, false);
     if(!conv) {
         conv=conversation_new_strat(pinfo, CONVERSATION_TCP, 0);
         conversation_is_new = true;

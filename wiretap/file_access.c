@@ -180,6 +180,8 @@ static const struct file_extension_info file_type_extensions_base[] = {
 	{ "MP4 file", false, "mp4" },
 	{ "RTPDump file", false, "rtp;rtpdump" },
 	{ "EMS file", false, "ems" },
+	{ "ASN.1 Basic Encoding Rules", false, "cer;crl;csr;p10;p12;p772;p7c;p7s;p7m;p8;pfx;tsq;tsr" },
+	{ "RFC 7468 files", false, "crt;pem" },
 };
 
 #define	N_FILE_TYPE_EXTENSIONS	array_length(file_type_extensions_base)
@@ -284,7 +286,7 @@ wtap_get_file_extension_type_extensions(unsigned extension_type)
 
 	g_slist_free(compression_type_extensions);
 
-	return extensions;
+	return g_slist_reverse(extensions);
 }
 
 /*
@@ -1984,7 +1986,7 @@ wtap_get_file_extensions_list(int file_type_subtype, bool include_compressed)
 
 	g_slist_free(compression_type_extensions);
 
-	return extensions;
+	return g_slist_reverse(extensions);
 }
 
 /* Return a list of all extensions that are used by all capture file
@@ -2039,7 +2041,7 @@ wtap_get_all_capture_file_extensions_list(void)
 
 	g_slist_free(compression_type_extensions);
 
-	return extensions;
+	return g_slist_reverse(extensions);
 }
 
 /* Return a list of all extensions that are used by all file types that
@@ -2077,7 +2079,7 @@ wtap_get_all_file_extensions_list(void)
 
 	g_slist_free(compression_type_extensions);
 
-	return extensions;
+	return g_slist_reverse(extensions);
 }
 
 /*
@@ -2516,12 +2518,11 @@ wtap_dump_add_idb(wtap_dumper *wdh, wtap_block_t idb, int *err,
 }
 
 bool
-wtap_dump(wtap_dumper *wdh, const wtap_rec *rec,
-	  const uint8_t *pd, int *err, char **err_info)
+wtap_dump(wtap_dumper *wdh, const wtap_rec *rec, int *err, char **err_info)
 {
 	*err = 0;
 	*err_info = NULL;
-	return (wdh->subtype_write)(wdh, rec, pd, err, err_info);
+	return (wdh->subtype_write)(wdh, rec, err, err_info);
 }
 
 bool
