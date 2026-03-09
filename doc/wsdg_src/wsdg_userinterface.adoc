@@ -200,18 +200,20 @@ In most cases you should handle the changeEvent in order to catch
 Qt makes translating the Wireshark UI into different languages easy. To add a new
 translation, do the following:
 
-- Run the following to generate/update your translation files:
+- Run the following to generate/update your translation files,
+replacing XX with the ISO 639 language code:
 ----
 lupdate -I. $(find ui/qt -name '*.cpp' -o -name '*.h' -o -name '*.ui') -ts ui/qt/wireshark_XX.ts
-msginit --no-translator --input packaging/debian/po/templates.pot --output packaging/debian/po/hu.po
+msginit --no-translator --input packaging/debian/po/templates.pot --output packaging/debian/po/XX.po
 ----
 - Add _ui/qt/wireshark_XX.ts_ to _ui/qt/CMakeLists.txt_.
 - Add _ui/qt/wireshark_XX.ts_ to _.tx/config_.
 - Translate with Qt Linguist: `linguist ui/qt/wireshark_XX.ts`.
 - Do a test build and make sure the generated _wireshark_XX.qm_ binary file is included.
+- Fill in the msgStr fields in the XX.po file.
 - Push your changes to GitLab for review. See <<ChSrcContribute>> for details.
 
-Alternatively you can put your QM and flag files in the _languages_
+Alternatively you can put your QM file in the _languages_
 directory in the Wireshark user configuration directory
 (_$XDG_CONFIG_HOME/wireshark/languages/_ or _$HOME/.wireshark/languages/_ on
 UNIX).
@@ -220,7 +222,7 @@ For more information about Qt Linguist see
 https://doc.qt.io/qt-5/qtlinguist-index.html[its manual].
 
 You can also manage translations online with
-https://www.transifex.com/wireshark/wireshark/[Transifex].
+https://explore.transifex.com/wireshark/wireshark/[Transifex].
 Translation resources are organized by type of translation and development branch:
 
 master::
@@ -237,7 +239,7 @@ po-_XY_, debian-_XY_::
 GNU gettext (.po) resources in the _debian_ directory in the _X.Y_ release branch.
 For example, po-34 matches the Wireshark 3.4 release branch.
 
-Each week translations are automatically synchronized with the source code through the following steps:
+Each week translations are link:{wireshark-code-file-url}/tools/update-tx[automatically synchronized] with the source code through the following steps:
 
 - Pull changes from Transifex by running `tx pull -f`.
 - Run `lupdate` on the ts files.
@@ -277,8 +279,8 @@ The main window has many QActions which are shared with child widgets. See
 _ui/qt/proto_tree.cpp_ for an example of this.
 
 To demonstrate the functionality of the plugin interface options, a
-demonstration plugin exists (pluginifdemo). See _doc/README.plugins_ and
-_plugins/epan/pluginifdemo_.
+demonstration plugin exists (pluginifdemo). See <<ChapterPlugins>> and
+_plugins/ui/pluginifdemo_.
 
 https://www.kdab.com/development-resources/qt-tools/gammaray/[GammaRay] lets you inspect
 the internals of a running Qt application similar to $$Spy++$$ on Windows.

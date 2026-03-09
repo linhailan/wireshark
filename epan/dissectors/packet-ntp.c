@@ -53,7 +53,7 @@ static dissector_handle_t ntp_handle;
  * |                   Reference Timestamp (64)                    |
  * |                                                               |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |                   Originate Timestamp (64)                    |
+ * |                     Origin Timestamp (64)                     |
  * |                                                               |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  * |                    Receive Timestamp (64)                     |
@@ -102,6 +102,7 @@ static dissector_handle_t ntp_handle;
 
 #define UDP_PORT_NTP	123
 #define TCP_PORT_NTP	123
+#define PTP_ORG_SUBTYPE   1
 
 /* Leap indicator, 2bit field is used to warn of a inserted/deleted
  * second, or clock unsynchronized indication.
@@ -612,6 +613,7 @@ static const range_string ntp_ext_field_types[] = {
 	{ 0x0002, 0x0002, "Reserved for historic reasons" },
 	{ 0x0102, 0x0102, "Reserved for historic reasons" },
 	{ 0x0104, 0x0104, "Unique Identifier" },
+	{ 0x010A, 0x010A, "Network Correction" },
 	{ 0x0200, 0x0200, "No-Operation Request" },
 	{ 0x0201, 0x0201, "Association Message Request" },
 	{ 0x0202, 0x0202, "Certificate Message Request" },
@@ -751,6 +753,7 @@ static int hf_ntp_ext;
 static int hf_ntp_ext_type;
 static int hf_ntp_ext_length;
 static int hf_ntp_ext_value;
+static int hf_ntp_ext_network_correction;
 
 static int hf_ntp_ext_nts;
 static int hf_ntp_nts_nonce_length;
@@ -1152,20 +1155,17 @@ static int nts_aad_start;
  */
 #define NTP_BASETIME EPOCH_DELTA_1900_01_01_00_00_00_UTC
 #define NTP_FLOAT_DENOM 4294967296.0
-#define NTP_TS_SIZE 110
 
 /* tvb_ntp_fmt_ts_sec - converts an NTP timestamps second part (32bits) to an human readable string.
 * TVB and an offset (IN).
-* returns pointer to filled buffer.  This buffer will be freed automatically once
-* dissection of the next packet occurs.
+* returns pointer to filled buffer allocated by allocator.
 */
 const char *
-tvb_ntp_fmt_ts_sec(tvbuff_t *tvb, int offset)
+tvb_ntp_fmt_ts_sec(wmem_allocator_t* allocator, tvbuff_t *tvb, int offset)
 {
 	uint32_t tempstmp;
 	time_t temptime;
 	struct tm *bd;
-	char *buff;
 
 	tempstmp = tvb_get_ntohl(tvb, offset);
 	if (tempstmp == 0){
@@ -1182,16 +1182,13 @@ tvb_ntp_fmt_ts_sec(tvbuff_t *tvb, int offset)
 		return "Not representable";
 	}
 
-	buff = (char *)wmem_alloc(wmem_packet_scope(), NTP_TS_SIZE);
-	snprintf(buff, NTP_TS_SIZE,
-		"%s %2d, %d %02d:%02d:%02d UTC",
+	return wmem_strdup_printf(allocator, "%s %2d, %d %02d:%02d:%02d UTC",
 		mon_names[bd->tm_mon],
 		bd->tm_mday,
 		bd->tm_year + 1900,
 		bd->tm_hour,
 		bd->tm_min,
 		bd->tm_sec);
-	return buff;
 }
 
 static tvbuff_t*
@@ -1435,6 +1432,7 @@ dissect_ntp_ext(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, int off
 	proto_item *tf, *ti, *ei;
 	uint16_t extlen;
 	uint32_t type;
+	nstime_t correction;
 	int value_length, offset_m = offset;
 	const char *ext_historic;
 
@@ -1458,17 +1456,33 @@ dissect_ntp_ext(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, int off
 
 	value_length = extlen - 4;
 
-	if(type == 0x0104) { /* NTS UID extension -> remember offset and length */
-		nts_tvb_uid_offset = offset;
-		nts_tvb_uid_length = value_length;
+	switch (type) {
+		case 0x0104: /* NTS UID extension -> remember offset and length */
+			nts_tvb_uid_offset = offset;
+			nts_tvb_uid_length = value_length;
 
-		/* Every NTP NTS packet must have this extension, so use it to add INFO */
-		col_append_sep_fstr(pinfo->cinfo, COL_INFO, ",", " NTS");
+			/* Every NTP NTS packet must have this extension, so use it to add INFO */
+			col_append_sep_fstr(pinfo->cinfo, COL_INFO, ",", " NTS");
+			break;
+
+		case 0x0204: /* NTS cookie extension */
+			dissect_nts_cookie(tvb, pinfo, ext_tree, offset, value_length, flags);
+			break;
+
+		case 0x0404: /* NTS authentication and encryption extension */
+			dissect_nts_ext(tvb, pinfo, ext_tree, ntp_tree, offset, value_length, flags, offset_m);
+			break;
+
+		case 0x010A: /* Network Correction */
+			nstime_set_zero(&correction);
+			correction.secs = tvb_get_ntohl(tvb, offset);
+			correction.nsecs = (int)(1000000000*(tvb_get_ntohl(tvb, offset+4)/4294967296.0));
+			proto_tree_add_time(ext_tree, hf_ntp_ext_network_correction, tvb, offset, 8, &correction);
+			break;
+
+		default:
+			break;
 	}
-	if(type == 0x0204) /* NTS cookie extension */
-		dissect_nts_cookie(tvb, pinfo, ext_tree, offset, value_length, flags);
-	if(type == 0x0404) /* NTS authentication and encryption extension */
-		dissect_nts_ext(tvb, pinfo, ext_tree, ntp_tree, offset, value_length, flags, offset_m);
 
 	offset += value_length;
 
@@ -1592,37 +1606,27 @@ dissect_ntp_std(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, ntp_con
 	 * But, all V3 and V4 servers set this to IP address of their
 	 * higher level server. My decision was to resolve this address.
 	 */
-	buff = (char *)wmem_alloc(pinfo->pool, NTP_TS_SIZE);
 	if (stratum == 0) {
-		snprintf (buff, NTP_TS_SIZE, "Unidentified Kiss-o\'-Death message '%s'",
+		buff = wmem_strdup_printf(pinfo->pool, "Unidentified Kiss-o\'-Death message '%s'",
 			tvb_get_string_enc(pinfo->pool, tvb, 12, 4, ENC_ASCII));
 		for (i = 0; kod_messages[i].id; i++) {
-			if (tvb_memeql(tvb, 12, kod_messages[i].id, 4) == 0) {
-				snprintf(buff, NTP_TS_SIZE, "%s",
-					kod_messages[i].data);
+			if (tvb_strneql(tvb, 12, kod_messages[i].id, 4) == 0) {
+				buff = wmem_strdup(pinfo->pool, kod_messages[i].data);
 				break;
 			}
 		}
 	} else if (stratum == 1) {
-		snprintf (buff, NTP_TS_SIZE, "Unidentified reference source '%s'",
+		buff = wmem_strdup_printf(pinfo->pool, "Unidentified reference source '%s'",
 			tvb_get_string_enc(pinfo->pool, tvb, 12, 4, ENC_ASCII));
 		for (i = 0; primary_sources[i].id; i++) {
 			if (tvb_memeql(tvb, 12, (const uint8_t*)primary_sources[i].id, 4) == 0) {
-				snprintf(buff, NTP_TS_SIZE, "%s",
-					primary_sources[i].data);
+				buff = wmem_strdup(pinfo->pool, primary_sources[i].data);
 				break;
 			}
 		}
 	} else {
-		int buffpos;
 		refid_addr = tvb_get_ipv4(tvb, 12);
-		buffpos = snprintf(buff, NTP_TS_SIZE, "%s", get_hostname (refid_addr));
-		if (buffpos >= NTP_TS_SIZE) {
-			buff[NTP_TS_SIZE-4]='.';
-			buff[NTP_TS_SIZE-3]='.';
-			buff[NTP_TS_SIZE-2]='.';
-			buff[NTP_TS_SIZE-1]=0;
-		}
+		buff = wmem_strdup(pinfo->pool, get_hostname (refid_addr));
 	}
 	proto_tree_add_bytes_format_value(ntp_tree, hf_ntp_refid, tvb, 12, 4,
 					NULL, "%s", buff);
@@ -1632,7 +1636,7 @@ dissect_ntp_std(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, ntp_con
 	 */
 	proto_tree_add_item(ntp_tree, hf_ntp_reftime, tvb, 16, 8, ENC_TIME_NTP|ENC_BIG_ENDIAN);
 
-	/* Originate Timestamp: This is the time at which the request departed
+	/* Origin Timestamp: This is the time at which the request departed
 	 * the client for the server.
 	 */
 	proto_tree_add_item(ntp_tree, hf_ntp_org, tvb, 24, 8, ENC_TIME_NTP|ENC_BIG_ENDIAN);
@@ -3068,6 +3072,9 @@ proto_register_ntp(void)
 		{ &hf_ntp_ext_value, {
 			"Value", "ntp.ext.value", FT_BYTES, BASE_NONE,
 			NULL, 0, "Type-specific value", HFILL }},
+		{ &hf_ntp_ext_network_correction, {
+			"Network Correction", "ntp.ext.correction", FT_RELATIVE_TIME, BASE_NONE,
+			NULL, 0, NULL, HFILL }},
 
 		{ &hf_ntp_ext_nts, {
 			"Network Time Security", "ntp.ext.nts", FT_NONE, BASE_NONE,
@@ -3938,6 +3945,7 @@ proto_reg_handoff_ntp(void)
 {
 	dissector_add_uint_with_preference("udp.port", UDP_PORT_NTP, ntp_handle);
 	dissector_add_uint_with_preference("tcp.port", TCP_PORT_NTP, ntp_handle);
+	dissector_add_uint("ptp.v2.tlv.oe.iana.organizationSubType", PTP_ORG_SUBTYPE, ntp_handle);
 }
 
 /*

@@ -61,8 +61,8 @@ tap_packet_cb get_hostlist_packet_func(register_ct_t* ct)
 
 static wmem_tree_t *registered_ct_tables;
 
-void
-dissector_conversation_init(const char *opt_arg, void* userdata)
+static bool
+dissector_conversation_init_internal(const char *opt_arg, void* userdata)
 {
     register_ct_t *table = (register_ct_t*)userdata;
     GString *cmd_str = g_string_new("conv,");
@@ -78,10 +78,18 @@ dissector_conversation_init(const char *opt_arg, void* userdata)
 
     if (table->conv_gui_init)
         table->conv_gui_init(table, filter);
+
+    return true;
 }
 
 void
-dissector_endpoint_init(const char *opt_arg, void* userdata)
+dissector_conversation_init(const char* opt_arg, void* userdata)
+{
+    dissector_conversation_init_internal(opt_arg, userdata);
+}
+
+static bool
+dissector_endpoint_init_internal(const char *opt_arg, void* userdata)
 {
     register_ct_t *table = (register_ct_t*)userdata;
     GString *cmd_str = g_string_new("");
@@ -100,6 +108,14 @@ dissector_endpoint_init(const char *opt_arg, void* userdata)
 
     if (table->endpoint_gui_init)
         table->endpoint_gui_init(table, filter);
+
+    return true;
+}
+
+void
+dissector_endpoint_init(const char* opt_arg, void* userdata)
+{
+    dissector_endpoint_init_internal(opt_arg, userdata);
 }
 
 /* For backwards source and binary compatibility */
@@ -119,6 +135,11 @@ register_ct_t* get_conversation_by_proto_id(int proto_id)
     return (register_ct_t*)wmem_tree_lookup_string(registered_ct_tables, proto_get_protocol_short_name(find_protocol_by_id(proto_id)), 0);
 }
 
+void conversation_table_init(void)
+{
+    registered_ct_tables = wmem_tree_new(wmem_epan_scope());
+}
+
 void
 register_conversation_table(const int proto_id, bool hide_ports, tap_packet_cb conv_packet_func, tap_packet_cb endpoint_packet_func)
 {
@@ -132,9 +153,6 @@ register_conversation_table(const int proto_id, bool hide_ports, tap_packet_cb c
     table->endpoint_func = endpoint_packet_func;
     table->conv_gui_init = NULL;
     table->endpoint_gui_init = NULL;
-
-    if (registered_ct_tables == NULL)
-        registered_ct_tables = wmem_tree_new(wmem_epan_scope());
 
     wmem_tree_insert_string(registered_ct_tables, proto_get_protocol_short_name(find_protocol_by_id(proto_id)), table, 0);
 }
@@ -153,7 +171,7 @@ set_conv_gui_data(const void *key _U_, void *value, void *userdata)
     ui_info.group = REGISTER_STAT_GROUP_CONVERSATION_LIST;
     ui_info.title = NULL;   /* construct this from the protocol info? */
     ui_info.cli_string = g_string_free(conv_cmd_str, FALSE);
-    ui_info.tap_init_cb = dissector_conversation_init;
+    ui_info.tap_init_cb = dissector_conversation_init_internal;
     ui_info.nparams = 0;
     ui_info.params = NULL;
     register_stat_tap_ui(&ui_info, table);
@@ -177,7 +195,7 @@ set_endpoint_gui_data(const void *key _U_, void *value, void *userdata)
     ui_info.group = REGISTER_STAT_GROUP_ENDPOINT_LIST;
     ui_info.title = NULL;   /* construct this from the protocol info? */
     ui_info.cli_string = ws_strdup_printf("%s,%s", ENDPOINT_TAP_PREFIX, proto_get_protocol_filter_name(table->proto_id));
-    ui_info.tap_init_cb = dissector_endpoint_init;
+    ui_info.tap_init_cb = dissector_endpoint_init_internal;
     ui_info.nparams = 0;
     ui_info.params = NULL;
     register_stat_tap_ui(&ui_info, table);
@@ -815,7 +833,7 @@ add_conversation_table_data_extended(
      * Relies heavily on frameid to identify the conversation.
      * XXX - Later on, either implement one more find_conversation() function to look for
      * conv_id in the 'addr/port tuple' Htable, or move the conversation to the convid Htable to
-     * build a quickier identification method.
+     * build a quicker identification method.
      */
     conversation_t *ct = find_conversation(frameid, src, dst, ctype, src_port, dst_port, 0);
 

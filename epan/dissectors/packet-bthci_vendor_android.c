@@ -1,4 +1,4 @@
-/* packet-bthci_vendor.c
+/* packet-bthci_vendor_android.c
  * Routines for the Bluetooth HCI Vendors Commands/Events
  *
  * Copyright 2014, Michal Labedzki for Tieto Corporation
@@ -200,6 +200,8 @@ static expert_field ei_android_unexpected_data;
 
 static dissector_handle_t bthci_vendor_android_handle;
 static dissector_handle_t btcommon_ad_android_handle;
+
+static const uint16_t bthci_vendor_manufacturer_android = 0x00e0; // Google LLC
 
 #define ANDROID_OPCODE_VALS(base) \
     { (base) | 0x0153,  "LE Get Vendor Capabilities" }, \
@@ -461,14 +463,12 @@ dissect_bthci_vendor_android(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
             tap_queue_packet(bluetooth_hci_summary_tap, pinfo, tap_hci_summary);
         }
 
-        proto_tree_add_item(main_tree, hf_android_parameter_length, tvb, offset, 1, ENC_NA);
-        length = tvb_get_uint8(tvb, offset);
+        proto_tree_add_item_ret_uint8(main_tree, hf_android_parameter_length, tvb, offset, 1, ENC_NA, &length);
         offset += 1;
 
         switch(ocf) {
         case 0x0154: /* LE Multi Advertising */
-            proto_tree_add_item(main_tree, hf_android_le_multi_advertising_subcode, tvb, offset, 1, ENC_NA);
-            subcode = tvb_get_uint8(tvb, offset);
+            proto_tree_add_item_ret_uint8(main_tree, hf_android_le_multi_advertising_subcode, tvb, offset, 1, ENC_NA, &subcode);
             offset += 1;
 
             switch (subcode) {
@@ -534,8 +534,7 @@ dissect_bthci_vendor_android(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
 
             break;
         case 0x0156: /* LE Batch Scan */
-            proto_tree_add_item(main_tree, hf_android_le_batch_scan_subcode, tvb, offset, 1, ENC_NA);
-            subcode = tvb_get_uint8(tvb, offset);
+            proto_tree_add_item_ret_uint8(main_tree, hf_android_le_batch_scan_subcode, tvb, offset, 1, ENC_NA, &subcode);
             offset += 1;
 
             switch (subcode) {
@@ -581,12 +580,10 @@ dissect_bthci_vendor_android(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
 
             break;
         case 0x0157: /* LE Advertising Filter */
-            proto_tree_add_item(main_tree, hf_android_le_advertising_filter_subcode, tvb, offset, 1, ENC_NA);
-            subcode = tvb_get_uint8(tvb, offset);
+            proto_tree_add_item_ret_uint8(main_tree, hf_android_le_advertising_filter_subcode, tvb, offset, 1, ENC_NA, &subcode);
             offset += 1;
 
-            proto_tree_add_item(main_tree, hf_android_le_scan_condition, tvb, offset, 1, ENC_NA);
-            condition = tvb_get_uint8(tvb, offset);
+            proto_tree_add_item_ret_uint8(main_tree, hf_android_le_scan_condition, tvb, offset, 1, ENC_NA, &condition);
             offset += 1;
 
             proto_tree_add_item(main_tree, hf_android_le_filter_index, tvb, offset, 1, ENC_NA);
@@ -630,8 +627,7 @@ dissect_bthci_vendor_android(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
             }
             break;
         case 0x015D: /* A2DP Hardware Offload */
-            proto_tree_add_item(main_tree, hf_android_a2dp_hardware_offload_subcode, tvb, offset, 1, ENC_NA);
-            subcode = tvb_get_uint8(tvb, offset);
+            proto_tree_add_item_ret_uint8(main_tree, hf_android_a2dp_hardware_offload_subcode, tvb, offset, 1, ENC_NA, &subcode);
             offset += 1;
 
             switch (subcode) {
@@ -774,7 +770,7 @@ dissect_bthci_vendor_android(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
                 if (cp_enable_scmst) {
                     proto_tree_add_item(main_tree, hf_android_a2dp_hardware_offload_start_cp_header_scmst, tvb, offset, 1, ENC_NA);
                 } else {
-                    proto_tree_add_item(main_tree, hf_android_a2dp_hardware_offload_start_cp_header_scmst_reserved, tvb, offset, 1, ENC_NA);
+                    proto_tree_add_item(main_tree, hf_android_a2dp_hardware_offload_start_cp_header_scmst_reserved, tvb, offset, 1, ENC_BIG_ENDIAN);
                 }
                 offset += 1;
 
@@ -823,7 +819,7 @@ dissect_bthci_vendor_android(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
         col_set_str(pinfo->cinfo, COL_INFO, "Rcvd Android ");
 
         event_code = tvb_get_uint8(tvb, offset);
-        description = val_to_str_ext(event_code, &bthci_evt_evt_code_vals_ext, "Unknown 0x%08x");
+        description = val_to_str_ext(pinfo->pool, event_code, &bthci_evt_evt_code_vals_ext, "Unknown 0x%08x");
         col_append_str(pinfo->cinfo, COL_INFO, description);
         proto_tree_add_item(main_tree, hf_android_event_code, tvb, offset, 1, ENC_NA);
         offset += 1;
@@ -844,8 +840,7 @@ dissect_bthci_vendor_android(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
             tap_queue_packet(bluetooth_hci_summary_tap, pinfo, tap_hci_summary);
         }
 
-        proto_tree_add_item(main_tree, hf_android_parameter_length, tvb, offset, 1, ENC_NA);
-        length = tvb_get_uint8(tvb, offset);
+        proto_tree_add_item_ret_uint8(main_tree, hf_android_parameter_length, tvb, offset, 1, ENC_NA, &length);
         offset += 1;
 
         switch (event_code) {
@@ -885,8 +880,7 @@ dissect_bthci_vendor_android(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
                 tap_queue_packet(bluetooth_hci_summary_tap, pinfo, tap_hci_summary);
             }
 
-            proto_tree_add_item(main_tree, hf_android_status, tvb, offset, 1, ENC_NA);
-            status = tvb_get_uint8(tvb, offset);
+            proto_tree_add_item_ret_uint8(main_tree, hf_android_status, tvb, offset, 1, ENC_NA, &status);
             offset += 1;
 
             switch (ocf) {
@@ -964,8 +958,7 @@ dissect_bthci_vendor_android(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
 
                 break;
             case 0x0156: /* LE Batch Scan */
-                proto_tree_add_item(main_tree, hf_android_le_batch_scan_subcode, tvb, offset, 1, ENC_NA);
-                subcode = tvb_get_uint8(tvb, offset);
+                proto_tree_add_item_ret_uint8(main_tree, hf_android_le_batch_scan_subcode, tvb, offset, 1, ENC_NA, &subcode);
                 offset += 1;
 
                 if (subcode == 0x04 && status == STATUS_SUCCESS) { /* Read Results*/
@@ -993,16 +986,16 @@ dissect_bthci_vendor_android(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
                 break;
             case 0x0159: /* LE Energy Info */
                 if (status == STATUS_SUCCESS) {
-                    proto_tree_add_item(main_tree, hf_android_le_energy_total_rx_time, tvb, offset, 1, ENC_NA);
+                    proto_tree_add_item(main_tree, hf_android_le_energy_total_rx_time, tvb, offset, 1, ENC_BIG_ENDIAN);
                     offset += 1;
 
-                    proto_tree_add_item(main_tree, hf_android_le_energy_total_tx_time, tvb, offset, 1, ENC_NA);
+                    proto_tree_add_item(main_tree, hf_android_le_energy_total_tx_time, tvb, offset, 1, ENC_BIG_ENDIAN);
                     offset += 1;
 
-                    proto_tree_add_item(main_tree, hf_android_le_energy_total_idle_time, tvb, offset, 1, ENC_NA);
+                    proto_tree_add_item(main_tree, hf_android_le_energy_total_idle_time, tvb, offset, 1, ENC_BIG_ENDIAN);
                     offset += 1;
 
-                    proto_tree_add_item(main_tree, hf_android_le_energy_total_energy_used, tvb, offset, 1, ENC_NA);
+                    proto_tree_add_item(main_tree, hf_android_le_energy_total_energy_used, tvb, offset, 1, ENC_BIG_ENDIAN);
                     offset += 1;
                 }
 

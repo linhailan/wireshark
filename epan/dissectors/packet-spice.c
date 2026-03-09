@@ -1347,7 +1347,7 @@ dissect_Image(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offs
             ImageSize = dissect_ImageJPEG_Alpha(tvb, tree, pinfo, offset);
             break;
         default:
-            proto_tree_add_expert(tree, pinfo, &ei_spice_unknown_image_type, tvb, offset, -1);
+            proto_tree_add_expert_remaining(tree, pinfo, &ei_spice_unknown_image_type, tvb, offset);
     }
 
     return sizeof_ImageDescriptor + ImageSize;
@@ -1474,8 +1474,7 @@ dissect_Mask(tvbuff_t *tvb, packet_info* pinfo, proto_tree *tree, uint32_t offse
     offset += 1;
     point_item = dissect_POINT32(tvb, Mask_tree, offset);
     offset += (int)sizeof(point32_t);
-    bitmap = tvb_get_letohl(tvb, offset);
-    proto_tree_add_item(Mask_tree, hf_ref_image, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item_ret_uint(Mask_tree, hf_ref_image, tvb, offset, 4, ENC_LITTLE_ENDIAN, &bitmap);
     offset += 4;
 
     if (bitmap != 0) {
@@ -2819,7 +2818,7 @@ dissect_spice_data_server_pdu(tvbuff_t *tvb, proto_tree *tree, packet_info *pinf
     }
 
     if ((offset - old_offset) != message_size) {
-        proto_tree_add_expert_format(tree, pinfo, &ei_spice_not_dissected, tvb, offset, -1,
+        proto_tree_add_expert_format_remaining(tree, pinfo, &ei_spice_not_dissected, tvb, offset,
             "message type %s (%u) not fully dissected", get_message_type_string(message_type, spice_info, false), message_type);
         offset = old_offset + message_size;
     }
@@ -3038,7 +3037,7 @@ dissect_spice_link_capabilities(tvbuff_t *tvb, packet_info* pinfo, proto_tree *t
                 }
                 break;
             default:
-                proto_tree_add_expert(tree, pinfo, &ei_spice_unknown_channel, tvb, offset, -1);
+                proto_tree_add_expert_remaining(tree, pinfo, &ei_spice_unknown_channel, tvb, offset);
                 return;
         }
         offset += 4;
@@ -3254,7 +3253,7 @@ dissect_spice(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
             proto_item_set_len(ti, pdu_len);
             proto_tree_add_uint(spice_tree, hf_spice_supported_authentication_mechanisms_list_length, tvb, offset, 4, pdu_len - 4);
             offset += 4;
-            proto_tree_add_item(spice_tree, hf_spice_supported_authentication_mechanisms_list, tvb, offset, pdu_len - 4, ENC_NA|ENC_ASCII);
+            proto_tree_add_item(spice_tree, hf_spice_supported_authentication_mechanisms_list, tvb, offset, pdu_len - 4, ENC_ASCII);
             offset += (pdu_len - 4);
             spice_info->next_state = SPICE_SASL_START_TO_SERVER;
             return offset;
@@ -3281,13 +3280,13 @@ dissect_spice(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
                         col_set_str(pinfo->cinfo, COL_INFO, "Client selected SASL authentication mechanism (start to server)");
                         proto_tree_add_uint(spice_tree, hf_spice_selected_authentication_mechanism_length, tvb, offset, 4, pdu_len - 4);
                         offset += 4;
-                        proto_tree_add_item(spice_tree, hf_spice_selected_authentication_mechanism, tvb, offset, pdu_len - 4, ENC_NA|ENC_ASCII);
+                        proto_tree_add_item(spice_tree, hf_spice_selected_authentication_mechanism, tvb, offset, pdu_len - 4, ENC_ASCII);
                     } else {
                         /* this is the client out list, ending the start from client message */
                          col_set_str(pinfo->cinfo, COL_INFO, "Client out mechanism (start to server)");
                          proto_tree_add_uint(spice_tree, hf_spice_client_out_mechanism_length, tvb, offset, 4, pdu_len - 4);
                          offset += 4;
-                         proto_tree_add_item(spice_tree, hf_spice_selected_client_out_mechanism, tvb, offset, pdu_len - 4, ENC_NA|ENC_ASCII);
+                         proto_tree_add_item(spice_tree, hf_spice_selected_client_out_mechanism, tvb, offset, pdu_len - 4, ENC_ASCII);
                          spice_info->next_state = SPICE_SASL_START_FROM_SERVER;
                     }
                     offset += (pdu_len - 4);
@@ -3364,7 +3363,7 @@ dissect_spice(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
                     col_set_str(pinfo->cinfo, COL_INFO, "Clientout (step to server)");
                     proto_tree_add_uint(spice_tree, hf_spice_clientout_length, tvb, offset, 4, pdu_len - 4);
                     offset += 4;
-                    proto_tree_add_item(spice_tree, hf_spice_clientout_list, tvb, offset, pdu_len - 4, ENC_NA|ENC_ASCII);
+                    proto_tree_add_item(spice_tree, hf_spice_clientout_list, tvb, offset, pdu_len - 4, ENC_ASCII);
                     spice_info->next_state = SPICE_SASL_STEP_FROM_SERVER;
                     offset += (pdu_len - 4);
                 }

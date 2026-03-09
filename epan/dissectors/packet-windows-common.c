@@ -1226,6 +1226,8 @@ static const value_string NT_errors[] = {
 	{ 0xC0000464, "STATUS_DEVICE_UNREACHABLE" },
 	{ 0xC0000465, "STATUS_INVALID_TOKEN" },
 	{ 0xC0000466, "STATUS_SERVER_UNAVAILABLE" },
+	{ 0xc0000467, "STATUS_FILE_NOT_AVAILABLE" },
+	{ 0xc0000480, "STATUS_SHARE_UNAVAILABLE" },
 	{ 0xC0000500, "STATUS_INVALID_TASK_NAME" },
 	{ 0xC0000501, "STATUS_INVALID_TASK_INDEX" },
 	{ 0xC0000502, "STATUS_THREAD_ALREADY_IN_TASK" },
@@ -2473,7 +2475,7 @@ static value_string_ext wkwn_S_1_5_21_rids_ext = VALUE_STRING_EXT_INIT(wkwn_S_1_
  * field, it will just pass a FT_STRING hf field here
  */
 int
-dissect_nt_sid(tvbuff_t *tvb, int offset, proto_tree *parent_tree,
+dissect_nt_sid(tvbuff_t *tvb, packet_info* pinfo, int offset, proto_tree *parent_tree,
 	       const char *name, char **sid_str, int hf_sid)
 {
 	int offset_sid_start = offset, sa_offset, rid_offset=0, wkwn_sid1_len=0,
@@ -2514,18 +2516,18 @@ dissect_nt_sid(tvbuff_t *tvb, int offset, proto_tree *parent_tree,
 		offset++;
 	}
 
-	sid_in_dec_str = wmem_strbuf_create(wmem_packet_scope());
+	sid_in_dec_str = wmem_strbuf_create(pinfo->pool);
 	wmem_strbuf_append_printf (sid_in_dec_str, "S-%u-%" PRIu64, revision, authority);
 
 	/*  If sid_display_hex is set, sid_in_dec_str is still needed for
 		looking up well-known SIDs*/
 	if (sid_display_hex) {
-		sid_in_hex_str = wmem_strbuf_create(wmem_packet_scope());
+		sid_in_hex_str = wmem_strbuf_create(pinfo->pool);
 		wmem_strbuf_append_printf (sid_in_hex_str, "S-%x-%" PRIx64, revision, authority);
 	}
 
-	wkwn_sid1_str = wmem_strbuf_create(wmem_packet_scope());
-	label_str = wmem_strbuf_create(wmem_packet_scope());
+	wkwn_sid1_str = wmem_strbuf_create(pinfo->pool);
+	label_str = wmem_strbuf_create(pinfo->pool);
 
 	if (strcmp(wmem_strbuf_get_str(sid_in_dec_str), "S-1-16")==0)
 		S_1_16 = true;
@@ -2550,9 +2552,9 @@ dissect_nt_sid(tvbuff_t *tvb, int offset, proto_tree *parent_tree,
 
 
 	sa_offset = offset;
-	sa_str = wmem_strbuf_create(wmem_packet_scope());
-	wkwn_sid2_str = wmem_strbuf_create(wmem_packet_scope());
-	domain_str = wmem_strbuf_create(wmem_packet_scope());
+	sa_str = wmem_strbuf_create(pinfo->pool);
+	wkwn_sid2_str = wmem_strbuf_create(pinfo->pool);
+	domain_str = wmem_strbuf_create(pinfo->pool);
 
 	/* Build the sub-authorities and full SID strings */
 	for(i=1; i<num_auth+1; i++) {
@@ -2738,13 +2740,13 @@ dissect_nt_sid(tvbuff_t *tvb, int offset, proto_tree *parent_tree,
 	/* If requested, return SID string with mapped name */
 	if(sid_str){
 		if(wmem_strbuf_get_len(label_str) > 0){
-			*sid_str = wmem_strdup_printf(wmem_packet_scope(), "%s  (%s)",
+			*sid_str = wmem_strdup_printf(pinfo->pool, "%s  (%s)",
 				(sid_display_hex ? wmem_strbuf_get_str(sid_in_hex_str) : wmem_strbuf_get_str(sid_in_dec_str)), wmem_strbuf_get_str(label_str));
 		} else {
-			*sid_str = wmem_strdup(wmem_packet_scope(), sid_display_hex ? wmem_strbuf_get_str(sid_in_hex_str) : wmem_strbuf_get_str(sid_in_dec_str));
+			*sid_str = wmem_strdup(pinfo->pool, sid_display_hex ? wmem_strbuf_get_str(sid_in_hex_str) : wmem_strbuf_get_str(sid_in_dec_str));
 		}
 		if(!(*sid_str)){
-			*sid_str=wmem_strdup(wmem_packet_scope(), "corrupted SID");
+			*sid_str=wmem_strdup(pinfo->pool, "corrupted SID");
 		}
 	}
 	return offset;
@@ -2752,7 +2754,7 @@ dissect_nt_sid(tvbuff_t *tvb, int offset, proto_tree *parent_tree,
 
 /* Dissect SYSTEM_RESOURCE_ATTRIBUTE_ACE Value, see [MS-DTYP] v20180912 section 2.4.4.15 */
 static int
-dissect_nt_ace_system_resource_attribute_value(tvbuff_t *tvb, int value_offset, proto_tree *tree,
+dissect_nt_ace_system_resource_attribute_value(tvbuff_t *tvb, packet_info* pinfo, int value_offset, proto_tree *tree,
 					       uint16_t value_type, proto_item *sra_item)
 {
 	unsigned value_len;
@@ -2787,7 +2789,7 @@ dissect_nt_ace_system_resource_attribute_value(tvbuff_t *tvb, int value_offset, 
 		break;
 
 	    case CLAIM_SECURITY_ATTRIBUTE_TYPE_SID:
-		value_offset = dissect_nt_sid(tvb, value_offset, tree,
+		value_offset = dissect_nt_sid(tvb, pinfo, value_offset, tree,
 					      "SID", &value_str, hf_nt_ace_sra_value_sid);
 		break;
 
@@ -2815,7 +2817,7 @@ dissect_nt_ace_system_resource_attribute_value(tvbuff_t *tvb, int value_offset, 
 
 	if (sra_item) {
 		if ((value_str == NULL) && value_item) {
-			value_str = proto_item_get_display_repr(wmem_packet_scope(), value_item);
+			value_str = proto_item_get_display_repr(pinfo->pool, value_item);
 		}
 
 		if (value_str == NULL) {
@@ -2835,7 +2837,7 @@ dissect_nt_ace_system_resource_attribute_value(tvbuff_t *tvb, int value_offset, 
 
 /* Dissect SYSTEM_RESOURCE_ATTRIBUTE_ACE, see [MS-DTYP] v20180912 section 2.4.4.15 */
 static int
-dissect_nt_ace_system_resource_attribute(tvbuff_t *tvb, int offset, uint16_t size, proto_tree *parent_tree)
+dissect_nt_ace_system_resource_attribute(tvbuff_t *tvb, packet_info* pinfo, int offset, uint16_t size, proto_tree *parent_tree)
 {
 	/* The caller has already dissected Header, Mask and Sid. Therefore
 	   this function only dissects Attribute Data. This data takes
@@ -2864,7 +2866,7 @@ dissect_nt_ace_system_resource_attribute(tvbuff_t *tvb, int offset, uint16_t siz
 					tvb, name_offset, name_len,
 					ENC_UTF_16 | ENC_LITTLE_ENDIAN);
 	proto_item_append_text(sra_item, ": %s=",
-			       proto_item_get_display_repr(wmem_packet_scope(), name_item));
+			       proto_item_get_display_repr(pinfo->pool, name_item));
 	offset += sizeof(name);
 
 	/* ValueType */
@@ -2937,7 +2939,7 @@ dissect_nt_ace_system_resource_attribute(tvbuff_t *tvb, int offset, uint16_t siz
 		value_offset = tvb_get_letohl(tvb, offset);
 		proto_tree_add_uint(value_offset_tree, hf_nt_ace_sra_value_offset,
 				    tvb, offset, sizeof(value_offset), value_offset);
-		dissect_nt_ace_system_resource_attribute_value(tvb, start_offset + value_offset,
+		dissect_nt_ace_system_resource_attribute_value(tvb, pinfo, start_offset + value_offset,
 							       value_tree, value_type, sra_item);
 		offset += sizeof(value_offset);
 	}
@@ -3078,7 +3080,7 @@ dissect_nt_conditional_ace_token(tvbuff_t *tvb, packet_info *pinfo, int offset, 
 	    case COND_ACE_TOKEN_SID:
 		offset += sizeof(len);
 
-		offset = dissect_nt_sid(tvb, offset, tree, "SID", NULL, -1);
+		offset = dissect_nt_sid(tvb, pinfo, offset, tree, "SID", NULL, -1);
 		break;
 
 	    case COND_ACE_TOKEN_LOCAL_ATTRIBUTE:
@@ -3169,15 +3171,21 @@ dissect_nt_conditional_ace(tvbuff_t *tvb, packet_info *pinfo, int offset, uint16
 */
 static int ett_nt_access_mask;
 static int ett_nt_access_mask_generic;
+static int ett_nt_access_mask_other;
 static int ett_nt_access_mask_standard;
 static int ett_nt_access_mask_specific;
 
-static int hf_access_sacl;
 static int hf_access_maximum_allowed;
 static int hf_access_generic_read;
 static int hf_access_generic_write;
 static int hf_access_generic_execute;
 static int hf_access_generic_all;
+static int hf_access_other_3;
+static int hf_access_other_2;
+static int hf_access_system_security;
+static int hf_access_standard_7;
+static int hf_access_standard_6;
+static int hf_access_standard_5;
 static int hf_access_standard_delete;
 static int hf_access_standard_read_control;
 static int hf_access_standard_synchronise;
@@ -3251,7 +3259,7 @@ dissect_nt_access_mask(tvbuff_t *tvb, int offset, packet_info *pinfo,
 		       struct access_mask_info *ami, uint32_t *perms)
 {
 	proto_item *item;
-	proto_tree *subtree, *generic_tree, *standard_tree, *specific_tree;
+	proto_tree *subtree, *generic_tree, *other_tree, *standard_tree, *specific_tree;
 	uint32_t access;
 
 	static int * const generic_access_flags[] = {
@@ -3259,12 +3267,21 @@ dissect_nt_access_mask(tvbuff_t *tvb, int offset, packet_info *pinfo,
 		&hf_access_generic_write,
 		&hf_access_generic_execute,
 		&hf_access_generic_all,
+		NULL
+	};
+
+	static int * const other_access_flags[] = {
+		&hf_access_other_3,
+		&hf_access_other_2,
 		&hf_access_maximum_allowed,
-		&hf_access_sacl,
+		&hf_access_system_security,
 		NULL
 	};
 
 	static int * const standard_access_flags[] = {
+		&hf_access_standard_7,
+		&hf_access_standard_6,
+		&hf_access_standard_5,
 		&hf_access_standard_synchronise,
 		&hf_access_standard_write_owner,
 		&hf_access_standard_write_dac,
@@ -3328,6 +3345,14 @@ dissect_nt_access_mask(tvbuff_t *tvb, int offset, packet_info *pinfo,
 				   access & GENERIC_RIGHTS_MASK);
 
 	proto_tree_add_bitmask_list_value(generic_tree, tvb, offset - 4, 4, generic_access_flags, access);
+
+	/* Other access rights */
+
+	other_tree = proto_tree_add_subtree_format(subtree, tvb, offset - 4, 4,
+				   ett_nt_access_mask_other, NULL, "Other rights: 0x%08x",
+				   access & 0x0F000000);
+
+	proto_tree_add_bitmask_list_value(other_tree, tvb, offset - 4, 4, other_access_flags, access);
 
 	/* Standard access rights */
 
@@ -3698,12 +3723,12 @@ dissect_nt_v2_ace(tvbuff_t *tvb, int offset, packet_info *pinfo,
 		}
 
 		/* SID */
-		offset = dissect_nt_sid(tvb, offset, tree, "SID", &sid_str, -1);
+		offset = dissect_nt_sid(tvb, pinfo, offset, tree, "SID", &sid_str, -1);
 
 		if (item)
 			proto_item_append_text(
 				item, "%s, flags 0x%02x, %s, mask 0x%08x", sid_str, flags,
-				val_to_str(type, ace_type_vals, "Unknown ACE type (0x%02x)"),
+				val_to_str(pinfo->pool, type, ace_type_vals, "Unknown ACE type (0x%02x)"),
 				perms);
 
 		data_size = size - (offset - old_offset);
@@ -3722,7 +3747,7 @@ dissect_nt_v2_ace(tvbuff_t *tvb, int offset, packet_info *pinfo,
 			break;
 
 		    case ACE_TYPE_SYSTEM_RESOURCE_ATTRIBUTE:
-			dissect_nt_ace_system_resource_attribute(tvb, offset, data_size, tree);
+			dissect_nt_ace_system_resource_attribute(tvb, pinfo, offset, data_size, tree);
 			break;
 		}
 		break;
@@ -3857,8 +3882,8 @@ static const true_false_string tfs_sec_desc_type_dacl_trusted = {
 	"Dacl trusted is FALSE"
 };
 static const true_false_string tfs_sec_desc_type_server_security = {
-	"SERVER SECURITY is TRUE",
-	"Server security is FALSE"
+	"DACL SERVER SECURITY is TRUE",
+	"DACL server security is FALSE"
 };
 static const true_false_string tfs_sec_desc_type_dacl_auto_inherit_req = {
 	"DACL has AUTO INHERIT REQUIRED",
@@ -4046,7 +4071,7 @@ dissect_nt_sec_desc(tvbuff_t *tvb, int offset_a, packet_info *pinfo,
 		    break;
 	    }
 	    TRY{
-	      offset_v = dissect_nt_sid(tvb, item_offset, tree, "Owner", NULL, -1);
+	      offset_v = dissect_nt_sid(tvb, pinfo, item_offset, tree, "Owner", NULL, -1);
 	      if (offset_v > end_offset)
 	        end_offset = offset_v;
 	    }
@@ -4071,7 +4096,7 @@ dissect_nt_sec_desc(tvbuff_t *tvb, int offset_a, packet_info *pinfo,
 		    break;
 	    }
 	    TRY {
-	      offset_v = dissect_nt_sid(tvb, item_offset, tree, "Group", NULL, -1);
+	      offset_v = dissect_nt_sid(tvb, pinfo, item_offset, tree, "Group", NULL, -1);
 	      if (offset_v > end_offset)
 	        end_offset = offset_v;
 	    }
@@ -4179,8 +4204,8 @@ proto_do_register_windows_common(int proto_smb)
 		    TFS(&tfs_sec_desc_type_dacl_trusted), 0x0040, "Does this SecDesc have DACL TRUSTED set?", HFILL }},
 
 		{ &hf_nt_sec_desc_type_server_security,
-		  { "Server Security", "nt.sec_desc.type.server_security", FT_BOOLEAN, 16,
-		    TFS(&tfs_sec_desc_type_server_security), 0x0080, "Does this SecDesc have SERVER SECURITY set?", HFILL }},
+		  { "DACL Server Security", "nt.sec_desc.type.server_security", FT_BOOLEAN, 16,
+		    TFS(&tfs_sec_desc_type_server_security), 0x0080, "Does this SecDesc have DACL SERVER SECURITY set?", HFILL }},
 
 		{ &hf_nt_sec_desc_type_sacl_auto_inherit_req,
 		  { "SACL Auto Inherit Required", "nt.sec_desc.type.sacl_auto_inherit_req", FT_BOOLEAN, 16,
@@ -4332,15 +4357,40 @@ proto_do_register_windows_common(int proto_smb)
 		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
 		    GENERIC_ALL_ACCESS, NULL, HFILL }},
 
+		{ &hf_access_other_3,
+		  { "Other access, bit 3", "nt.access_mask.other_3",
+		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
+		    0x08000000, NULL, HFILL }},
+
+		{ &hf_access_other_2,
+		  { "Other access, bit 2", "nt.access_mask.other_2",
+		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
+		    0x04000000, NULL, HFILL }},
+
 		{ &hf_access_maximum_allowed,
 		  { "Maximum allowed", "nt.access_mask.maximum_allowed",
 		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
 		    MAXIMUM_ALLOWED_ACCESS, NULL, HFILL }},
 
-		{ &hf_access_sacl,
-		  { "Access SACL", "nt.access_mask.access_sacl",
+		{ &hf_access_system_security,
+		  { "System security", "nt.access_mask.system_security",
 		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
-		    ACCESS_SACL_ACCESS, NULL, HFILL }},
+		    SYSTEM_SECURITY_ACCESS, NULL, HFILL }},
+
+		{ &hf_access_standard_7,
+		  { "Standard access, bit 7", "nt.access_mask.standard_7",
+		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
+		    0x00800000, NULL, HFILL }},
+
+		{ &hf_access_standard_6,
+		  { "Standard access, bit 6", "nt.access_mask.standard_6",
+		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
+		    0x00400000, NULL, HFILL }},
+
+		{ &hf_access_standard_5,
+		  { "Standard access, bit 5", "nt.access_mask.standard_5",
+		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
+		    0x00200000, NULL, HFILL }},
 
 		{ &hf_access_standard_read_control,
 		  { "Read control", "nt.access_mask.read_control",
@@ -4403,47 +4453,47 @@ proto_do_register_windows_common(int proto_smb)
 		    0x00000200, NULL, HFILL }},
 
 		{ &hf_access_specific_8,
-		  { "Specific access, bit 8", "nt.access_mask.specific_8",
+		  { "Write attributes", "nt.access_mask.specific_8",
 		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
 		    0x00000100, NULL, HFILL }},
 
 		{ &hf_access_specific_7,
-		  { "Specific access, bit 7", "nt.access_mask.specific_7",
+		  { "Read attributes", "nt.access_mask.specific_7",
 		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
 		    0x00000080, NULL, HFILL }},
 
 		{ &hf_access_specific_6,
-		  { "Specific access, bit 6", "nt.access_mask.specific_6",
+		  { "Delete child", "nt.access_mask.specific_6",
 		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
 			0x00000040, NULL, HFILL }},
 
 		{ &hf_access_specific_5,
-		  { "Specific access, bit 5", "nt.access_mask.specific_5",
+		  { "Execute file / Traverse directory", "nt.access_mask.specific_5",
 		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
 		    0x00000020, NULL, HFILL }},
 
 		{ &hf_access_specific_4,
-		  { "Specific access, bit 4", "nt.access_mask.specific_4",
+		  { "Write extended attributes", "nt.access_mask.specific_4",
 		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
 		    0x00000010, NULL, HFILL }},
 
 		{ &hf_access_specific_3,
-		  { "Specific access, bit 3", "nt.access_mask.specific_3",
+		  { "Read extended attributes", "nt.access_mask.specific_3",
 		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
 		    0x00000008, NULL, HFILL }},
 
 		{ &hf_access_specific_2,
-		  { "Specific access, bit 2", "nt.access_mask.specific_2",
+		  { "Append data to file / Add subdirectory / Create pipe instance", "nt.access_mask.specific_2",
 		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
 		    0x00000004, NULL, HFILL }},
 
 		{ &hf_access_specific_1,
-		  { "Specific access, bit 1", "nt.access_mask.specific_1",
+		  { "Write data to file / Add file to directory", "nt.access_mask.specific_1",
 		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
 		    0x00000002, NULL, HFILL }},
 
 		{ &hf_access_specific_0,
-		  { "Specific access, bit 0", "nt.access_mask.specific_0",
+		  { "Read data file / List directory", "nt.access_mask.specific_0",
 		    FT_BOOLEAN, 32, TFS(&tfs_set_notset),
 		    0x00000001, NULL, HFILL }},
 
@@ -4651,6 +4701,7 @@ proto_do_register_windows_common(int proto_smb)
 		&ett_nt_ace_object_flags,
 		&ett_nt_access_mask,
 		&ett_nt_access_mask_generic,
+		&ett_nt_access_mask_other,
 		&ett_nt_access_mask_standard,
 		&ett_nt_access_mask_specific,
 		&ett_nt_security_information,

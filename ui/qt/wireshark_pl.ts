@@ -64,32 +64,12 @@
         <translation>Filtruj po typie:</translation>
     </message>
     <message>
-        <source>Keyboard Shortcuts</source>
-        <translation>Skróty klawiaturowe</translation>
-    </message>
-    <message>
-        <source>Search Shortcuts</source>
-        <translation>Szukaj skrótów</translation>
-    </message>
-    <message>
         <source>Acknowledgments</source>
         <translation>Podziękowania</translation>
     </message>
     <message>
         <source>License</source>
         <translation>Licencja</translation>
-    </message>
-    <message>
-        <source>About Stratoshark</source>
-        <translation>O Stratoshark</translation>
-    </message>
-    <message>
-        <source>Stratoshark</source>
-        <translation>Stratoshark</translation>
-    </message>
-    <message>
-        <source>&lt;h3&gt;System Call and Event Log Analyzer&lt;/h3&gt;</source>
-        <translation>&lt;h3&gt;Analizator wywołań systemowych i dziennika zdarzeń&lt;/h3&gt;</translation>
     </message>
     <message>
         <source>The directory does not exist</source>
@@ -726,48 +706,6 @@
     </message>
 </context>
 <context>
-    <name>ByteViewTab</name>
-    <message>
-        <source>Packet bytes</source>
-        <translation>Bajty pakietu</translation>
-    </message>
-</context>
-<context>
-    <name>ByteViewText</name>
-    <message>
-        <source>Allow hover highlighting</source>
-        <translation>Zezwalaj na podświetlanie po najechaniu myszką</translation>
-    </message>
-    <message>
-        <source>Show bytes as hexadecimal</source>
-        <translation>Pokaż szesnastkowo</translation>
-    </message>
-    <message>
-        <source>…as decimal</source>
-        <translation>…w postaci dziesiętnej</translation>
-    </message>
-    <message>
-        <source>…as octal</source>
-        <translation>…w postaci ósemkowej</translation>
-    </message>
-    <message>
-        <source>…as bits</source>
-        <translation>...jako bity</translation>
-    </message>
-    <message>
-        <source>Show text based on packet</source>
-        <translation>Pokaż tekst na podstawie pakietu</translation>
-    </message>
-    <message>
-        <source>…as ASCII</source>
-        <translation>…jako ASCII</translation>
-    </message>
-    <message>
-        <source>…as EBCDIC</source>
-        <translation>…jako EBCDIC</translation>
-    </message>
-</context>
-<context>
     <name>CaptureCommentDialog</name>
     <message>
         <source>Edit Capture Comments</source>
@@ -841,6 +779,14 @@
     <message>
         <source>Start / elapsed:</source>
         <translation>Start / upłynęło:</translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln day(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
     </message>
     <message>
         <source>Automatically detect file type</source>
@@ -981,10 +927,6 @@
 <context>
     <name>CaptureFilePropertiesDialog</name>
     <message>
-        <source>Details</source>
-        <translation>Szczegóły</translation>
-    </message>
-    <message>
         <source>Edit Comments</source>
         <translation>Edytuj komentarze</translation>
     </message>
@@ -1041,24 +983,36 @@
         <translation>Czas</translation>
     </message>
     <message>
-        <source>First packet</source>
-        <translation>Pierwszy pakiet</translation>
+        <source>Capture start</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>First event</source>
-        <translation>Pierwsze zdarzenie</translation>
+        <source>First packet</source>
+        <translation>Pierwszy pakiet</translation>
     </message>
     <message>
         <source>Last packet</source>
         <translation>Ostatni pakiet</translation>
     </message>
     <message>
-        <source>Last event</source>
-        <translation>Ostatnie zdarzenie</translation>
+        <source>Capture end</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln day(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
     </message>
     <message>
-        <source>Elapsed</source>
-        <translation>Minęło</translation>
+        <source>Elapsed (first to last packet)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Elapsed capturing</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Section %1</source>
@@ -1093,10 +1047,6 @@
         <translation>Porzucone pakiety</translation>
     </message>
     <message>
-        <source>Dropped events</source>
-        <translation>Porzucone zdarzenia</translation>
-    </message>
-    <message>
         <source>Capture filter</source>
         <translation>Filtr przechwytywania</translation>
     </message>
@@ -1107,10 +1057,6 @@
     <message>
         <source>Packet size limit (snaplen)</source>
         <translation>Limit rozmiaru pakietu (snaplen)</translation>
-    </message>
-    <message>
-        <source>Event size limit (snaplen)</source>
-        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>none</source>
@@ -1165,10 +1111,6 @@
         <translation>Pakiety</translation>
     </message>
     <message>
-        <source>Events</source>
-        <translation>Zdarzenia</translation>
-    </message>
-    <message>
         <source>Time span, s</source>
         <translation>Okres czasu, s</translation>
     </message>
@@ -1179,10 +1121,6 @@
     <message>
         <source>Average packet size, B</source>
         <translation>Średni rozmiar pakietu, B</translation>
-    </message>
-    <message>
-        <source>Average event size, B</source>
-        <translation>Średni rozmiar zdarzenia, B</translation>
     </message>
     <message>
         <source>Bytes</source>
@@ -1201,10 +1139,6 @@
         <translation>Komentarze pakietu</translation>
     </message>
     <message>
-        <source>Event Comments</source>
-        <translation>Komentarze dotyczące zdarzenia</translation>
-    </message>
-    <message>
         <source>&lt;p&gt;Frame %1: </source>
         <translation>&lt;p&gt;Ramka %1: </translation>
     </message>
@@ -1213,14 +1147,6 @@
 
 </source>
         <translation>Stworzony dzięki Wiresharkowi %1</translation>
-    </message>
-    <message>
-        <source>Created by Stratoshark %1
-
-</source>
-        <translation>Utworzono przez Stratoshark %1
-
-</translation>
     </message>
 </context>
 <context>
@@ -1268,6 +1194,17 @@
     <message>
         <source>Manage Capture Filters</source>
         <translation>Zarządzaj filtrami przechwytywania</translation>
+    </message>
+</context>
+<context>
+    <name>CaptureFilterSyntaxWorker</name>
+    <message>
+        <source>Unable to check capture filter</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unable to check capture filter (BPF extensions require a live handle)</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -1452,6 +1389,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Optimize</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Usually a wireless network card will only capture the traffic sent to and from its own network address, and only captures &lt;em&gt;user data&lt;/em&gt; traffic with &amp;quot;fake&amp;quot; Ethernet headers. If you want to capture all traffic that wireless network cards can &amp;quot;see&amp;quot;, or are interested in 802.11 management or control packets, or radio-layer information, mark this option. Monitor mode availability depends on the wireless card and driver. See the Wiki for some more details of capturing packets on WLAN networks.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Zwykle bezprzewodowa karta sieciowa przechwytuje tylko ruch wysyłany do i z jej własnego adresu sieciowego, i tylko przechwytuje ruch &lt;em&gt;danych użytkownika&lt;/em&gt; z &amp;quot;fałszywymi&amp;quot; ruch nagłówkami Ethernet. Jeśli chcesz przechwytywać cały ruch, który karty sieci bezprzewodowej mogą „widzieć”, lub interesują Cię pakiety zarządzania lub kontroli standardu 802.11 albo informacje warstwy radiowej, zaznacz tę opcję. Dostępność trybu monitorowania zależy od karty bezprzewodowej i sterownika. Więcej szczegółów na temat przechwytywania pakietów w sieciach WLAN można znaleźć na Wiki.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
@@ -1628,6 +1569,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Wybierz katalog tymczasowy</translation>
     </message>
     <message>
+        <source>Extcap interface settings</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>%1: %2</source>
         <translation>%1: %2</translation>
     </message>
@@ -1712,6 +1657,26 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The interval between new packet updates. Affects how often the GUI updates and the granularity of timers.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable Aggregation View for real-time capturing</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>This option can only be changed when Aggregation Mode is not active.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Aggregation fields</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Fiedls used for aggregation.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit..</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1978,6 +1943,26 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Copy filter text to the clipboard.</source>
         <translation>Skopiuj filtr do schowka.</translation>
+    </message>
+    <message>
+        <source>No capture filter</source>
+        <translation type="unfinished">Brak filtru przechwytywania</translation>
+    </message>
+    <message>
+        <source>Multiple filters</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Capture filters cannot be compiled for standard input.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Capture filters cannot be compiled for pipes.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Capture filter: %1</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -2257,6 +2242,25 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
+    <name>DataSourceTab</name>
+    <message>
+        <source>Packet bytes</source>
+        <translation type="unfinished">Bajty pakietu</translation>
+    </message>
+    <message>
+        <source>Displays the raw bytes of the selected packet in hexadecimal and ASCII.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Event data</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Displays the raw data of the selected event.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>DecodeAsDialog</name>
     <message>
         <source>Change the dissection behavior for a protocol.</source>
@@ -2420,7 +2424,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Zarządzaj filtrami wyświetlania</translation>
     </message>
     <message>
-        <source>Filter Button Preferences...</source>
+        <source>Filter Button Preferences…</source>
+        <oldsource>Filter Button Preferences...</oldsource>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -3060,6 +3065,17 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
+    <name>ExtArgTable</name>
+    <message>
+        <source>Add custom data</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Custom:</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>ExtcapArgumentFileSelection</name>
     <message>
         <source>Clear</source>
@@ -3090,6 +3106,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Start</translation>
     </message>
     <message>
+        <source>Interface Sub-options</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ok</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Default</source>
         <translation>Domyślnie</translation>
     </message>
@@ -3106,8 +3130,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Nie znaleziono pomocy dla interfejsu extcap %1. Plik: %2</translation>
     </message>
     <message>
-        <source>Save parameter(s) on capture start</source>
-        <translation>Zapisz parametry przy starcie przechwytywania</translation>
+        <source>Save parameters on capture start</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -3304,7 +3328,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 <context>
     <name>FilterExpressionToolBar</name>
     <message>
-        <source>Filter Button Preferences...</source>
+        <source>Filter Button Preferences…</source>
+        <oldsource>Filter Button Preferences...</oldsource>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -3403,6 +3428,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>MAC destination address.</source>
         <translation>Adres docelowy MAC</translation>
+    </message>
+    <message>
+        <source>Save %1 rules as…</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Text file (*.txt);;All Files (</source>
@@ -3635,26 +3664,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         </translation>
     </message>
     <message>
-        <source>Event %1. </source>
-        <translation>Zdarzenie %1.</translation>
-    </message>
-    <message numerus="yes">
-        <source>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;reads&lt;/span&gt;, </source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
-            <numerusform></numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;writes&lt;/span&gt;, </source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
-            <numerusform></numerusform>
-        </translation>
-    </message>
-    <message>
         <source> Click to select.</source>
         <translation>Kliknij by wybrać.</translation>
     </message>
@@ -3685,18 +3694,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>%1 stream not found on the selected packet.</source>
         <translation>Nie znaleziono strumienia %1 w wybranym pakiecie.</translation>
-    </message>
-    <message>
-        <source>Read activity(%6)</source>
-        <translation>Aktywność odczytu(%6)</translation>
-    </message>
-    <message>
-        <source>Write activity(%6)</source>
-        <translation>Aktywność zapisu(%6)</translation>
-    </message>
-    <message>
-        <source>Entire I/O activity (%1)</source>
-        <translation>Cała aktywność we/wy (%1)</translation>
     </message>
     <message>
         <source>Entire conversation (%1)</source>
@@ -4017,6 +4014,45 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
+    <name>HexDataSourceView</name>
+    <message>
+        <source>Allow hover highlighting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show bytes as hexadecimal</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>…as decimal</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>…as octal</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>…as bits</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show text as frame encoding</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show text based on event</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>…as ASCII</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>…as EBCDIC</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>IOConsoleDialog</name>
     <message>
         <source>Dialog</source>
@@ -4025,6 +4061,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Enter code</source>
         <translation>Wprowadź kod</translation>
+    </message>
+    <message>
+        <source>Console</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Evaluate</source>
@@ -4046,87 +4086,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Okno</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;
-
-&lt;h3&gt;Valuable and amazing time-saving keyboard shortcuts&lt;/h3&gt;
-&lt;table&gt;&lt;tbody&gt;
-
-&lt;tr&gt;&lt;th&gt;+&lt;/th&gt;&lt;td&gt;Zoom in&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;-&lt;/th&gt;&lt;td&gt;Zoom out&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;x&lt;/th&gt;&lt;td&gt;Zoom in X axis&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;X&lt;/th&gt;&lt;td&gt;Zoom out X axis&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;y&lt;/th&gt;&lt;td&gt;Zoom in Y axis&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;Y&lt;/th&gt;&lt;td&gt;Zoom out Y axis&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;0&lt;/th&gt;&lt;td&gt;Reset graph to its initial state&lt;/td&gt;&lt;/th&gt;
-
-&lt;tr&gt;&lt;th&gt;→&lt;/th&gt;&lt;td&gt;Move right 10 pixels&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;←&lt;/th&gt;&lt;td&gt;Move left 10 pixels&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;↑&lt;/th&gt;&lt;td&gt;Move up 10 pixels&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;↓&lt;/th&gt;&lt;td&gt;Move down 10 pixels&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;→&lt;/th&gt;&lt;td&gt;Move right 1 pixel&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;←&lt;/th&gt;&lt;td&gt;Move left 1 pixel&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↑&lt;/th&gt;&lt;td&gt;Move up 1 pixel&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↓&lt;/th&gt;&lt;td&gt;Move down 1 pixel&lt;/td&gt;&lt;/th&gt;
-
-&lt;tr&gt;&lt;th&gt;g&lt;/th&gt;&lt;td&gt;Go to packet under cursor&lt;/td&gt;&lt;/th&gt;
-
-&lt;tr&gt;&lt;th&gt;z&lt;/th&gt;&lt;td&gt;Toggle mouse drag / zoom&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;t&lt;/th&gt;&lt;td&gt;Toggle capture / session time origin&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;Space&lt;/th&gt;&lt;td&gt;Toggle crosshairs&lt;/td&gt;&lt;/th&gt;
-
-&lt;/tbody&gt;&lt;/table&gt;
-&lt;/body&gt;&lt;/html&gt;</source>
-        <oldsource>&lt;html&gt;&lt;head/&gt;&lt;body&gt;
-
-&lt;h3&gt;Valuable and amazing time-saving keyboard shortcuts&lt;/h3&gt;
-&lt;table&gt;&lt;tbody&gt;
-
-&lt;tr&gt;&lt;th&gt;+&lt;/th&gt;&lt;td&gt;Zoom in&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;-&lt;/th&gt;&lt;td&gt;Zoom out&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;0&lt;/th&gt;&lt;td&gt;Reset graph to its initial state&lt;/td&gt;&lt;/th&gt;
-
-&lt;tr&gt;&lt;th&gt;→&lt;/th&gt;&lt;td&gt;Move right 10 pixels&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;←&lt;/th&gt;&lt;td&gt;Move left 10 pixels&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;↑&lt;/th&gt;&lt;td&gt;Move up 10 pixels&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;↓&lt;/th&gt;&lt;td&gt;Move down 10 pixels&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;→&lt;/th&gt;&lt;td&gt;Move right 1 pixel&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;←&lt;/th&gt;&lt;td&gt;Move left 1 pixel&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↑&lt;/th&gt;&lt;td&gt;Move up 1 pixel&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↓&lt;/th&gt;&lt;td&gt;Move down 1 pixel&lt;/td&gt;&lt;/th&gt;
-
-&lt;tr&gt;&lt;th&gt;g&lt;/th&gt;&lt;td&gt;Go to packet under cursor&lt;/td&gt;&lt;/th&gt;
-
-&lt;tr&gt;&lt;th&gt;z&lt;/th&gt;&lt;td&gt;Toggle mouse drag / zoom&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;t&lt;/th&gt;&lt;td&gt;Toggle capture / session time origin&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;Space&lt;/th&gt;&lt;td&gt;Toggle crosshairs&lt;/td&gt;&lt;/th&gt;
-
-&lt;/tbody&gt;&lt;/table&gt;
-&lt;/body&gt;&lt;/html&gt;</oldsource>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;
-
-&lt;h3&gt;Przydatne skróty klawiaturowe&lt;/h3&gt;
-&lt;table&gt;&lt;tbody&gt;
-
-&lt;tr&gt;&lt;th&gt;+&lt;/th&gt;&lt;td&gt;Powiększ&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;-&lt;/th&gt;&lt;td&gt;Pomniejsz&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;0&lt;/th&gt;&lt;td&gt;Resetuj wykres do stanu początkowego&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;→&lt;/th&gt;&lt;td&gt;Przesuń w prawo o 10 pikseli&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;←&lt;/th&gt;&lt;td&gt;Przesuń w lewo o 10 pikseli&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;↑&lt;/th&gt;&lt;td&gt;Przesuń w górę o 10 pikseli&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;↓&lt;/th&gt;&lt;td&gt;Move down 10 pixels&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;→&lt;/th&gt;&lt;td&gt;Przesuń w prawo o 1 piksel&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;←&lt;/th&gt;&lt;td&gt;Przesuń w lewo o 1 piksel&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↑&lt;/th&gt;&lt;td&gt;Przesuń w górę o 1 piksel&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↓&lt;/th&gt;&lt;td&gt;Przesuń w dół o 1 piksel&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;g&lt;/th&gt;&lt;td&gt;Przejdź do pakietu pod kursorem&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;z&lt;/th&gt;&lt;td&gt;Przełącz mysz pomiędzy funkcją przeciągnięcia a powiększenia/pomniejszenia&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;t&lt;/th&gt;&lt;td&gt;Przełącz między czasem przechwytywania a sesji&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;Spacja&lt;/th&gt;&lt;td&gt;Przełącz wskaźniki wykresu&lt;/td&gt;&lt;/tr&gt;
-
-&lt;/tbody&gt;&lt;/table&gt;
-&lt;/body&gt;&lt;/html&gt;</translation>
-    </message>
-    <message>
         <source>Add a new graph.</source>
         <translation>Utwórz nowy wykres.</translation>
     </message>
@@ -4135,19 +4094,19 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Wyczyść wszystkie wykresy.</translation>
     </message>
     <message>
-        <source>Remove the selected graph(s).</source>
-        <translation>Usuń wybrany/e wykres(y).</translation>
-    </message>
-    <message>
-        <source>Duplicate the selected graph(s).</source>
+        <source>Remove the selected graphs.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move the selected graph(s) upwards.</source>
+        <source>Duplicate the selected graphs.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Move the selected graph(s) downwards.</source>
+        <source>Move the selected graphs upwards.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the selected graphs downwards.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4185,6 +4144,43 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Automatic update</source>
         <translation>Automatyczna aktualizacja</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;
+
+&lt;h3&gt;Valuable and amazing time-saving keyboard shortcuts&lt;/h3&gt;
+&lt;table&gt;&lt;tbody&gt;
+
+&lt;tr&gt;&lt;th&gt;+&lt;/th&gt;&lt;td&gt;Zoom in&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;-&lt;/th&gt;&lt;td&gt;Zoom out&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;x&lt;/th&gt;&lt;td&gt;Zoom in X axis&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;X&lt;/th&gt;&lt;td&gt;Zoom out X axis&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;y&lt;/th&gt;&lt;td&gt;Zoom in Y axis&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;Y&lt;/th&gt;&lt;td&gt;Zoom out Y axis&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;0&lt;/th&gt;&lt;td&gt;Reset graph to its initial state&lt;/td&gt;&lt;/th&gt;
+
+&lt;tr&gt;&lt;th&gt;→&lt;/th&gt;&lt;td&gt;Move right 10 pixels&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;←&lt;/th&gt;&lt;td&gt;Move left 10 pixels&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;↑&lt;/th&gt;&lt;td&gt;Move up 10 pixels&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;↓&lt;/th&gt;&lt;td&gt;Move down 10 pixels&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;→&lt;/th&gt;&lt;td&gt;Move right 1 pixel&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;←&lt;/th&gt;&lt;td&gt;Move left 1 pixel&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↑&lt;/th&gt;&lt;td&gt;Move up 1 pixel&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↓&lt;/th&gt;&lt;td&gt;Move down 1 pixel&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Alt+&lt;/i&gt;→&lt;/th&gt;&lt;td&gt;Move right 100 pixels&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Alt+&lt;/i&gt;←&lt;/th&gt;&lt;td&gt;Move left 100 pixels&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Alt+&lt;/i&gt;↑&lt;/th&gt;&lt;td&gt;Move up 100 pixels&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Alt+&lt;/i&gt;↓&lt;/th&gt;&lt;td&gt;Move down 100 pixels&lt;/td&gt;&lt;/th&gt;
+
+&lt;tr&gt;&lt;th&gt;g&lt;/th&gt;&lt;td&gt;Go to packet under cursor&lt;/td&gt;&lt;/th&gt;
+
+&lt;tr&gt;&lt;th&gt;z&lt;/th&gt;&lt;td&gt;Toggle mouse drag / zoom&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;t&lt;/th&gt;&lt;td&gt;Toggle capture / session time origin&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;Space&lt;/th&gt;&lt;td&gt;Toggle crosshairs&lt;/td&gt;&lt;/th&gt;
+
+&lt;/tbody&gt;&lt;/table&gt;
+&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Reset Graph</source>
@@ -4282,6 +4278,38 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Shift+Down</source>
         <translation>Shift+w dół</translation>
+    </message>
+    <message>
+        <source>Move Up 100 Pixels</source>
+        <translation type="unfinished">Przesuń w górę o 100 pikseli</translation>
+    </message>
+    <message>
+        <source>Alt+Up</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move Left 100 Pixels</source>
+        <translation type="unfinished">Przesuń w lewo o 10 pikseli {100 ?}</translation>
+    </message>
+    <message>
+        <source>Alt+Left</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move Right 100 Pixels</source>
+        <translation type="unfinished">Przesuń w prawo o 10 pikseli {100 ?}</translation>
+    </message>
+    <message>
+        <source>Alt+Right</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move Down 100 Pixels</source>
+        <translation type="unfinished">Przesuń w dół o 10 pikseli {100 ?}</translation>
+    </message>
+    <message>
+        <source>Alt+Down</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Go To Packet Under Cursor</source>
@@ -4504,24 +4532,16 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>5 min</translation>
     </message>
     <message>
-        <source>Wireshark I/O Graphs: %1</source>
-        <translation>Wireshark wykresy I/O: %1</translation>
+        <source>%1 I/O Graphs: %2</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Filtered packets</source>
         <translation>Filtrowane pakiety</translation>
     </message>
     <message>
-        <source>Filtered events</source>
-        <translation>Filtrowane zdarzenia</translation>
-    </message>
-    <message>
         <source>All packets</source>
         <translation>Wszystkie pakiety</translation>
-    </message>
-    <message>
-        <source>All events</source>
-        <translation>Wszystkie zdarzenia</translation>
     </message>
     <message>
         <source>All Packets</source>
@@ -4532,14 +4552,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Błędy TCP</translation>
     </message>
     <message>
-        <source>All Events</source>
-        <translation>Wszystkie zdarzenia</translation>
-    </message>
-    <message>
-        <source>All Execs</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Hover over the graph for details.</source>
         <translation>Przesuń kursor nad wykresem by zobaczyć szczegóły.</translation>
     </message>
@@ -4548,24 +4560,12 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Brak pakietów w zadanym czasie</translation>
     </message>
     <message>
-        <source>No events in interval</source>
-        <translation>Brak zdarzeń w danym czasie</translation>
-    </message>
-    <message>
         <source>Click to select packet</source>
         <translation>Kliknij by wybrać pakiet</translation>
     </message>
     <message>
         <source>Packet</source>
         <translation>Pakiet</translation>
-    </message>
-    <message>
-        <source>Click to select event</source>
-        <translation>Kliknij, aby wybrać zdarzenie</translation>
-    </message>
-    <message>
-        <source>Event</source>
-        <translation>Zdarzenie</translation>
     </message>
     <message>
         <source>%1 (%2s%3).</source>
@@ -5235,7 +5235,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Obsługiwane pola to data, dir, time, seqno</translation>
     </message>
     <message>
-        <source>Missing capturing group data (use (?&lt;data&gt;(...)) )</source>
+        <source>Missing capturing group data (use (?&lt;data&gt;(…)) )</source>
+        <oldsource>Missing capturing group data (use (?&lt;data&gt;(...)) )</oldsource>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -5459,6 +5460,48 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Capture filter</source>
         <translation>Filtr przechwytywania</translation>
+    </message>
+</context>
+<context>
+    <name>JsonDataSourceView</name>
+    <message>
+        <source>Event JSON</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>KeyboardShortcutsDialog</name>
+    <message>
+        <source>Keyboard Shortcuts</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Search Shortcuts</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Print Shortcutlist</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy</source>
+        <translation type="unfinished">Kopiuj</translation>
+    </message>
+    <message numerus="yes">
+        <source>Copy Row(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>%1 %2</source>
+        <translation type="unfinished">%1 %2</translation>
     </message>
 </context>
 <context>
@@ -6373,6 +6416,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Zawieraj ramki RACH w filtrze</translation>
     </message>
     <message>
+        <source>3GPP Mac Statistics (%1 UEs, %2 frames)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>MAC Statistics</source>
         <translation>Statystyki MAC</translation>
     </message>
@@ -6730,6 +6777,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Statystyki 3GPP RLC</translation>
     </message>
     <message>
+        <source>Launch UL Graph</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Launch DL Graph</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Include SR frames in filter</source>
         <translation>Zawieraj ramki SR w filtrze</translation>
     </message>
@@ -6788,6 +6843,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>DL Missing</source>
         <translation>Brakujące DL</translation>
+    </message>
+    <message>
+        <source>LTE RLC Statistics (%1 UEs, %2 frames)</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>RLC Statistics</source>
@@ -6850,6 +6909,46 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>jest najwyższym poziomem informacji eksperckiej</translation>
     </message>
     <message>
+        <source>Expert information</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Opens the expert information dialog, showing errors, warnings, and other relevant information about the capture.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Capture comment</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Opens the Capture File Properties dialog to view or edit capture-level comments.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Information</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Displays general information, status messages, and expert severity details.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Packet statistics</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Shows the number of captured, displayed, and selected packets.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Configuration profile</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Displays the current configuration profile and allows switching between profiles.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>ERROR</source>
         <translation>BŁĄD</translation>
     </message>
@@ -6900,14 +6999,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Wybrany pakiet: %1 %2</translation>
     </message>
     <message>
-        <source>Selected Event: %1 %2 </source>
-        <translation>Wybrane zdarzenie: %1 %2</translation>
-    </message>
-    <message>
-        <source>Events: %1</source>
-        <translation>Zdarzenie: %1</translation>
-    </message>
-    <message>
         <source> %1 Selected: %2 (%3%)</source>
         <translation> %1 Wybranych: %2 (%3%)</translation>
     </message>
@@ -6937,24 +7028,24 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Brak pakietów</translation>
     </message>
     <message>
-        <source>No Events</source>
-        <translation>Brak zdarzeń</translation>
+        <source>From Zip File…</source>
+        <oldsource>From Zip File...</oldsource>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>From Zip File...</source>
-        <translation>Z pliku ZIP....</translation>
+        <source>From Directory…</source>
+        <oldsource>From Directory...</oldsource>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>From Directory...</source>
-        <translation>Z katalogu...</translation>
+        <source>Selected Personal Profile…</source>
+        <oldsource>Selected Personal Profile...</oldsource>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Selected Personal Profile...</source>
-        <translation>Wybrany profil osobisty...</translation>
-    </message>
-    <message>
-        <source>All Personal Profiles...</source>
-        <translation>Wszystkie profile osobiste...</translation>
+        <source>All Personal Profiles…</source>
+        <oldsource>All Personal Profiles...</oldsource>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Packets: %1</source>
@@ -6980,6 +7071,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>…as %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>The Wireshark Network Analyzer</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6989,6 +7084,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Capturing from %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear Menu</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -7182,8 +7281,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Adres MAC</translation>
     </message>
     <message>
-        <source>Search vendor name using a case-insentitive regular expression.</source>
-        <translation>Wyszukaj nazwę producenta, używając wyrażenia regularnego nieuwzględniającego wielkości liter.</translation>
+        <source>Search vendor name using a case-insensitive regular expression.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Vendor Name</source>
@@ -7227,6 +7326,29 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Vendor Name</source>
         <translation>Nazwa producenta</translation>
+    </message>
+</context>
+<context>
+    <name>MarkerDialog</name>
+    <message>
+        <source>Choose marker:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter new position:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move marker</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Delete marker</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -7454,6 +7576,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Diagram pakietu</translation>
     </message>
     <message>
+        <source>Displays a visual diagram of the selected packet&apos;s fields.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Show Field Values</source>
         <translation>Pokaż wartości pól</translation>
     </message>
@@ -7570,6 +7696,22 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <source>No duplicate keys</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Export a name/value pair for each field with the field value&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Values</source>
+        <translation type="unfinished">Wartości</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Export a name/value pair for each field with the hex bytes of its packet data&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Raw Bytes</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>PacketFormatTextGroupBox</name>
@@ -7652,6 +7794,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 </context>
 <context>
     <name>PacketList</name>
+    <message>
+        <source>Packet list</source>
+        <translation type="unfinished">Lista pakietów</translation>
+    </message>
+    <message>
+        <source>List of captured packets</source>
+        <translation type="unfinished"></translation>
+    </message>
     <message>
         <source>Summary as Text</source>
         <translation>Podsumowanie jako tekst</translation>
@@ -7833,6 +7983,440 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Select a path</source>
         <translation>Wybierz ścieżkę</translation>
+    </message>
+</context>
+<context>
+    <name>Plot</name>
+    <message>
+        <source>Field cannot be empty!</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PlotAction</name>
+    <message>
+        <source>Plot %1 with current filter</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Plot %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PlotDialog</name>
+    <message>
+        <source>Dialog</source>
+        <translation type="unfinished">Okno</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;
+
+&lt;h3&gt;Valuable and amazing time-saving keyboard shortcuts&lt;/h3&gt;
+&lt;table&gt;&lt;tbody&gt;
+
+&lt;tr&gt;&lt;th&gt;+&lt;/th&gt;&lt;td&gt;Zoom in&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;-&lt;/th&gt;&lt;td&gt;Zoom out&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;x&lt;/th&gt;&lt;td&gt;Zoom in X axis&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;X&lt;/th&gt;&lt;td&gt;Zoom out X axis&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;y&lt;/th&gt;&lt;td&gt;Zoom in Y axis&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;Y&lt;/th&gt;&lt;td&gt;Zoom out Y axis&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;0&lt;/th&gt;&lt;td&gt;Reset plot to its initial state&lt;/td&gt;&lt;/th&gt;
+
+&lt;tr&gt;&lt;th&gt;→&lt;/th&gt;&lt;td&gt;Move right 10 pixels&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;←&lt;/th&gt;&lt;td&gt;Move left 10 pixels&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;↑&lt;/th&gt;&lt;td&gt;Move up 10 pixels&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;↓&lt;/th&gt;&lt;td&gt;Move down 10 pixels&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;→&lt;/th&gt;&lt;td&gt;Move right 1 pixel&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;←&lt;/th&gt;&lt;td&gt;Move left 1 pixel&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↑&lt;/th&gt;&lt;td&gt;Move up 1 pixel&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↓&lt;/th&gt;&lt;td&gt;Move down 1 pixel&lt;/td&gt;&lt;/th&gt;
+
+&lt;tr&gt;&lt;th&gt;g&lt;/th&gt;&lt;td&gt;Go to packet under cursor&lt;/td&gt;&lt;/th&gt;
+
+&lt;tr&gt;&lt;th&gt;t&lt;/th&gt;&lt;td&gt;Toggle time origin&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;Space&lt;/th&gt;&lt;td&gt;Toggle crosshairs&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;a&lt;/th&gt;&lt;td&gt;Toggle top axis&lt;/td&gt;&lt;/th&gt;
+
+&lt;/tbody&gt;&lt;/table&gt;
+&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add a new plot.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove the selected plots.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Duplicate the selected plots.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the selected plots upwards.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the selected plots downwards.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear all plots.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Automatic update</source>
+        <translation type="unfinished">Automatyczna aktualizacja</translation>
+    </message>
+    <message>
+        <source>Reset Plot</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reset the plot to its initial state.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>0</source>
+        <translation type="unfinished">0</translation>
+    </message>
+    <message>
+        <source>Zoom In</source>
+        <translation type="unfinished">Powiększ</translation>
+    </message>
+    <message>
+        <source>+</source>
+        <translation type="unfinished">+</translation>
+    </message>
+    <message>
+        <source>Zoom Out</source>
+        <translation type="unfinished">Pomniejsz</translation>
+    </message>
+    <message>
+        <source>-</source>
+        <translation type="unfinished">-</translation>
+    </message>
+    <message>
+        <source>Move Up 10 Pixels</source>
+        <translation type="unfinished">Przesuń w górę o 10 pikseli</translation>
+    </message>
+    <message>
+        <source>Up</source>
+        <translation type="unfinished">W górę</translation>
+    </message>
+    <message>
+        <source>Move Left 10 Pixels</source>
+        <translation type="unfinished">Przesuń w lewo o 10 pikseli</translation>
+    </message>
+    <message>
+        <source>Left</source>
+        <translation type="unfinished">W lewo</translation>
+    </message>
+    <message>
+        <source>Move Right 10 Pixels</source>
+        <translation type="unfinished">Przesuń w prawo o 10 pikseli</translation>
+    </message>
+    <message>
+        <source>Right</source>
+        <translation type="unfinished">W prawo</translation>
+    </message>
+    <message>
+        <source>Move Down 10 Pixels</source>
+        <translation type="unfinished">Przesuń w dół o 10 pikseli</translation>
+    </message>
+    <message>
+        <source>Down</source>
+        <translation type="unfinished">W dół</translation>
+    </message>
+    <message>
+        <source>Move Up 1 Pixel</source>
+        <translation type="unfinished">Przesuń w górę o 1 piksel</translation>
+    </message>
+    <message>
+        <source>Shift+Up</source>
+        <translation type="unfinished">Shift+w górę</translation>
+    </message>
+    <message>
+        <source>Move Left 1 Pixel</source>
+        <translation type="unfinished">Przesuń w lewo o 1 piksel</translation>
+    </message>
+    <message>
+        <source>Shift+Left</source>
+        <translation type="unfinished">Shift+w lewo</translation>
+    </message>
+    <message>
+        <source>Move Right 1 Pixel</source>
+        <translation type="unfinished">Przesuń w prawo o 1 piksel</translation>
+    </message>
+    <message>
+        <source>Shift+Right</source>
+        <translation type="unfinished">Shift+w prawo</translation>
+    </message>
+    <message>
+        <source>Move Down 1 Pixel</source>
+        <translation type="unfinished">Przesuń w dół o 1 piksel</translation>
+    </message>
+    <message>
+        <source>Move down 1 Pixel</source>
+        <translation type="unfinished">Przesuń w dół o 1 piksel</translation>
+    </message>
+    <message>
+        <source>Shift+Down</source>
+        <translation type="unfinished">Shift+w dół</translation>
+    </message>
+    <message>
+        <source>Go To Packet Under Cursor</source>
+        <translation type="unfinished">Przejdź do pakietu pod kursorem</translation>
+    </message>
+    <message>
+        <source>Go to packet currently under the cursor</source>
+        <translation type="unfinished">Przejdź do pakietu pod kursorem</translation>
+    </message>
+    <message>
+        <source>G</source>
+        <translation type="unfinished">G</translation>
+    </message>
+    <message>
+        <source>Time origin</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle between time relative to first data point and time relative to capture start</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>T</source>
+        <translation type="unfinished">T</translation>
+    </message>
+    <message>
+        <source>Log scale</source>
+        <translation type="unfinished">Skala logarytmiczna</translation>
+    </message>
+    <message>
+        <source>Toggle Y-axis between logarithmic and linear scale</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Crosshairs</source>
+        <translation type="unfinished">Wskaźniki</translation>
+    </message>
+    <message>
+        <source>Toggle crosshairs</source>
+        <translation type="unfinished">Przełącz wskaźnik wykresu</translation>
+    </message>
+    <message>
+        <source>Space</source>
+        <translation type="unfinished">Spacja</translation>
+    </message>
+    <message>
+        <source>Top axis</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle top axis on and off</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A</source>
+        <translation type="unfinished">A</translation>
+    </message>
+    <message>
+        <source>Legend</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle legend</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Zoom In X Axis</source>
+        <translation type="unfinished">Zwiększ zakres osi X</translation>
+    </message>
+    <message>
+        <source>X</source>
+        <translation type="unfinished">X</translation>
+    </message>
+    <message>
+        <source>Zoom Out X Axis</source>
+        <translation type="unfinished">Zmniejsz zakres osi X</translation>
+    </message>
+    <message>
+        <source>Shift+X</source>
+        <translation type="unfinished">Shift+X</translation>
+    </message>
+    <message>
+        <source>Zoom In Y Axis</source>
+        <translation type="unfinished">Zwiększ zakres osi Y</translation>
+    </message>
+    <message>
+        <source>Y</source>
+        <translation type="unfinished">Y</translation>
+    </message>
+    <message>
+        <source>Zoom Out Y Axis</source>
+        <translation type="unfinished">Zmniejsz zakres osi Y</translation>
+    </message>
+    <message>
+        <source>Shift+Y</source>
+        <translation type="unfinished">Shift+Y</translation>
+    </message>
+    <message>
+        <source>Add Marker</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move Marker</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show Pos Marker</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show Markers Difference</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Delete Marker</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Delete All</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show Markers DataPoints</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Auto Scroll</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Multiple Value Axes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Plots</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Save As…</source>
+        <translation type="unfinished">Zapisz jako...</translation>
+    </message>
+    <message>
+        <source>Copy</source>
+        <translation type="unfinished">Kopiuj</translation>
+    </message>
+    <message>
+        <source>Copy plots from another profile.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Markers</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Filtered packets</source>
+        <translation type="unfinished">Filtrowane pakiety</translation>
+    </message>
+    <message>
+        <source>All packets</source>
+        <translation type="unfinished">Wszystkie pakiety</translation>
+    </message>
+    <message>
+        <source>Seq. num.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Frame num.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Release to zoom, x = %1 to %2, y = %3 to %4</source>
+        <translation type="unfinished">Powiększenie, x = %1 do %2, y = %3 do %4</translation>
+    </message>
+    <message>
+        <source>Unable to select range.</source>
+        <translation type="unfinished">Niemożna wybrać danego zakresu.</translation>
+    </message>
+    <message>
+        <source>Select a plot for details.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Click to select packet</source>
+        <translation type="unfinished">Kliknij by wybrać pakiet</translation>
+    </message>
+    <message>
+        <source>%1 Plots: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Packet</source>
+        <translation type="unfinished">Pakiet</translation>
+    </message>
+    <message>
+        <source>%1 (%2s%3).</source>
+        <translation type="unfinished">%1 (%2s%3).</translation>
+    </message>
+    <message>
+        <source>Move to top left</source>
+        <translation type="unfinished">Przesuń w górny lewy róg</translation>
+    </message>
+    <message>
+        <source>Move to top center</source>
+        <translation type="unfinished">Przesuń na górny środek</translation>
+    </message>
+    <message>
+        <source>Move to top right</source>
+        <translation type="unfinished">Przesuń w górny prawy róg</translation>
+    </message>
+    <message>
+        <source>Move to bottom left</source>
+        <translation type="unfinished">Przesuń w dolny lewy róg</translation>
+    </message>
+    <message>
+        <source>Move to bottom center</source>
+        <translation type="unfinished">Przesuń na dolny środek</translation>
+    </message>
+    <message>
+        <source>Move to bottom right</source>
+        <translation type="unfinished">Przesuń w dolny prawy róg</translation>
+    </message>
+    <message>
+        <source>Time (s)</source>
+        <translation type="unfinished">Czas (s)</translation>
+    </message>
+    <message>
+        <source>relative to capture start</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>relative to first data point</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Portable Document Format (*.pdf)</source>
+        <translation type="unfinished">Dokument PDF (*.pdf)</translation>
+    </message>
+    <message>
+        <source>Portable Network Graphics (*.png)</source>
+        <translation type="unfinished">Obraz PNG (*.png)</translation>
+    </message>
+    <message>
+        <source>Windows Bitmap (*.bmp)</source>
+        <translation type="unfinished">Bitmapa Windows (*.bmp)</translation>
+    </message>
+    <message>
+        <source>JPEG File Interchange Format (*.jpeg *.jpg)</source>
+        <translation type="unfinished">Obraz JPEG (*.jpeg *.jpg)</translation>
+    </message>
+    <message>
+        <source>Save Graph As…</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -8072,10 +8656,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Konfiguracja profili</translation>
     </message>
     <message>
-        <source>Auto switch event limit</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Import</source>
         <comment>noun</comment>
         <translation>Importuj</translation>
@@ -8086,24 +8666,28 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Eksportuj</translation>
     </message>
     <message>
-        <source>From Zip File...</source>
-        <translation>Z pliku ZIP....</translation>
+        <source>From Zip File…</source>
+        <oldsource>From Zip File...</oldsource>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>From Directory...</source>
-        <translation>Z katalogu...</translation>
+        <source>From Directory…</source>
+        <oldsource>From Directory...</oldsource>
+        <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <source>%Ln Selected Personal Profile(s)...</source>
-        <translation>
-            <numerusform>%Ln wybrany profil osobisty...</numerusform>
-            <numerusform>%Ln wybrane profile osobiste...</numerusform>
-            <numerusform>%Ln wybranych profili osobistych...</numerusform>
+        <source>%Ln Selected Personal Profile(s)…</source>
+        <oldsource>%Ln Selected Personal Profile(s)...</oldsource>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>
-        <source>All Personal Profiles...</source>
-        <translation>Wszystkie profile osobiste...</translation>
+        <source>All Personal Profiles…</source>
+        <oldsource>All Personal Profiles...</oldsource>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>New profile</source>
@@ -8355,12 +8939,40 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <source>Loading</source>
         <translation>Wczytywanie</translation>
     </message>
+    <message>
+        <source>Task progress</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Shows the progress of the current background task.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Progress bar</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Shows the percentage of the task that has been completed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Stop</source>
+        <translation type="unfinished">Zatrzymaj</translation>
+    </message>
+    <message>
+        <source>Stops the current background task.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>ProtoTree</name>
     <message>
         <source>Packet details</source>
         <translation>Szczegóły pakietu</translation>
+    </message>
+    <message>
+        <source>Tree view of the selected packet&apos;s fields</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Not a field or protocol</source>
@@ -9120,6 +9732,38 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <source>Unacked (Outstanding) Bytes</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Dissector</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>File Type</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Codec</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Analysis</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tap Listener</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Display Filter</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>User Interface</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>not found</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>QObject::QObject::QObject</name>
@@ -9640,9 +10284,13 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <source>Stream %1 Delta</source>
         <translation type="unfinished"></translation>
     </message>
-    <message>
-        <source> %1 streams, </source>
-        <translation>%1 strumieni.</translation>
+    <message numerus="yes">
+        <source> %Ln stream(s), </source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
     </message>
     <message>
         <source>Save one stream CSV</source>
@@ -9655,10 +10303,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>&amp;Analyze</source>
         <translation>&amp;Analiza</translation>
-    </message>
-    <message>
-        <source>Open the analysis window for the selected stream(s)</source>
-        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>&amp;Set List</source>
@@ -9674,6 +10318,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Replace existing list in RTP Analysis Dialog with new one</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Open the analysis window for the selected stream(s)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -9761,8 +10409,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Przygotuj filtr</translation>
     </message>
     <message>
-        <source>Prepare a filter matching the selected stream(s).</source>
-        <translation type="unfinished">Przygotuj filtr dla zaznaczonych strumieni.</translation>
+        <source>Prepare a filter matching the selected streams.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>&amp;Current Tab</source>
@@ -9952,6 +10600,18 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Czas dnia</translation>
     </message>
     <message>
+        <source>Visual Sample Rate:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Adjust the sampling rate used for the waveform display. Higher values display higher frequency harmonics but take additional processing time. Values between 1 kHz and 48 kHz are supported.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> Hz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>&amp;Export</source>
         <translation>&amp;Eksportuj</translation>
     </message>
@@ -10120,8 +10780,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Przygotuj &amp;filtr</translation>
     </message>
     <message>
-        <source>Prepare a filter matching the selected stream(s).</source>
-        <translation type="unfinished">Przygotuj filtr dla zaznaczonych strumieni.</translation>
+        <source>Prepare a filter matching the selected streams.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>R&amp;efresh streams</source>
@@ -10248,8 +10908,9 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Brak Audio</translation>
     </message>
     <message>
-        <source>Decoding streams...</source>
-        <translation>Dekodowanie strumieni...</translation>
+        <source>Decoding streams…</source>
+        <oldsource>Decoding streams...</oldsource>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Out of Sequence</source>
@@ -10271,9 +10932,13 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <source>Double click on cell to change audio routing</source>
         <translation type="unfinished"></translation>
     </message>
-    <message>
-        <source>%1 streams</source>
-        <translation>%1 strumieni</translation>
+    <message numerus="yes">
+        <source>%Ln stream(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
     </message>
     <message>
         <source>, %1 selected</source>
@@ -10298,6 +10963,11 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Automatic</source>
         <translation>Automatycznie</translation>
+    </message>
+    <message>
+        <source>Resampling waveform…</source>
+        <oldsource>Resampling waveform...</oldsource>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>WAV (*.wav)</source>
@@ -10360,8 +11030,9 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Preparing to play...</source>
-        <translation>Przygotowywanie do odtworzenia...</translation>
+        <source>Preparing to play…</source>
+        <oldsource>Preparing to play...</oldsource>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Unknown</source>
@@ -10463,7 +11134,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>&amp;Analiza</translation>
     </message>
     <message>
-        <source>Open the analysis window for the selected stream(s) and add it to it</source>
+        <source>Open the analysis window for the selected streams and add it to it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -10519,8 +11190,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Zaznacz pakiety</translation>
     </message>
     <message>
-        <source>Mark the packets of the selected stream(s).</source>
-        <translation>Zaznacz pakiety wybranych strumieni.</translation>
+        <source>Mark the packets of the selected streams.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>M</source>
@@ -10563,8 +11234,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>G</translation>
     </message>
     <message>
-        <source>Prepare a filter matching the selected stream(s).</source>
-        <translation>Przygotuj filtr dla zaznaczonych strumieni.</translation>
+        <source>Prepare a filter matching the selected streams.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>P</source>
@@ -10622,13 +11293,21 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <source>as YAML</source>
         <translation>jako YAML</translation>
     </message>
-    <message>
-        <source>%1 streams</source>
-        <translation>%1 strumieni</translation>
+    <message numerus="yes">
+        <source>%Ln stream(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
     </message>
-    <message>
-        <source>, %1 selected, %2 total packets</source>
-        <translation>, %1 zaznaczonych, %2 wszystkich pakietów</translation>
+    <message numerus="yes">
+        <source>, %1 selected, %Ln total packet(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
     </message>
     <message>
         <source>Save RTPDump As…</source>
@@ -11166,22 +11845,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Invalid filter.</source>
         <translation>Błędny filtr.</translation>
-    </message>
-    <message>
-        <source>Event List</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Event Details</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Event Bytes</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Search the Info column of the event list (summary pane), decoded event display labels (tree view pane) or the ASCII-converted event data (hex view pane).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>That filter doesn&apos;t test anything.</source>
@@ -11768,6 +12431,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 <context>
     <name>ShowPacketBytesTextEdit</name>
     <message>
+        <source>&lt;html&gt;Mouse byte selection is enabled when&lt;p&gt;&quot;Decode as&quot; = None&lt;p&gt;AND&lt;p&gt;&quot;Show as&quot; = ASCII, ASCII &amp; Control, EBCDIC or Raw&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Show Selected</source>
         <translation>Pokaż wybrane</translation>
     </message>
@@ -11924,119 +12591,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Dialog</source>
         <translation>Okno</translation>
-    </message>
-    <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;
-
-&lt;h3&gt;Valuable and amazing time-saving keyboard shortcuts&lt;/h3&gt;
-&lt;table&gt;&lt;tbody&gt;
-
-&lt;tr&gt;&lt;th&gt;+&lt;/th&gt;&lt;td&gt;Zoom in&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;-&lt;/th&gt;&lt;td&gt;Zoom out&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;x&lt;/th&gt;&lt;td&gt;Zoom in X axis&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;X&lt;/th&gt;&lt;td&gt;Zoom out X axis&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;y&lt;/th&gt;&lt;td&gt;Zoom in Y axis&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;Y&lt;/th&gt;&lt;td&gt;Zoom out Y axis&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;0&lt;/th&gt;&lt;td&gt;Reset graph to its initial state&lt;/td&gt;&lt;/th&gt;
-
-&lt;tr&gt;&lt;th&gt;→&lt;/th&gt;&lt;td&gt;Move right 10 pixels&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;←&lt;/th&gt;&lt;td&gt;Move left 10 pixels&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;↑&lt;/th&gt;&lt;td&gt;Move up 10 pixels&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;↓&lt;/th&gt;&lt;td&gt;Move down 10 pixels&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;→&lt;/th&gt;&lt;td&gt;Move right 1 pixel&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;←&lt;/th&gt;&lt;td&gt;Move left 1 pixel&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↑&lt;/th&gt;&lt;td&gt;Move up 1 pixel&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↓&lt;/th&gt;&lt;td&gt;Move down 1 pixel&lt;/td&gt;&lt;/th&gt;
-
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Pg Up&lt;/i&gt;&lt;/th&gt;&lt;td&gt;Next stream&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Pg Dn&lt;/i&gt;&lt;/th&gt;&lt;td&gt;Previous stream&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;d&lt;/th&gt;&lt;td&gt;Switch direction (swap TCP endpoints)&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;g&lt;/th&gt;&lt;td&gt;Go to packet under cursor&lt;/td&gt;&lt;/th&gt;
-
-&lt;tr&gt;&lt;th&gt;z&lt;/th&gt;&lt;td&gt;Toggle mouse drag / zoom&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;s&lt;/th&gt;&lt;td&gt;Toggle relative / absolute sequence numbers&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;t&lt;/th&gt;&lt;td&gt;Toggle capture / session time origin&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;Space&lt;/th&gt;&lt;td&gt;Toggle crosshairs&lt;/td&gt;&lt;/th&gt;
-
-&lt;tr&gt;&lt;th&gt;1&lt;/th&gt;&lt;td&gt;Round Trip Time graph&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;2&lt;/th&gt;&lt;td&gt;Throughput graph&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;3&lt;/th&gt;&lt;td&gt;Stevens-style Time / Sequence graph&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;4&lt;/th&gt;&lt;td&gt;tcptrace-style Time / Sequence graph&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;5&lt;/th&gt;&lt;td&gt;Window Scaling graph&lt;/td&gt;&lt;/th&gt;
-
-&lt;/tbody&gt;&lt;/table&gt;
-&lt;/body&gt;&lt;/html&gt;</source>
-        <oldsource>&lt;html&gt;&lt;head/&gt;&lt;body&gt;
-
-&lt;h3&gt;Valuable and amazing time-saving keyboard shortcuts&lt;/h3&gt;
-&lt;table&gt;&lt;tbody&gt;
-
-&lt;tr&gt;&lt;th&gt;+&lt;/th&gt;&lt;td&gt;Zoom in&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;-&lt;/th&gt;&lt;td&gt;Zoom out&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;0&lt;/th&gt;&lt;td&gt;Reset graph to its initial state&lt;/td&gt;&lt;/th&gt;
-
-&lt;tr&gt;&lt;th&gt;→&lt;/th&gt;&lt;td&gt;Move right 10 pixels&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;←&lt;/th&gt;&lt;td&gt;Move left 10 pixels&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;↑&lt;/th&gt;&lt;td&gt;Move up 10 pixels&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;↓&lt;/th&gt;&lt;td&gt;Move down 10 pixels&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;→&lt;/th&gt;&lt;td&gt;Move right 1 pixel&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;←&lt;/th&gt;&lt;td&gt;Move left 1 pixel&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↑&lt;/th&gt;&lt;td&gt;Move up 1 pixel&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↓&lt;/th&gt;&lt;td&gt;Move down 1 pixel&lt;/td&gt;&lt;/th&gt;
-
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Pg Up&lt;/i&gt;&lt;/th&gt;&lt;td&gt;Next stream&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Pg Dn&lt;/i&gt;&lt;/th&gt;&lt;td&gt;Previous stream&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;d&lt;/th&gt;&lt;td&gt;Switch direction (swap TCP endpoints)&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;g&lt;/th&gt;&lt;td&gt;Go to packet under cursor&lt;/td&gt;&lt;/th&gt;
-
-&lt;tr&gt;&lt;th&gt;z&lt;/th&gt;&lt;td&gt;Toggle mouse drag / zoom&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;s&lt;/th&gt;&lt;td&gt;Toggle relative / absolute sequence numbers&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;t&lt;/th&gt;&lt;td&gt;Toggle capture / session time origin&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;Space&lt;/th&gt;&lt;td&gt;Toggle crosshairs&lt;/td&gt;&lt;/th&gt;
-
-&lt;tr&gt;&lt;th&gt;1&lt;/th&gt;&lt;td&gt;Round Trip Time graph&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;2&lt;/th&gt;&lt;td&gt;Throughput graph&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;3&lt;/th&gt;&lt;td&gt;Stevens-style Time / Sequence graph&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;4&lt;/th&gt;&lt;td&gt;tcptrace-style Time / Sequence graph&lt;/td&gt;&lt;/th&gt;
-&lt;tr&gt;&lt;th&gt;5&lt;/th&gt;&lt;td&gt;Window Scaling graph&lt;/td&gt;&lt;/th&gt;
-
-&lt;/tbody&gt;&lt;/table&gt;
-&lt;/body&gt;&lt;/html&gt;</oldsource>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;
-
-&lt;h3&gt;Przydatne skróty klawiaturowe&lt;/h3&gt;
-&lt;table&gt;&lt;tbody&gt;
-
-&lt;tr&gt;&lt;th&gt;+&lt;/th&gt;&lt;td&gt;Powiększ&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;-&lt;/th&gt;&lt;td&gt;Pomniejsz&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;0&lt;/th&gt;&lt;td&gt;Resetuj wykres do stanu początkowego&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;→&lt;/th&gt;&lt;td&gt;Przesuń w prawo o 10 pikseli&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;←&lt;/th&gt;&lt;td&gt;Przesuń w lewo o 10 pikseli&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;↑&lt;/th&gt;&lt;td&gt;Przesuń w górę o 10 pikseli&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;↓&lt;/th&gt;&lt;td&gt;Move down 10 pixels&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;→&lt;/th&gt;&lt;td&gt;Przesuń w prawo o 1 piksel&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;←&lt;/th&gt;&lt;td&gt;Przesuń w lewo o 1 piksel&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↑&lt;/th&gt;&lt;td&gt;Przesuń w górę o 1 piksel&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↓&lt;/th&gt;&lt;td&gt;Przesuń w dół o 1 piksel&lt;/td&gt;&lt;/tr&gt;
-
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Pg Up&lt;/i&gt;&lt;/th&gt;&lt;td&gt;Następny strumień&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;&lt;i&gt;Pg Dn&lt;/i&gt;&lt;/th&gt;&lt;td&gt;Poprzedni strumień&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;d&lt;/th&gt;&lt;td&gt;Przełącz kierunki (zamień miejscami punkty krańcowe TCP)&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;g&lt;/th&gt;&lt;td&gt;Przejdź do pakietu pod kursorem&lt;/td&gt;&lt;/tr&gt;
-
-&lt;tr&gt;&lt;th&gt;z&lt;/th&gt;&lt;td&gt;Przełącz mysz pomiędzy funkcją przeciągnięcia a powiększenia/pomniejszenia&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;s&lt;/th&gt;&lt;td&gt;Przełącz numery sekwencyjne pomiędzy relatywnymi a absolutnymi&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;t&lt;/th&gt;&lt;td&gt;Przełącz między czasem przechwytywania a sesji&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;Space&lt;/th&gt;&lt;td&gt;Przełącz wskaźniki wykresu&lt;/td&gt;&lt;/tr&gt;
-
-&lt;tr&gt;&lt;th&gt;1&lt;/th&gt;&lt;td&gt;Wykres czasu podróży&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;2&lt;/th&gt;&lt;td&gt;Wykres przepusowości&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;3&lt;/th&gt;&lt;td&gt;Wykres czasu/sekwencji Stevensa&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;4&lt;/th&gt;&lt;td&gt;Wykres w stylu czasu/sekwencji programu tcptrace&lt;/td&gt;&lt;/tr&gt;
-&lt;tr&gt;&lt;th&gt;5&lt;/th&gt;&lt;td&gt;Wykres okna skalowania&lt;/td&gt;&lt;/tr&gt;
-
-&lt;/tbody&gt;&lt;/table&gt;
-&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>&lt;small&gt;&lt;i&gt;Mouse over for shortcuts&lt;/i&gt;&lt;/small&gt;</source>
@@ -12300,6 +12854,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Z</translation>
     </message>
     <message>
+        <source>Legend</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle legend</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Relative / Absolute Sequence Numbers</source>
         <translation>Relatywne/Absolutne numery sekwencyjne</translation>
     </message>
@@ -12322,6 +12884,18 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>T</source>
         <translation>T</translation>
+    </message>
+    <message>
+        <source>Axis SI Units</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle axis SI units</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>U</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Crosshairs</source>
@@ -12350,6 +12924,50 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Throughput</source>
         <translation>Przepustowość</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;
+
+&lt;h3&gt;Valuable and amazing time-saving keyboard shortcuts&lt;/h3&gt;
+&lt;table&gt;&lt;tbody&gt;
+
+&lt;tr&gt;&lt;th&gt;+&lt;/th&gt;&lt;td&gt;Zoom in&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;-&lt;/th&gt;&lt;td&gt;Zoom out&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;x&lt;/th&gt;&lt;td&gt;Zoom in X axis&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;X&lt;/th&gt;&lt;td&gt;Zoom out X axis&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;y&lt;/th&gt;&lt;td&gt;Zoom in Y axis&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;Y&lt;/th&gt;&lt;td&gt;Zoom out Y axis&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;0&lt;/th&gt;&lt;td&gt;Reset graph to its initial state&lt;/td&gt;&lt;/th&gt;
+
+&lt;tr&gt;&lt;th&gt;→&lt;/th&gt;&lt;td&gt;Move right 10 pixels&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;←&lt;/th&gt;&lt;td&gt;Move left 10 pixels&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;↑&lt;/th&gt;&lt;td&gt;Move up 10 pixels&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;↓&lt;/th&gt;&lt;td&gt;Move down 10 pixels&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;→&lt;/th&gt;&lt;td&gt;Move right 1 pixel&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;←&lt;/th&gt;&lt;td&gt;Move left 1 pixel&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↑&lt;/th&gt;&lt;td&gt;Move up 1 pixel&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Shift+&lt;/i&gt;↓&lt;/th&gt;&lt;td&gt;Move down 1 pixel&lt;/td&gt;&lt;/th&gt;
+
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Pg Up&lt;/i&gt;&lt;/th&gt;&lt;td&gt;Next stream&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;&lt;i&gt;Pg Dn&lt;/i&gt;&lt;/th&gt;&lt;td&gt;Previous stream&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;d&lt;/th&gt;&lt;td&gt;Switch direction (swap TCP endpoints)&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;g&lt;/th&gt;&lt;td&gt;Go to packet under cursor&lt;/td&gt;&lt;/th&gt;
+
+&lt;tr&gt;&lt;th&gt;z&lt;/th&gt;&lt;td&gt;Toggle mouse drag / zoom&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;s&lt;/th&gt;&lt;td&gt;Toggle relative / absolute sequence numbers&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;t&lt;/th&gt;&lt;td&gt;Toggle capture / session time origin&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;u&lt;/th&gt;&lt;td&gt;Toggle axis SI units&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;Space&lt;/th&gt;&lt;td&gt;Toggle crosshairs&lt;/td&gt;&lt;/th&gt;
+
+&lt;tr&gt;&lt;th&gt;1&lt;/th&gt;&lt;td&gt;Round Trip Time graph&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;2&lt;/th&gt;&lt;td&gt;Throughput graph&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;3&lt;/th&gt;&lt;td&gt;Stevens-style Time / Sequence graph&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;4&lt;/th&gt;&lt;td&gt;tcptrace-style Time / Sequence graph&lt;/td&gt;&lt;/th&gt;
+&lt;tr&gt;&lt;th&gt;5&lt;/th&gt;&lt;td&gt;Window Scaling graph&lt;/td&gt;&lt;/th&gt;
+
+&lt;/tbody&gt;&lt;/table&gt;
+&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Switch to the Throughput graph</source>
@@ -12460,6 +13078,42 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Shift+Y</translation>
     </message>
     <message>
+        <source>Segments</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>ACK</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Dup ACKs</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>SACK</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Most recent SACK</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>SACK 2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Subsequent SACKs</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Receive Window</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Zero Window</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Save As…</source>
         <translation>Zapisz jako...</translation>
     </message>
@@ -12494,6 +13148,30 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source> for %1:%2 %3 %4:%5</source>
         <translation> dla %1:%2 %3 %4:%5</translation>
+    </message>
+    <message>
+        <source>Move to top left</source>
+        <translation type="unfinished">Przesuń w górny lewy róg</translation>
+    </message>
+    <message>
+        <source>Move to top center</source>
+        <translation type="unfinished">Przesuń na górny środek</translation>
+    </message>
+    <message>
+        <source>Move to top right</source>
+        <translation type="unfinished">Przesuń w górny prawy róg</translation>
+    </message>
+    <message>
+        <source>Move to bottom left</source>
+        <translation type="unfinished">Przesuń w dolny lewy róg</translation>
+    </message>
+    <message>
+        <source>Move to bottom center</source>
+        <translation type="unfinished">Przesuń na dolny środek</translation>
+    </message>
+    <message>
+        <source>Move to bottom right</source>
+        <translation type="unfinished">Przesuń w dolny prawy róg</translation>
     </message>
     <message>
         <source>%1 %2 (%3s len %4 seq %5 ack %6 win %7)</source>
@@ -12741,6 +13419,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Rozwiązywanie nazw</translation>
     </message>
     <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Display exact numbers instead of rounding with SI prefixes. (Exact numbers always used when sorting.)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Display raw data</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Only show conversations matching the current display filter&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pokazuj tylko konwersacje pasujące do filtru&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
@@ -12963,7 +13649,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Show flow sequence for selected call(s).</source>
+        <source>Show flow sequence for selected calls.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -12971,7 +13657,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Przygotuj &amp;filtr</translation>
     </message>
     <message>
-        <source>Prepare a filter matching the selected calls(s).</source>
+        <source>Prepare a filter matching the selected calls.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -13149,6 +13835,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Pliki przechwytywania, które były uprzednio używane</translation>
     </message>
     <message>
+        <source>Capture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Capture live packets from your network.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Przechwytuj pakiety.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
@@ -13208,7 +13898,7 @@ a:hover {
 
 &lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
 
-&lt;th&gt;&lt;a href=&quot;https://discord.com/invite/ts9GZCjGj5&quot;&gt;Wireshark Discord&lt;/a&gt;&lt;/th&gt;
+&lt;th&gt;&lt;a href=&quot;https://discord.gg/fT2jvkawGj&quot;&gt;Wireshark Discord&lt;/a&gt;&lt;/th&gt;
 
 &lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
 
@@ -13216,49 +13906,7 @@ a:hover {
 
 &lt;/tr&gt;&lt;/table&gt;
 &lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head&gt;
-&lt;style&gt;
-a:link {
-  color: palette(text);
-  text-decoration: none;
-}
-a:hover {
-  color: palette(text);
-  text-decoration: underline;
-}
-&lt;/style&gt;
-&lt;/head&gt;
-&lt;body&gt;
-
-&lt;table&gt;&lt;tr&gt;
-&lt;th&gt;&lt;a href=&quot;https://www.wireshark.org/docs/wsug_html_chunked/&quot;&gt;Podręcznik użytkownika&lt;/a&gt;&lt;/th&gt;
-
-&lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
-
-&lt;th&gt;&lt;a href=&quot;https://gitlab.com/wireshark/wireshark/-/wikis/&quot;&gt;Wiki&lt;/a&gt;&lt;/th&gt;
-
-&lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
-
-&lt;th&gt;&lt;a href=&quot;https://ask.wireshark.org/&quot;&gt;Q&amp;A - Pytania i odpowiedzi&lt;/a&gt;&lt;/th&gt;
-
-&lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
-
-&lt;th&gt;&lt;a href=&quot;https://www.wireshark.org/lists/&quot;&gt;Listy mailingowe&lt;/a&gt;&lt;/th&gt;
-
-&lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
-
-&lt;th&gt;&lt;a href=&quot;https://sharkfest.wireshark.org/&quot;&gt;SharkFest&lt;/a&gt;&lt;/th&gt;
-
-&lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
-
-&lt;th&gt;&lt;a href=&quot;https://discord.com/invite/ts9GZCjGj5&quot;&gt;Wireshark na Discord&lt;/a&gt;&lt;/th&gt;
-
-&lt;td style=&quot;padding-left: 8px; padding-right: 8px;&quot;&gt;·&lt;/td&gt;
-
-&lt;th&gt;&lt;a href=&quot;https://wiresharkfoundation.org/donate/&quot;&gt;Donacja&lt;/a&gt;&lt;/th&gt;
-
-&lt;/tr&gt;&lt;/table&gt;
-&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Show in Finder</source>
@@ -13289,14 +13937,6 @@ a:hover {
         <translation>Dzięki Wiresharkowi podglądasz fundamenty współczesnego  Internetu.</translation>
     </message>
     <message>
-        <source>You are sniffing the glue that holds your system together using Stratoshark </source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>You are running Stratoshark </source>
-        <translation>Używasz programu Stratoshark</translation>
-    </message>
-    <message>
         <source>You are running Wireshark </source>
         <translation>Używasz Wireshark </translation>
     </message>
@@ -13307,10 +13947,6 @@ a:hover {
     <message>
         <source> You have disabled automatic updates.</source>
         <translation>Automatyczne aktualizacje są wyłączone.</translation>
-    </message>
-    <message>
-        <source>not found</source>
-        <translation>nie znaleziono</translation>
     </message>
     <message>
         <source>Copy file path</source>
@@ -13330,6 +13966,14 @@ a:hover {
     <message>
         <source>Interface</source>
         <translation>Interfejs</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Set the 802.11 band.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Band</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Set the 802.11 channel.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
@@ -14586,12 +15230,72 @@ a:hover {
         <translation>&amp;Opcje…</translation>
     </message>
     <message>
+        <source>Allows jumping to a specific packet by its number.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Search packet</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Allows searching for packets based on different criteria like display filters or text.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit Address</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Allows editing address resolution information for the current capture.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit Column</source>
+        <translation type="unfinished">Edytuj kolumnę</translation>
+    </message>
+    <message>
+        <source>Allows adding, removing, or modifying columns in the packet list.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit Preference</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Allows changing protocol or application preferences.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit Filter Expression</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Allows creating or editing display filter buttons.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>&amp;3GPP Uu</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>&amp;Wireless</source>
         <translation>Bezprze&amp;wodowe</translation>
+    </message>
+    <message>
+        <source>Contains buttons for common actions like starting a capture or opening a file.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Status Bar</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Shows information about the current capture file and application state.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Contains the display filter edit box and expression buttons.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>&amp;User&apos;s Guide</source>
@@ -14624,6 +15328,10 @@ a:hover {
     <message>
         <source>Go to the last packet in this conversation</source>
         <translation>Przejdź do ostatniego pakietu w tej konwersacji</translation>
+    </message>
+    <message>
+        <source>Redissect Packets</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Capture &amp;Filters…</source>
@@ -14710,6 +15418,14 @@ a:hover {
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Inject ESP Secrets</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Embed used ESP secrets in the capture file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Discard All Secrets</source>
         <translation type="unfinished"></translation>
     </message>
@@ -14746,6 +15462,14 @@ a:hover {
         <translation>Sekwencja żądań HTTP</translation>
     </message>
     <message>
+        <source>&amp;BPv7</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>BPv7 PDU and block statistics</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>E2AP</source>
         <translation>E2AP</translation>
     </message>
@@ -14764,6 +15488,14 @@ a:hover {
     <message>
         <source>Create graphs based on display filter fields</source>
         <translation>Stwórz wykres bazując na aktualnym filtrze</translation>
+    </message>
+    <message>
+        <source>Plots</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Plot display filter fields over time</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>&amp;Main Toolbar</source>
@@ -14852,6 +15584,14 @@ a:hover {
     <message>
         <source>Show packet times as the seconds since the UNIX / POSIX epoch (1970-01-01).</source>
         <translation>Jako czas pakietów pokazuj sekundy od ery UNIX/POSIX (1970-01-01).</translation>
+    </message>
+    <message>
+        <source>Seconds Since Capture Start</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show packet times as seconds since the start of the capture file.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Seconds Since Previous Captured Packet</source>
@@ -14998,6 +15738,14 @@ a:hover {
         <translation>&amp;Obsługiwane Protokoły</translation>
     </message>
     <message>
+        <source>&amp;Keyboard Shortcuts</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show the current keyboard shortcuts</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>MAP Summary</source>
         <translation>Podsumowanie MAP</translation>
     </message>
@@ -15016,6 +15764,14 @@ a:hover {
     <message>
         <source>Show Linked Packet in New Window</source>
         <translation>Pokazuj podlinkowane pakiety w nowym oknie</translation>
+    </message>
+    <message>
+        <source>Aggregation in Live Capture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Aggregation View.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>New Coloring Rule…</source>
@@ -15371,6 +16127,10 @@ a:hover {
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Unsaved packets…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Do you want to stop the capture and save the captured packets%1?</source>
         <translation>Czy chcesz zatrzymać przechwytywanie i zapisać przechwycone pakiety%1?</translation>
     </message>
@@ -15439,10 +16199,6 @@ a:hover {
         <translation>%1: %2</translation>
     </message>
     <message>
-        <source>Clear Menu</source>
-        <translation>Wyczyść Menu</translation>
-    </message>
-    <message>
         <source> before closing the file</source>
         <translation>przed zapisaniem pliku</translation>
     </message>
@@ -15474,6 +16230,14 @@ a:hover {
     <message>
         <source>Are you sure you want to remove all packet comments?</source>
         <translation>Czy na pewno chcesz usunąć wszystkie komentarze do pakietów?</translation>
+    </message>
+    <message>
+        <source>No %1 Secrets</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>There are no available secrets used to decrypt %1 traffic in the capture file.  Would you like to view information about how to decrypt %2 traffic on the wiki?</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Unable to build conversation filter.</source>
@@ -15531,11 +16295,11 @@ a:hover {
         <translation>Usuń komentarze pakietów</translation>
     </message>
     <message numerus="yes">
-        <source>Delete comments from %n packet(s)</source>
-        <translation>
-            <numerusform>Usuń komentarze z %n pakietu</numerusform>
-            <numerusform>Usuń komentarze z %n pakietów</numerusform>
-            <numerusform>Usuń komentarze z %n pakietów</numerusform>
+        <source>Delete comments from %Ln packet(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>
@@ -15555,6 +16319,14 @@ a:hover {
         <translation>przed aktualizacją</translation>
     </message>
     <message>
+        <source> before exporting PDUs</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> before stripping headers</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>There are no TLS Session Keys to save.</source>
         <translation>Nie ma żadnych kluczy sesji TLS do zapisu.</translation>
     </message>
@@ -15569,14 +16341,6 @@ a:hover {
     <message>
         <source>TLS Session Keys (*.keys *.txt);;All Files (</source>
         <translation>Klucze sesji SSL (*.keys *.txt);; Dowolny plik (</translation>
-    </message>
-    <message>
-        <source>No TLS Secrets</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>There are no available secrets used to decrypt TLS traffic in the capture file.  Would you like to view information about how to decrypt TLS traffic on the wiki?</source>
-        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Are you sure you want to discard all decryption secrets?</source>

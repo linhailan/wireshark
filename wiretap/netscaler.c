@@ -10,9 +10,10 @@
 #include "netscaler.h"
 
 #include <string.h>
-#include "wtap-int.h"
+#include "wtap_module.h"
 #include "file_wrappers.h"
 #include <wsutil/ws_assert.h>
+#include <wsutil/pint.h>
 
 /* Defines imported from netscaler code: nsperfrc.h */
 
@@ -968,9 +969,9 @@ nspm_signature_version(char *nstrace_buf, unsigned len)
          * be smaller, with a shorter signature field?)
          */
         if (len >= nspr_signature_v10_s &&
-            (pletoh16(&sigv10p->nsprRecordType) == NSPR_SIGNATURE_V10) &&
-            (pletoh16(&sigv10p->nsprRecordSize) <= len) &&
-            (pletoh16(&sigv10p->nsprRecordSize) >= nspr_signature_v10_s))
+            (pletohu16(&sigv10p->nsprRecordType) == NSPR_SIGNATURE_V10) &&
+            (pletohu16(&sigv10p->nsprRecordSize) <= len) &&
+            (pletohu16(&sigv10p->nsprRecordSize) >= nspr_signature_v10_s))
         {
             if ((nspm_signature_isv10(sigv10p->sig_Signature, sizeof sigv10p->sig_Signature)))
                 return NSPM_SIGNATURE_1_0;
@@ -1011,8 +1012,8 @@ nspm_signature_version(char *nstrace_buf, unsigned len)
     return NSPM_SIGNATURE_NOMATCH;    /* no version found */
 }
 
-#define nspr_getv10recordtype(hdp) (pletoh16(&(hdp)->nsprRecordType))
-#define nspr_getv10recordsize(hdp) (pletoh16(&(hdp)->nsprRecordSize))
+#define nspr_getv10recordtype(hdp) (pletohu16(&(hdp)->nsprRecordType))
+#define nspr_getv10recordsize(hdp) (pletohu16(&(hdp)->nsprRecordSize))
 #define nspr_getv20recordtype(hdp) ((hdp)->phd_RecordType)
 #define nspr_getv20recordsize(hdp) \
     (uint32_t)(((hdp)->phd_RecordSizeLow & NSPR_V20RECORDSIZE_2BYTES)? \
@@ -1049,7 +1050,7 @@ nspm_signature_version(char *nstrace_buf, unsigned len)
                     case NSPR_ABSTIME_V##ver:\
                         if (!nstrace_ensure_buflen(nstrace, nstrace_buf_offset, sizeof(nspr_abstime_v##ver##_t), err, err_info))\
                             return false;\
-                        ns_setabstime(nstrace, pletoh32(&((nspr_abstime_v##ver##_t *) fp)->abs_Time), pletoh16(&((nspr_abstime_v##ver##_t *) fp)->abs_RelTime));\
+                        ns_setabstime(nstrace, pletohu32(&((nspr_abstime_v##ver##_t *) fp)->abs_Time), pletohu16(&((nspr_abstime_v##ver##_t *) fp)->abs_RelTime));\
                         nstrace->nstrace_buf_offset = nstrace_buf_offset + nspr_getv##ver##recordsize(fp);\
                         nstrace->nstrace_buflen = nstrace_buflen;\
                         return true;\
@@ -1082,7 +1083,7 @@ nstrace_set_start_time_ver(20)
 /*
 ** Set the start time of the trace file. We look for the first ABSTIME record. We use that
 ** to set the start time. Apart from that we also make sure that we remember the position of
-** the next record after the ABSTIME record. Inorder to report correct time values, all trace
+** the next record after the ABSTIME record. In order to report correct time values, all trace
 ** records before the ABSTIME record are ignored.
 */
 static bool nstrace_set_start_time(wtap *wth, int file_version, int *err,
@@ -1123,7 +1124,7 @@ static bool nstrace_set_start_time(wtap *wth, int file_version, int *err,
 #define TIMEDEFV10(rec,fp,type) \
     do {\
         (rec)->presence_flags = WTAP_HAS_TS;\
-        nsg_creltime += ns_hrtime2nsec(pletoh32(&type->type##_RelTimeHr));\
+        nsg_creltime += ns_hrtime2nsec(pletohu32(&type->type##_RelTimeHr));\
         (rec)->ts.secs = nstrace->nspm_curtime + (uint32_t) (nsg_creltime / 1000000000);\
         (rec)->ts.nsecs = (uint32_t) (nsg_creltime % 1000000000);\
     }while(0)
@@ -1131,13 +1132,13 @@ static bool nstrace_set_start_time(wtap *wth, int file_version, int *err,
 #define PARTSIZEDEFV10(rec,pp,ver) \
     do {\
         (rec)->presence_flags |= WTAP_HAS_CAP_LEN;\
-        (rec)->rec_header.packet_header.len = pletoh16(&pp->pp_PktSizeOrg) + nspr_pktracepart_v##ver##_s;\
-        (rec)->rec_header.packet_header.caplen = pletoh16(&pp->nsprRecordSize);\
+        (rec)->rec_header.packet_header.len = pletohu16(&pp->pp_PktSizeOrg) + nspr_pktracepart_v##ver##_s;\
+        (rec)->rec_header.packet_header.caplen = pletohu16(&pp->nsprRecordSize);\
     }while(0)
 
 #define FULLSIZEDEFV10(rec,fp,ver) \
     do {\
-        (rec)->rec_header.packet_header.len = pletoh16(&(fp)->nsprRecordSize);\
+        (rec)->rec_header.packet_header.len = pletohu16(&(fp)->nsprRecordSize);\
         (rec)->rec_header.packet_header.caplen = (rec)->rec_header.packet_header.len;\
     }while(0)
 
@@ -1151,12 +1152,12 @@ static bool nstrace_set_start_time(wtap *wth, int file_version, int *err,
         }\
         nspr_pktrace##fullpart##_v##ver##_t *type = (nspr_pktrace##fullpart##_v##ver##_t *) &nstrace_buf[nstrace_buf_offset];\
         /* Check sanity of record size */\
-        if (pletoh16(&type->nsprRecordSize) < sizeof *type) {\
+        if (pletohu16(&type->nsprRecordSize) < sizeof *type) {\
             *err = WTAP_ERR_BAD_FILE;\
             *err_info = g_strdup("nstrace: record size is less than record header size");\
             return false;\
         }\
-        (rec)->rec_type = REC_TYPE_PACKET;\
+        wtap_setup_packet_rec((rec), (wth)->file_encap);\
         (rec)->block = wtap_block_create(WTAP_BLOCK_PACKET);\
         TIMEDEFV##ver((rec),fp,type);\
         FULLPART##SIZEDEFV##ver((rec),type,ver);\
@@ -1205,7 +1206,7 @@ static bool nstrace_read_v10(wtap *wth, wtap_rec *rec,
         case NSPR_PDPKTRACEPARTRX_V##ver:\
             PACKET_DESCRIBE(rec,PART,part,ver,pp,HEADERVER);
 
-            switch (pletoh16(&(( nspr_header_v10_t*)&nstrace_buf[nstrace_buf_offset])->ph_RecordType))
+            switch (pletohu16(&(( nspr_header_v10_t*)&nstrace_buf[nstrace_buf_offset])->ph_RecordType))
             {
                 GENERATE_CASE_FULL(rec,10,100)
                 GENERATE_CASE_PART(rec,10,100)
@@ -1218,13 +1219,13 @@ static bool nstrace_read_v10(wtap *wth, wtap_rec *rec,
                     if (!nstrace_ensure_buflen(nstrace, nstrace_buf_offset, sizeof(nspr_pktracefull_v10_t), err, err_info))
                         return false;
                     nspr_pktracefull_v10_t *fp = (nspr_pktracefull_v10_t *) &nstrace_buf[nstrace_buf_offset];
-                    if (pletoh16(&fp->nsprRecordSize) == 0) {
+                    if (pletohu16(&fp->nsprRecordSize) == 0) {
                         *err = WTAP_ERR_BAD_FILE;
                         *err_info = g_strdup("nstrace: zero size record found");
                         return false;
                     }
-                    ns_setabstime(nstrace, pletoh32(((nspr_abstime_v10_t *) fp)->abs_Time), pletoh32(&((nspr_abstime_v10_t *) fp)->abs_RelTime));
-                    nstrace_buf_offset += pletoh16(&fp->nsprRecordSize);
+                    ns_setabstime(nstrace, pletohu32(((nspr_abstime_v10_t *) fp)->abs_Time), pletohu32(&((nspr_abstime_v10_t *) fp)->abs_RelTime));
+                    nstrace_buf_offset += pletohu16(&fp->nsprRecordSize);
                     break;
                 }
 
@@ -1233,13 +1234,13 @@ static bool nstrace_read_v10(wtap *wth, wtap_rec *rec,
                     if (!nstrace_ensure_buflen(nstrace, nstrace_buf_offset, sizeof(nspr_pktracefull_v10_t), err, err_info))
                         return false;
                     nspr_pktracefull_v10_t *fp = (nspr_pktracefull_v10_t *) &nstrace_buf[nstrace_buf_offset];
-                    if (pletoh16(&fp->nsprRecordSize) == 0) {
+                    if (pletohu16(&fp->nsprRecordSize) == 0) {
                         *err = WTAP_ERR_BAD_FILE;
                         *err_info = g_strdup("nstrace: zero size record found");
                         return false;
                     }
-                    ns_setrelativetime(nstrace, pletoh32(((nspr_abstime_v10_t *) fp)->abs_RelTime));
-                    nstrace_buf_offset += pletoh16(&fp->nsprRecordSize);
+                    ns_setrelativetime(nstrace, pletohu32(((nspr_abstime_v10_t *) fp)->abs_RelTime));
+                    nstrace_buf_offset += pletohu16(&fp->nsprRecordSize);
                     break;
                 }
 
@@ -1252,12 +1253,12 @@ static bool nstrace_read_v10(wtap *wth, wtap_rec *rec,
                     if (!nstrace_ensure_buflen(nstrace, nstrace_buf_offset, sizeof(nspr_pktracefull_v10_t), err, err_info))
                         return false;
                     nspr_pktracefull_v10_t *fp = (nspr_pktracefull_v10_t *) &nstrace_buf[nstrace_buf_offset];
-                    if (pletoh16(&fp->nsprRecordSize) == 0) {
+                    if (pletohu16(&fp->nsprRecordSize) == 0) {
                         *err = WTAP_ERR_BAD_FILE;
                         *err_info = g_strdup("nstrace: zero size record found");
                         return false;
                     }
-                    nstrace_buf_offset += pletoh16(&fp->nsprRecordSize);
+                    nstrace_buf_offset += pletohu16(&fp->nsprRecordSize);
                     break;
                 }
             }
@@ -1276,7 +1277,7 @@ static bool nstrace_read_v10(wtap *wth, wtap_rec *rec,
 #define TIMEDEFV20(rec,fp,type) \
     do {\
         (rec)->presence_flags = WTAP_HAS_TS;\
-        nsg_creltime += ns_hrtime2nsec(pletoh32(fp->type##_RelTimeHr));\
+        nsg_creltime += ns_hrtime2nsec(pletohu32(fp->type##_RelTimeHr));\
         (rec)->ts.secs = nstrace->nspm_curtime + (uint32_t) (nsg_creltime / 1000000000);\
         (rec)->ts.nsecs = (uint32_t) (nsg_creltime % 1000000000);\
     }while(0)
@@ -1285,7 +1286,7 @@ static bool nstrace_read_v10(wtap *wth, wtap_rec *rec,
     do {\
         (rec)->presence_flags = WTAP_HAS_TS;\
         /* access _AbsTimeHr as a 64bit value */\
-        nsg_creltime = pletoh64(fp->type##_AbsTimeHr);\
+        nsg_creltime = pletohu64(fp->type##_AbsTimeHr);\
         (rec)->ts.secs = (uint32_t) (nsg_creltime / 1000000000);\
         (rec)->ts.nsecs = (uint32_t) (nsg_creltime % 1000000000);\
     }while(0)
@@ -1303,7 +1304,7 @@ static bool nstrace_read_v10(wtap *wth, wtap_rec *rec,
 #define PARTSIZEDEFV20(rec,pp,ver) \
     do {\
         (rec)->presence_flags |= WTAP_HAS_CAP_LEN;\
-        (rec)->rec_header.packet_header.len = pletoh16(&pp->pp_PktSizeOrg) + nspr_pktracepart_v##ver##_s;\
+        (rec)->rec_header.packet_header.len = pletohu16(&pp->pp_PktSizeOrg) + nspr_pktracepart_v##ver##_s;\
         (rec)->rec_header.packet_header.caplen = nspr_getv20recordsize((nspr_hd_v20_t *)pp);\
     }while(0)
 
@@ -1342,7 +1343,7 @@ static bool nstrace_read_v10(wtap *wth, wtap_rec *rec,
             *err_info = g_strdup("nstrace: record size is less than record header size");\
             return false;\
         }\
-        (rec)->rec_type = REC_TYPE_PACKET;\
+        wtap_setup_packet_rec((rec), (wth)->file_encap);\
         (rec)->block = wtap_block_create(WTAP_BLOCK_PACKET);\
         TIMEDEFV##ver((rec),fp,type);\
         FULLPART##SIZEDEFV##ver((rec),fp,ver);\
@@ -1443,7 +1444,7 @@ static bool nstrace_read_v20(wtap *wth, wtap_rec *rec,
                     nstrace_buf_offset += nspr_getv20recordsize((nspr_hd_v20_t *)fp20);
                     if (!nstrace_ensure_buflen(nstrace, nstrace_buf_offset, sizeof(nspr_abstime_v20_t), err, err_info))
                         return false;
-                    ns_setabstime(nstrace, pletoh32(&((nspr_abstime_v20_t *) fp20)->abs_Time), pletoh16(&((nspr_abstime_v20_t *) fp20)->abs_RelTime));
+                    ns_setabstime(nstrace, pletohu32(&((nspr_abstime_v20_t *) fp20)->abs_Time), pletohu16(&((nspr_abstime_v20_t *) fp20)->abs_RelTime));
                     break;
                 }
 
@@ -1459,7 +1460,7 @@ static bool nstrace_read_v20(wtap *wth, wtap_rec *rec,
                     }
                     if (!nstrace_ensure_buflen(nstrace, nstrace_buf_offset, sizeof(nspr_abstime_v20_t), err, err_info))
                         return false;
-                    ns_setrelativetime(nstrace, pletoh16(&((nspr_abstime_v20_t *) fp20)->abs_RelTime));
+                    ns_setrelativetime(nstrace, pletohu16(&((nspr_abstime_v20_t *) fp20)->abs_RelTime));
                     nstrace_buf_offset += nspr_getv20recordsize((nspr_hd_v20_t *)fp20);
                     break;
                   }
@@ -1500,7 +1501,7 @@ static bool nstrace_read_v20(wtap *wth, wtap_rec *rec,
 #undef PACKET_DESCRIBE
 
 #define SETETHOFFSET_35(rec)\
-  (rec)->rec_header.packet_header.pseudo_header.nstr.eth_offset = pletoh16(&fp->fp_headerlen);\
+  (rec)->rec_header.packet_header.pseudo_header.nstr.eth_offset = pletohu16(&fp->fp_headerlen);\
 
 #define SETETHOFFSET_30(rec) ;\
 
@@ -1508,7 +1509,7 @@ static bool nstrace_read_v20(wtap *wth, wtap_rec *rec,
     do {\
         (rec)->presence_flags = WTAP_HAS_TS;\
         /* access _AbsTimeHr as a 64bit value */\
-        nsg_creltime = pletoh64(fp->type##_AbsTimeHr);\
+        nsg_creltime = pletohu64(fp->type##_AbsTimeHr);\
         (rec)->ts.secs = (uint32_t) (nsg_creltime / 1000000000);\
         (rec)->ts.nsecs = (uint32_t) (nsg_creltime % 1000000000);\
     }while(0)
@@ -1522,14 +1523,14 @@ static bool nstrace_read_v20(wtap *wth, wtap_rec *rec,
 #define FULLSIZEDEFV30(rec,fp,ver)\
     do {\
         (rec)->presence_flags |= WTAP_HAS_CAP_LEN;\
-        (rec)->rec_header.packet_header.len = pletoh16(&fp->fp_PktSizeOrg) + nspr_pktracefull_v##ver##_s + fp->fp_src_vmname_len + fp->fp_dst_vmname_len;\
+        (rec)->rec_header.packet_header.len = pletohu16(&fp->fp_PktSizeOrg) + nspr_pktracefull_v##ver##_s + fp->fp_src_vmname_len + fp->fp_dst_vmname_len;\
         (rec)->rec_header.packet_header.caplen = nspr_getv20recordsize((nspr_hd_v20_t *)fp);\
     }while(0)
 
 #define FULLSIZEDEFV35(rec,fp,ver)\
     do {\
         (rec)->presence_flags |= WTAP_HAS_CAP_LEN;\
-        (rec)->rec_header.packet_header.len = pletoh16(&fp->fp_PktSizeOrg) + pletoh16(&fp->fp_headerlen);\
+        (rec)->rec_header.packet_header.len = pletohu16(&fp->fp_PktSizeOrg) + pletohu16(&fp->fp_headerlen);\
         (rec)->rec_header.packet_header.caplen = nspr_getv20recordsize((nspr_hd_v20_t *)fp);\
     }while(0)
 
@@ -1543,7 +1544,7 @@ static bool nstrace_read_v20(wtap *wth, wtap_rec *rec,
             return false;\
         }\
         nspr_##structname##_t *fp = (nspr_##structname##_t *) &nstrace_buf[nstrace_buf_offset];\
-        (rec)->rec_type = REC_TYPE_PACKET;\
+        wtap_setup_packet_rec((rec), (wth)->file_encap);\
         (rec)->block = wtap_block_create(WTAP_BLOCK_PACKET);\
         TIMEDEFV##ver((rec),fp,type);\
         FULLPART##SIZEDEFV##ver((rec),fp,ver);\
@@ -1688,7 +1689,7 @@ static bool nstrace_read_v30(wtap *wth, wtap_rec *rec,
                         g_free(nstrace_tmpbuff);
                         return false;
                     }
-                    ns_setabstime(nstrace, pletoh32(&((nspr_abstime_v20_t *) &nstrace_buf[nstrace_buf_offset])->abs_Time), pletoh16(&((nspr_abstime_v20_t *) &nstrace_buf[nstrace_buf_offset])->abs_RelTime));
+                    ns_setabstime(nstrace, pletohu32(&((nspr_abstime_v20_t *) &nstrace_buf[nstrace_buf_offset])->abs_Time), pletohu16(&((nspr_abstime_v20_t *) &nstrace_buf[nstrace_buf_offset])->abs_RelTime));
                     break;
                 }
 
@@ -1698,7 +1699,7 @@ static bool nstrace_read_v30(wtap *wth, wtap_rec *rec,
                         g_free(nstrace_tmpbuff);
                         return false;
                     }
-                    ns_setrelativetime(nstrace, pletoh16(&((nspr_abstime_v20_t *) &nstrace_buf[nstrace_buf_offset])->abs_RelTime));
+                    ns_setrelativetime(nstrace, pletohu16(&((nspr_abstime_v20_t *) &nstrace_buf[nstrace_buf_offset])->abs_RelTime));
                     nstrace_buf_offset += nspr_getv20recordsize(hdp);
                     break;
                 }
@@ -1742,7 +1743,7 @@ static bool nstrace_read_v30(wtap *wth, wtap_rec *rec,
 #define PACKET_DESCRIBE(rec,FULLPART,fullpart,ver,type,HEADERVER) \
     do {\
         nspr_pktrace##fullpart##_v##ver##_t *type = (nspr_pktrace##fullpart##_v##ver##_t *) pd;\
-        (rec)->rec_type = REC_TYPE_PACKET;\
+        wtap_setup_packet_rec((rec), (wth)->file_encap);\
         (rec)->block = wtap_block_create(WTAP_BLOCK_PACKET);\
         TIMEDEFV##ver((rec),fp,type);\
         FULLPART##SIZEDEFV##ver((rec),type,ver);\
@@ -1805,7 +1806,7 @@ static bool nstrace_seek_read_v10(wtap *wth, int64_t seek_off,
             PACKET_DESCRIBE(rec,PART,part,type,pp,HEADERVER);\
             break;
 
-    switch (pletoh16(&(( nspr_header_v10_t*)pd)->ph_RecordType))
+    switch (pletohu16(&(( nspr_header_v10_t*)pd)->ph_RecordType))
     {
         GENERATE_CASE_FULL(rec,10,100)
         GENERATE_CASE_PART(rec,10,100)
@@ -1837,7 +1838,7 @@ static bool nstrace_seek_read_v10(wtap *wth, int64_t seek_off,
 #define PACKET_DESCRIBE(rec,FULLPART,ver,enumprefix,type,structname,HEADERVER)\
     do {\
         nspr_##structname##_t *fp= (nspr_##structname##_t*)pd;\
-        (rec)->rec_type = REC_TYPE_PACKET;\
+        wtap_setup_packet_rec((rec), (wth)->file_encap);\
         (rec)->block = wtap_block_create(WTAP_BLOCK_PACKET);\
         TIMEDEFV##ver((rec),fp,type);\
         FULLPART##SIZEDEFV##ver((rec),fp,ver);\
@@ -1954,7 +1955,7 @@ static bool nstrace_seek_read_v20(wtap *wth, int64_t seek_off,
 
 #define SETETHOFFSET_35(rec)\
    {\
-    (rec)->rec_header.packet_header.pseudo_header.nstr.eth_offset = pletoh16(&fp->fp_headerlen);\
+    (rec)->rec_header.packet_header.pseudo_header.nstr.eth_offset = pletohu16(&fp->fp_headerlen);\
    }
 
 #define SETETHOFFSET_30(rec) ;\
@@ -1962,7 +1963,7 @@ static bool nstrace_seek_read_v20(wtap *wth, int64_t seek_off,
 #define PACKET_DESCRIBE(rec,FULLPART,ver,enumprefix,type,structname,HEADERVER)\
     do {\
         nspr_##structname##_t *fp= (nspr_##structname##_t*)pd;\
-        (rec)->rec_type = REC_TYPE_PACKET;\
+        wtap_setup_packet_rec((rec), (wth)->file_encap);\
         (rec)->block = wtap_block_create(WTAP_BLOCK_PACKET);\
         TIMEDEFV##ver((rec),fp,type);\
         SETETHOFFSET_##ver(rec);\
@@ -2248,7 +2249,7 @@ nstrace_add_abstime(wtap_dumper *wdh, const wtap_rec *rec,
     {
         uint16_t val16;
         uint32_t reltime;
-        uint64_t abstime;
+        uint32_t abstime;
         nspr_abstime_v10_t abs10;
 
         /* populate the record */
@@ -2275,7 +2276,7 @@ nstrace_add_abstime(wtap_dumper *wdh, const wtap_rec *rec,
         (nstrace->version == NSTRACE_3_0) ||
         (nstrace->version == NSTRACE_3_5))    {
         uint32_t reltime;
-        uint64_t abstime;
+        uint32_t abstime;
         nspr_abstime_v20_t abs20;
 
         abs20.abs_RecordType = NSPR_ABSTIME_V20;
@@ -2286,7 +2287,7 @@ nstrace_add_abstime(wtap_dumper *wdh, const wtap_rec *rec,
 
         memset(abs20.abs_RelTime, 0, sizeof abs20.abs_RelTime);
         abstime = GUINT32_TO_LE((uint32_t)rec->ts.secs - (uint32_t)(nsg_creltime/1000000000));
-        memcpy(abs20.abs_RelTime, &abstime, sizeof abs20.abs_RelTime);
+        memcpy(abs20.abs_Time, &abstime, sizeof abs20.abs_Time);
 
         /* Write the record into the file */
         if (!wtap_dump_file_write(wdh, &abs20, nspr_abstime_v20_s, err))
@@ -2316,6 +2317,7 @@ static bool nstrace_dump(wtap_dumper *wdh, const wtap_rec *rec,
     /* We can only write packet records. */
     if (rec->rec_type != REC_TYPE_PACKET) {
         *err = WTAP_ERR_UNWRITABLE_REC_TYPE;
+        *err_info = wtap_unwritable_rec_type_err_string(rec);
         return false;
     }
 

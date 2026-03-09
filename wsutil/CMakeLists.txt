@@ -81,9 +81,8 @@ set(WMEM_FILES
 set(WSUTIL_PUBLIC_HEADERS
 	802_11-utils.h
 	adler32.h
-	application_flavor.h
+	app_mem_usage.h
 	array.h
-	base32.h
 	bits_count_ones.h
 	bits_ctz.h
 	bitswap.h
@@ -104,11 +103,14 @@ set(WSUTIL_PUBLIC_HEADERS
 	crc16-plain.h
 	crc32.h
 	curve25519.h
+	dtoa.h
 	eax.h
 	epochs.h
 	exported_pdu_tlvs.h
 	failure_message_simple.h
 	feature_list.h
+	file_compressed.h
+	file_util.h
 	filesystem.h
 	g711.h
 	inet_addr.h
@@ -140,6 +142,7 @@ set(WSUTIL_PUBLIC_HEADERS
 	type_util.h
 	unicode-utils.h
 	utf8_entities.h
+	value_string.h
 	version_info.h
 	ws_assert.h
 	ws_cpuid.h
@@ -147,6 +150,7 @@ set(WSUTIL_PUBLIC_HEADERS
 	ws_getopt.h
 	ws_mempbrk.h
 	ws_mempbrk_int.h
+	ws_padding_to.h
 	ws_pipe.h
 	ws_roundup.h
 	ws_strptime.h
@@ -160,8 +164,7 @@ set(WSUTIL_PUBLIC_HEADERS
 set(WSUTIL_COMMON_FILES
 	802_11-utils.c
 	adler32.c
-	application_flavor.c
-	base32.c
+	app_mem_usage.c
 	bitswap.c
 	buffer.c
 	clopts_common.c
@@ -178,11 +181,11 @@ set(WSUTIL_COMMON_FILES
 	crc8.c
 	crc11.c
 	curve25519.c
-	dot11decrypt_wep.c
 	dtoa.c
 	eax.c
 	failure_message_simple.c
 	feature_list.c
+	file_compressed.c
 	filesystem.c
 	filter_files.c
 	g711.c
@@ -211,6 +214,7 @@ set(WSUTIL_COMMON_FILES
 	to_str.c
 	type_util.c
 	unicode-utils.c
+	value_string.c
 	version_info.c
 	ws_getopt.c
 	ws_mempbrk.c
@@ -334,6 +338,28 @@ set_source_files_properties(
 	COMPILE_FLAGS "${WERROR_COMMON_FLAGS}"
 )
 
+if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+	# The optimizer in GCC 12.2 (at least) gets confused about "ulpmask"
+	# being used uninitialized.  Silence it.
+	set_source_files_properties(
+		dtoa.c
+		PROPERTIES
+		COMPILE_FLAGS "${WERROR_COMMON_FLAGS} -Wno-maybe-uninitialized"
+	)
+	# Make GCC follow the C standard with regards to excess precision to
+	# avoid floating point instability on x86 processors without SSE
+	# (using the x87 FPU and 80-bit floating point intermediates.)
+	# GCC supports -fexcess-precision=standard for C starting with 4.5.
+	# (Wireshark requires C11, so not clear the project can be compiled
+	# with an older version anyway so don't bother testing for the flag.)
+	set_property(SOURCE
+		str_util.c
+		APPEND
+		PROPERTY
+		COMPILE_OPTIONS
+		-fexcess-precision=standard)
+endif()
+
 if (HAVE_SSE4_2)
 	# TODO with CMake 2.8.12, we could use COMPILE_OPTIONS and just append
 	# instead of this COMPILE_FLAGS duplication...
@@ -349,7 +375,7 @@ if (ENABLE_APPLICATION_BUNDLE)
 		filesystem.c
 		PROPERTIES
 		COMPILE_FLAGS "${WERROR_COMMON_FLAGS} -DENABLE_APPLICATION_BUNDLE"
-)
+	)
 endif()
 
 add_library(wsutil
@@ -380,6 +406,7 @@ endif()
 target_link_libraries(wsutil
 	PUBLIC
 		${GLIB2_LIBRARIES}
+		${XXHASH_LIBRARIES}
 	PRIVATE
 		${GMODULE2_LIBRARIES}
 		${APPLE_CORE_FOUNDATION_LIBRARY}
@@ -389,9 +416,11 @@ target_link_libraries(wsutil
 		${M_LIBRARIES}
 		${ZLIB_LIBRARIES}
 		${ZLIBNG_LIBRARIES}
+		${LZ4_LIBRARIES}
 		$<IF:$<CONFIG:Debug>,${PCRE2_DEBUG_LIBRARIES},${PCRE2_LIBRARIES}>
 		${WIN_IPHLPAPI_LIBRARY}
 		${WIN_WS2_32_LIBRARY}
+		${WIN_PSAPI_LIBRARY}
 )
 
 target_include_directories(wsutil SYSTEM
@@ -399,10 +428,13 @@ target_include_directories(wsutil SYSTEM
 		${GLIB2_INCLUDE_DIRS}
 		${GCRYPT_INCLUDE_DIRS}
 		${GNUTLS_INCLUDE_DIRS}
+		${XXHASH_INCLUDE_DIRS}
 	PRIVATE
 		${GMODULE2_INCLUDE_DIRS}
 		${ZLIB_INCLUDE_DIRS}
 		${ZLIBNG_INCLUDE_DIRS}
+		${ZSTD_INCLUDE_DIRS}
+		${LZ4_INCLUDE_DIRS}
 		${PCRE2_INCLUDE_DIRS}
 )
 
@@ -444,11 +476,14 @@ target_link_libraries(wsutil_static
 		${GCRYPT_LIBRARIES}
 		${GNUTLS_LIBRARIES}
 		${M_LIBRARIES}
+		${XXHASH_LIBRARIES}
 		${ZLIB_LIBRARIES}
 		${ZLIBNG_LIBRARIES}
+		${LZ4_LIBRARIES}
 		$<IF:$<CONFIG:Debug>,${PCRE2_DEBUG_LIBRARIES},${PCRE2_LIBRARIES}>
 		${WIN_IPHLPAPI_LIBRARY}
 		${WIN_WS2_32_LIBRARY}
+		${WIN_PSAPI_LIBRARY}
 )
 
 target_include_directories(wsutil_static SYSTEM
@@ -458,8 +493,11 @@ target_include_directories(wsutil_static SYSTEM
 		${GNUTLS_INCLUDE_DIRS}
 	PRIVATE
 		${GMODULE2_INCLUDE_DIRS}
+		${XXHASH_INCLUDE_DIRS}
 		${ZLIB_INCLUDE_DIRS}
 		${ZLIBNG_INCLUDE_DIRS}
+		${ZSTD_INCLUDE_DIRS}
+		${LZ4_INCLUDE_DIRS}
 		${PCRE2_INCLUDE_DIRS}
 )
 
@@ -482,7 +520,7 @@ add_executable(test_wsutil EXCLUDE_FROM_ALL
 	test_wsutil.c
 )
 
-target_link_libraries(test_wsutil ${GLIB2_LIBRARIES} wsutil)
+target_link_libraries(test_wsutil ${M_LIBRARIES} ${GLIB2_LIBRARIES} wsutil)
 
 set_target_properties(test_wsutil PROPERTIES
 	FOLDER "Tests"

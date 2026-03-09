@@ -686,7 +686,7 @@ static const value_string rng_tech_vals[] = {
 };
 
 
-const value_string docsis_conf_code[] = {
+static const value_string docsis_conf_code[] = {
   {  0, "okay/success"},
   {  1, "Reject: Other/Auth failure (1.0)"},
   {  2, "Reject: Unrecognized configuration setting/COS failure (1.0)"},
@@ -4097,7 +4097,7 @@ dissect_tcc(tvbuff_t * tvb, packet_info * pinfo,
               {
                 proto_tree_add_item_ret_uint (tcc_tree,
                                      hf_docsis_tlv_tcc_us_ch_id, tvb, pos,
-                                     length, ENC_BIG_ENDIAN, &channel_id);
+                                     length, ENC_BIG_ENDIAN, (uint32_t*)&channel_id);
                 /* Only perform reassembly on UCD if TLV is reassembled. fragment_end_seq_next added for the rare cases where UCD end is 254 long. */
                 if(!pinfo->fragmented && *previous_channel_id != -1) {
                   fragment_end_seq_next(&ucd_reassembly_table, pinfo, *previous_channel_id, NULL);
@@ -5340,7 +5340,7 @@ dissect_em_id_list_for_cm(tvbuff_t * tvb, proto_tree *tree, int start, uint16_t 
 
   while (pos < (start + len))
     {
-      proto_tree_add_item (em_id_list_tree, hf_docsis_tlv_em_id_list_for_cm_em_id, tvb, pos, 2, ENC_NA);
+      proto_tree_add_item (em_id_list_tree, hf_docsis_tlv_em_id_list_for_cm_em_id, tvb, pos, 2, ENC_BIG_ENDIAN);
       pos+=2;
     }
 }
@@ -5493,7 +5493,7 @@ dissect_docsis_tlv (tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void
               if (length == 3)
                 {
                   proto_tree_add_item (tlv_tree, hf_docsis_tlv_vendor_id, tvb,
-                                       pos, length, ENC_NA);
+                                       pos, length, ENC_BIG_ENDIAN);
                 }
               else
                 {

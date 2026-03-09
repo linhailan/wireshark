@@ -18,11 +18,11 @@
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/in_cksum.h>
-#include <epan/ipproto.h>
 #include <epan/prefs.h>
 #include <epan/reassemble.h>
 #include <epan/tfs.h>
 #include <epan/unit_strings.h>
+#include <epan/iana-info.h>
 
 #include <wsutil/array.h>
 
@@ -424,8 +424,7 @@ dissect_stt_tree(tvbuff_t *tvb, packet_info *pinfo, proto_tree *stt_tree,
     offset += 2;
 
     /* Context ID */
-    context_id = tvb_get_ntoh64(tvb, offset);
-    proto_tree_add_item(stt_tree, hf_stt_context_id, tvb, offset, 8, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint64(stt_tree, hf_stt_context_id, tvb, offset, 8, ENC_BIG_ENDIAN, &context_id);
     proto_item_append_text(stt_item, ", Context ID: 0x%" PRIx64,
                            context_id);
     offset += 8;
@@ -573,91 +572,91 @@ proto_register_stt(void)
         { &hf_stt_tcp_data,
           { "TCP Data", "stt.tcp",
             FT_BYTES, BASE_NONE, NULL, 0x0,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_tcp_data_offset,
           { "Data Offset", "stt.tcp.data_offset",
             FT_UINT8, BASE_DEC|BASE_UNIT_STRING, UNS(&units_byte_bytes), 0x0,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_tcp_flags,
           { "Flags", "stt.tcp.flags",
             FT_UINT16, BASE_HEX, NULL, 0x0FFF,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_tcp_rsvd,
           { "Reserved", "stt.tcp.flags.rsvd",
             FT_BOOLEAN, 12, NULL, 0xE00,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_tcp_ns,
           { "Nonce", "stt.tcp.flags.ns",
             FT_BOOLEAN, 12, NULL, 0x100,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_tcp_cwr,
           { "Congestion Window Reduced (CWR)", "stt.tcp.flags.cwr",
             FT_BOOLEAN, 12, NULL, 0x080,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_tcp_ece,
           { "ECN-Echo", "stt.tcp.flags.ece",
             FT_BOOLEAN, 12, NULL, 0x040,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_tcp_urg,
           { "Urgent", "stt.tcp.flags.urg",
             FT_BOOLEAN, 12, NULL, 0x020,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_tcp_ack,
           { "Acknowledgement", "stt.tcp.flags.ack",
             FT_BOOLEAN, 12, NULL, 0x010,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_tcp_psh,
           { "Push", "stt.tcp.flags.psh",
             FT_BOOLEAN, 12, NULL, 0x008,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_tcp_rst,
           { "Reset", "stt.tcp.flags.rst",
             FT_BOOLEAN, 12, NULL, 0x004,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_tcp_syn,
           { "Syn", "stt.tcp.flags.syn",
             FT_BOOLEAN, 12, NULL, 0x002,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_tcp_fin,
           { "Fin", "stt.tcp.flags.fin",
             FT_BOOLEAN, 12, NULL, 0x001,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_tcp_window,
           { "Window", "stt.tcp.window",
             FT_UINT16, BASE_DEC, NULL, 0x0,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_tcp_urg_ptr,
           { "Urgent Pointer", "stt.tcp.urg_ptr",
             FT_UINT16, BASE_DEC, NULL, 0x0,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
 
@@ -671,91 +670,91 @@ proto_register_stt(void)
         { &hf_stt_flags,
           { "Flags", "stt.flags",
             FT_UINT8, BASE_HEX, NULL, 0x0,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_flag_rsvd,
           { "Reserved", "stt.flags.rsvd",
             FT_BOOLEAN, 8, NULL, 0xF0,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_flag_tcp,
           { "TCP payload", "stt.flags.tcp",
             FT_BOOLEAN, 8, NULL, 0x08,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_flag_ipv4,
           { "IPv4 packet", "stt.flags.ipv4",
             FT_BOOLEAN, 8, NULL, 0x04,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_flag_partial,
           { "Checksum partial", "stt.flags.csum_partial",
             FT_BOOLEAN, 8, NULL, 0x02,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_flag_verified,
           { "Checksum verified", "stt.flags.csum_verified",
             FT_BOOLEAN, 8, NULL, 0x01,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_l4_offset,
           { "L4 Offset", "stt.l4offset",
             FT_UINT8, BASE_DEC, NULL, 0x0,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_reserved_8,
           { "Reserved", "stt.reserved",
             FT_UINT8, BASE_HEX, NULL, 0x0,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_mss,
           { "Max Segment Size", "stt.mss",
             FT_UINT16, BASE_DEC, NULL, 0x0,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_vlan,
           { "VLAN", "stt.vlan",
             FT_UINT16, BASE_HEX, NULL, 0x0,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_pcp,
           { "PCP", "stt.vlan.pcp",
             FT_UINT16, BASE_DEC, VALS(pri_vals), STT_PCP_MASK,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_v,
           { "V flag", "stt.vlan.v",
             FT_UINT16, BASE_DEC, NULL, STT_V_MASK,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_vlan_id,
           { "VLAN ID", "stt.vlan.id",
             FT_UINT16, BASE_DEC, NULL, STT_VLANID_MASK,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_context_id,
           { "Context ID", "stt.context_id",
             FT_UINT64, BASE_HEX, NULL, 0x0,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
         { &hf_stt_padding,
           { "Padding", "stt.padding",
             FT_UINT16, BASE_HEX, NULL, 0x0,
-            NULL, HFILL,
+            NULL, HFILL
           },
         },
 
@@ -905,7 +904,7 @@ void
 proto_reg_handoff_stt(void)
 {
     /*
-     * The I-D doesn't explicity indicate that the FCS isn't present
+     * The I-D doesn't explicitly indicate that the FCS isn't present
      * in the tunneled Ethernet frames, but it is missing from the
      * captures attached to bug 10282.
      */

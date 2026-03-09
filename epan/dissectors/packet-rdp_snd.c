@@ -1,4 +1,4 @@
-/* Packet-rdp_snd.c
+/* packet-rdp_snd.c
  * Routines for the audio output RDP channel
  * Copyright 2023, David Fort <contact@hardening-consulting.com>
  *
@@ -19,17 +19,11 @@
 #include <epan/prefs.h>
 #include <epan/conversation.h>
 #include <epan/expert.h>
-#include <epan/value_string.h>
 
 #include "packet-rdpudp.h"
 
-#define PNAME  "RDP audio output virtual channel Protocol"
-#define PSNAME "rdpsnd"
-#define PFNAME "rdp_snd"
-
 void proto_register_rdp_snd(void);
 void proto_reg_handoff_rdp_snd(void);
-
 
 static int proto_rdp_snd;
 
@@ -38,7 +32,6 @@ static int hf_snd_bPad;
 static int hf_snd_bodySize;
 
 static int ett_rdp_snd;
-
 
 enum {
 	SNDC_CLOSE = 0x01,
@@ -151,7 +144,7 @@ void proto_register_rdp_snd(void) {
 		&ett_rdp_snd,
 	};
 
-	proto_rdp_snd = proto_register_protocol(PNAME, PSNAME, PFNAME);
+	proto_rdp_snd = proto_register_protocol("RDP audio output virtual channel Protocol", "rdpsnd", "rdp_snd");
 
 	/* Register fields and subtrees */
 	proto_register_field_array(proto_rdp_snd, hf, array_length(hf));

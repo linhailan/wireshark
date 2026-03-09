@@ -210,9 +210,9 @@ dissect_ubdp(tvbuff_t *ubdp_tvb, packet_info *pinfo, proto_tree *tree, void *dat
           case UB_HW_IP_ADDR_2:
             if(ubdp_length == 10){ // UB_HW_IP_ADDR
               proto_tree_add_item(tlv_tree, hf_ubdp_mac, ubdp_tvb, offset, 6, ENC_NA);
-              proto_tree_add_item(tlv_tree, hf_ubdp_ip, ubdp_tvb, offset + 6, 4, ENC_NA);
+              proto_tree_add_item(tlv_tree, hf_ubdp_ip, ubdp_tvb, offset + 6, 4, ENC_BIG_ENDIAN);
             }else if(ubdp_length == 4){ // UB_HW_IP_ADDR_2
-              proto_tree_add_item(tlv_tree, hf_ubdp_ip, ubdp_tvb, offset, 4, ENC_NA);
+              proto_tree_add_item(tlv_tree, hf_ubdp_ip, ubdp_tvb, offset, 4, ENC_BIG_ENDIAN);
             }else{
               expert_add_info(pinfo, tlv_item, &ei_ubdp_unexpected_len);
               proto_tree_add_item(tlv_tree, hf_ubdp_generic, ubdp_tvb, offset, ubdp_length, ENC_NA);
@@ -235,7 +235,7 @@ dissect_ubdp(tvbuff_t *ubdp_tvb, packet_info *pinfo, proto_tree *tree, void *dat
             break;
           case UB_UPTIME:
             if(ubdp_length == 4){
-              proto_tree_add_item(tlv_tree, hf_ubdp_uptime, ubdp_tvb, offset, ubdp_length, ENC_NA);
+              proto_tree_add_item(tlv_tree, hf_ubdp_uptime, ubdp_tvb, offset, ubdp_length, ENC_BIG_ENDIAN);
             }else{
               expert_add_info(pinfo, tlv_item, &ei_ubdp_unexpected_len);
               proto_tree_add_item(tlv_tree, hf_ubdp_generic, ubdp_tvb, offset, ubdp_length, ENC_NA);
@@ -245,7 +245,7 @@ dissect_ubdp(tvbuff_t *ubdp_tvb, packet_info *pinfo, proto_tree *tree, void *dat
             proto_tree_add_item(tlv_tree, hf_ubdp_hostname, ubdp_tvb, offset, ubdp_length, ENC_UTF_8);
             break;
           case UB_PRODUCT:
-            uValue = tvb_get_string_enc(pinfo->pool, ubdp_tvb, offset, ubdp_length, ENC_ASCII);
+            uValue = (char*)tvb_get_string_enc(pinfo->pool, ubdp_tvb, offset, ubdp_length, ENC_ASCII);
             uModel = try_str_to_str(uValue, ubiquiti_vals);
             proto_tree_add_string(tlv_tree, hf_ubdp_product, ubdp_tvb, offset, ubdp_length, uModel ? uModel : uValue);
             break;
@@ -273,19 +273,19 @@ dissect_ubdp(tvbuff_t *ubdp_tvb, packet_info *pinfo, proto_tree *tree, void *dat
             break;
           case UB_SEQ_NUM:
             if(ubdp_length == 4){
-              proto_tree_add_item(tlv_tree, hf_ubdp_seq_num, ubdp_tvb, offset, ubdp_length, ENC_NA);
+              proto_tree_add_item(tlv_tree, hf_ubdp_seq_num, ubdp_tvb, offset, ubdp_length, ENC_BIG_ENDIAN);
             }else{
               expert_add_info(pinfo, tlv_item, &ei_ubdp_unexpected_len);
               proto_tree_add_item(tlv_tree, hf_ubdp_generic, ubdp_tvb, offset, ubdp_length, ENC_NA);
             }
             break;
           case UB_TYPE:
-            uValue = tvb_get_string_enc(pinfo->pool, ubdp_tvb, offset, ubdp_length, ENC_ASCII);
+            uValue = (char*)tvb_get_string_enc(pinfo->pool, ubdp_tvb, offset, ubdp_length, ENC_ASCII);
             uModel = try_str_to_str(uValue, ubiquiti_vals);
             proto_tree_add_string(tlv_tree, hf_ubdp_model, ubdp_tvb, offset, ubdp_length, uModel ? uModel : uValue);
             break;
           case UB_MODEL:
-            uValue = tvb_get_string_enc(pinfo->pool, ubdp_tvb, offset, ubdp_length, ENC_ASCII);
+            uValue = (char*)tvb_get_string_enc(pinfo->pool, ubdp_tvb, offset, ubdp_length, ENC_ASCII);
             uModel = try_str_to_str(uValue, ubiquiti_vals);
             proto_tree_add_string(tlv_tree, hf_ubdp_model, ubdp_tvb, offset, ubdp_length, uModel ? uModel : uValue);
             break;
@@ -294,7 +294,7 @@ dissect_ubdp(tvbuff_t *ubdp_tvb, packet_info *pinfo, proto_tree *tree, void *dat
             break;
           case UB_DEFAULT:
             if(ubdp_length == 1 || ubdp_length == 4){
-              proto_tree_add_item(tlv_tree, hf_ubdp_default, ubdp_tvb, offset, ubdp_length, ENC_NA);
+              proto_tree_add_item(tlv_tree, hf_ubdp_default, ubdp_tvb, offset, ubdp_length, ENC_BIG_ENDIAN);
             }else{
               expert_add_info(pinfo, tlv_item, &ei_ubdp_unexpected_len);
               proto_tree_add_item(tlv_tree, hf_ubdp_generic, ubdp_tvb, offset, ubdp_length, ENC_NA);
@@ -302,7 +302,7 @@ dissect_ubdp(tvbuff_t *ubdp_tvb, packet_info *pinfo, proto_tree *tree, void *dat
             break;
           case UB_LOCATING:
             if(ubdp_length == 1 || ubdp_length == 4){
-              proto_tree_add_item(tlv_tree, hf_ubdp_locating, ubdp_tvb, offset, ubdp_length, ENC_NA);
+              proto_tree_add_item(tlv_tree, hf_ubdp_locating, ubdp_tvb, offset, ubdp_length, ENC_BIG_ENDIAN);
             }else{
               expert_add_info(pinfo, tlv_item, &ei_ubdp_unexpected_len);
               proto_tree_add_item(tlv_tree, hf_ubdp_generic, ubdp_tvb, offset, ubdp_length, ENC_NA);

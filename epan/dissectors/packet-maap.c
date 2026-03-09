@@ -87,7 +87,7 @@ dissect_maap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
 
     /* Display the name of the packet type in the info column. */
     col_add_fstr(pinfo->cinfo, COL_INFO, "%s:",
-                val_to_str(maap_msg_type, maap_msg_type_vals,
+                val_to_str(pinfo->pool, maap_msg_type, maap_msg_type_vals,
                             "Unknown Type(0x%02x)"));
 
     /* Now, we'll add the start and conflict addresses and counts to the info column as appropriate */
@@ -186,11 +186,7 @@ proto_register_maap(void)
     static int *ett[] = { &ett_maap };
 
     /* Register the protocol name and description */
-    proto_maap = proto_register_protocol (
-        "IEEE 1722 MAAP Protocol", /* name */
-        "MAAP", /* short name */
-        "maap" /* abbrev */
-        );
+    proto_maap = proto_register_protocol ("IEEE 1722 MAAP Protocol", "MAAP", "maap");
 
     /* Required function calls to register the header fields and subtrees used */
     proto_register_field_array(proto_maap, hf, array_length(hf));

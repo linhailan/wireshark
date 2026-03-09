@@ -24,7 +24,7 @@
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
-#include <epan/ipproto.h>
+#include <epan/iana-info.h>
 
 void proto_register_userlog(void);
 void proto_reg_handoff_userlog(void);
@@ -128,7 +128,7 @@ dissect_userlog(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data 
 	offset += 1;
 
 	proto_tree_add_item_ret_uint(userlog_header, hf_userlog_logtype, tvb, offset, 1, ENC_BIG_ENDIAN, &log_type);
-	col_add_fstr(pinfo->cinfo, COL_INFO, "LogType = %s", val_to_str(log_type, logtype, "Unknown (0x%02x)"));
+	col_add_fstr(pinfo->cinfo, COL_INFO, "LogType = %s", val_to_str(pinfo->pool, log_type, logtype, "Unknown (0x%02x)"));
 	offset += 1;
 
 	proto_tree_add_item_ret_uint(userlog_header, hf_userlog_count, tvb, offset, 2, ENC_BIG_ENDIAN, &log_max);

@@ -38,13 +38,16 @@
 #include <epan/packet.h>
 #include <epan/strutil.h>
 #include <epan/to_str.h>
+#include <epan/uat-int.h>
 #include <epan/uat.h>
 #include <epan/prefs.h>
+#include <epan/prefs-int.h>
 #include <epan/proto.h>
 #include <epan/epan_dissect.h>
 #include <epan/tap.h>
 #include <epan/column-utils.h>
 #include <wsutil/filesystem.h>
+#include <wsutil/wsgcrypt.h>
 #include <epan/funnel.h>
 #include <epan/tvbparse.h>
 #include <epan/epan.h>
@@ -135,8 +138,8 @@ struct _wslua_pinfo {
 
 struct _wslua_tvbrange {
     struct _wslua_tvb* tvb;
-    int offset;
-    int len;
+    unsigned offset;
+    unsigned len;
 };
 
 struct _wslua_tw {
@@ -166,26 +169,11 @@ typedef struct _wslua_expert_field_t {
     int severity;
 } wslua_expert_field_t;
 
-/**
- * PREF_OBSOLETE is used for preferences that a module used to support
- * but no longer supports; we give different error messages for them.
- */
-typedef enum {
-    PREF_UINT,
-    PREF_BOOL,
-    PREF_ENUM,
-    PREF_STRING,
-    PREF_RANGE,
-    PREF_STATIC_TEXT,
-    PREF_UAT,
-    PREF_OBSOLETE
-} pref_type_t;
-
 typedef struct _wslua_pref_t {
     char* name;
     char* label;
     char* desc;
-    pref_type_t type;
+    pref_type_e type;
     union {
         bool b;
         unsigned u;
@@ -284,6 +272,16 @@ struct _wslua_field_info {
     bool expired;
 };
 
+/*
+ * _func_saver stores function refs so that Lua won't garbage collect them prematurely.
+ * It is only used by tcp_dissect_pdus right now.
+ */
+struct _wslua_func_saver {
+    lua_State* state;
+    int get_len_ref;
+    int dissect_ref;
+};
+
 typedef void (*tap_extractor_t)(lua_State*,const void*);
 
 struct _wslua_tap {
@@ -373,6 +371,7 @@ typedef struct _wslua_proto_t* Proto;
 typedef struct _wslua_distbl_t* DissectorTable;
 typedef dissector_handle_t Dissector;
 typedef GByteArray* ByteArray;
+typedef gcry_cipher_hd_t* GcryptCipher;
 typedef struct _wslua_tvb* Tvb;
 typedef struct _wslua_tvbrange* TvbRange;
 typedef struct _wslua_col_info* Column;
@@ -784,6 +783,8 @@ extern tvbuff_t* lua_tvb;
 extern bool lua_initialized;
 extern int lua_dissectors_table_ref;
 extern int lua_heur_dissectors_table_ref;
+extern const char* lua_app_env_var_prefix;
+extern GPtrArray* lua_outstanding_FuncSavers;
 
 WSLUA_DECLARE_CLASSES()
 WSLUA_DECLARE_FUNCTIONS()
@@ -836,7 +837,7 @@ extern int Proto_commit(lua_State* L);
 
 extern TreeItem create_TreeItem(proto_tree* tree, proto_item* item);
 
-extern void clear_outstanding_FuncSavers(void);
+extern void clear_outstanding_FuncSavers(lua_State* L);
 
 extern void Int64_pack(lua_State* L, luaL_Buffer *b, int idx, bool asLittleEndian);
 extern int Int64_unpack(lua_State* L, const char *buff, bool asLittleEndian);
@@ -865,7 +866,7 @@ extern void clear_outstanding_FieldInfo(void);
 
 extern void wslua_print_stack(char* s, lua_State* L);
 
-extern void wslua_init(register_cb cb, void *client_data);
+extern void wslua_init(register_cb cb, void *client_data, const char* app_env_var_prefix);
 extern void wslua_early_cleanup(void);
 extern void wslua_cleanup(void);
 

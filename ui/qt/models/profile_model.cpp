@@ -17,6 +17,7 @@
 
 #include "wsutil/filesystem.h"
 #include "wsutil/utf8_entities.h"
+#include "app/application_flavor.h"
 
 #include <ui/qt/models/profile_model.h>
 
@@ -73,14 +74,28 @@ bool ProfileSortModel::lessThan(const QModelIndex &source_left, const QModelInde
 
 void ProfileSortModel::setFilterType(FilterType ft)
 {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+    beginFilterChange();
+#endif
     ft_ = ft;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
+    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+#else
     invalidateFilter();
+#endif
 }
 
 void ProfileSortModel::setFilterString(QString txt)
 {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+    beginFilterChange();
+#endif
     ftext_ = ! txt.isEmpty() ? txt : "";
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
+    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+#else
     invalidateFilter();
+#endif
 }
 
 QStringList ProfileSortModel::filterTypes()
@@ -279,9 +294,6 @@ QVariant ProfileModel::dataDisplay(const QModelIndex &index) const
             return tr("Personal");
     case COL_AUTO_SWITCH_FILTER:
     {
-        if (prof->is_global) {
-            return QString(UTF8_EM_DASH);
-        }
         return (QString(prof->auto_switch_filter));
     }
 
@@ -431,17 +443,17 @@ QVariant ProfileModel::dataBackgroundRole(const QModelIndex &index) const
         return QVariant();
 
     if (prof->status == PROF_STAT_DEFAULT && reset_default_)
-        return ColorUtils::fromColorT(&prefs.gui_text_deprecated);
+        return ColorUtils::fromColorT(&prefs.gui_filter_deprecated_bg);
 
     if (prof->status != PROF_STAT_DEFAULT && ! prof->is_global)
     {
         /* Highlights erroneous line */
         if (checkInvalid(index) || checkIfDeleted(index) || checkDuplicate(index) || ! checkNameValidity(prof->name))
-            return ColorUtils::fromColorT(&prefs.gui_text_invalid);
+            return ColorUtils::fromColorT(&prefs.gui_filter_invalid_bg);
 
         /* Highlights line, which has been duplicated by another index */
         if (checkDuplicate(index, true))
-            return ColorUtils::fromColorT(&prefs.gui_text_valid);
+            return ColorUtils::fromColorT(&prefs.gui_filter_valid_bg);
     }
 
     return QVariant();
@@ -518,16 +530,16 @@ QVariant ProfileModel::dataPath(const QModelIndex &index) const
     {
     case PROF_STAT_DEFAULT:
         if (!reset_default_)
-            return gchar_free_to_qstring(get_persconffile_path("", false));
+            return gchar_free_to_qstring(get_persconffile_path("", false, application_configuration_environment_prefix()));
         else
             return tr("Resetting to default");
     case PROF_STAT_EXISTS:
         {
             QString profile_path;
             if (prof->is_global) {
-                profile_path = gchar_free_to_qstring(get_global_profiles_dir());
+                profile_path = gchar_free_to_qstring(get_global_profiles_dir(application_configuration_environment_prefix()));
             } else {
-                profile_path = gchar_free_to_qstring(get_profiles_dir());
+                profile_path = gchar_free_to_qstring(get_profiles_dir(application_configuration_environment_prefix()));
             }
             profile_path.append("/").append(prof->name);
             return QDir::toNativeSeparators(profile_path);
@@ -563,7 +575,7 @@ QVariant ProfileModel::dataPath(const QModelIndex &index) const
                 QString appendix;
 
                 /* A global profile is neither deleted or removed, only system provided is allowed as appendix */
-                if (profile_exists(prof->reference, true) && prof->from_global)
+                if (profile_exists(application_configuration_environment_prefix(), prof->reference, true) && prof->from_global)
                     appendix = tr("system provided");
                 /* A default model as reference can neither be deleted or renamed, so skip if the reference was one */
                 else  if (! index.data(ProfileModel::DATA_IS_DEFAULT).toBool())
@@ -768,7 +780,7 @@ QModelIndex ProfileModel::duplicateEntry(QModelIndex idx, int new_status)
     if (! prof)
         return QModelIndex();
 
-    /* only new and copied stati can be set */
+    /* only new and copied static can be set */
     if (new_status != PROF_STAT_NEW && new_status != PROF_STAT_COPY)
         new_status = PROF_STAT_COPY;
 
@@ -1075,7 +1087,7 @@ QFileInfoList ProfileModel::filterProfilePath(QString path, QFileInfoList ent, b
         }
         else
         {
-            if (path.compare(entry.absoluteFilePath()) != 0)
+            if (!filePathsMatch(path, entry.absoluteFilePath()))
                 // We recurse here, but our depth is limited
                 result.append(filterProfilePath(entry.absoluteFilePath(), result, fromZip));
         }
@@ -1130,7 +1142,7 @@ bool ProfileModel::exportProfiles(QString filename, QModelIndexList items, QStri
         return false;
     }
 
-    if (WiresharkZipHelper::zip(filename, files, gchar_free_to_qstring(get_profiles_dir()) + "/") )
+    if (WiresharkZipHelper::zip(filename, files, gchar_free_to_qstring(get_profiles_dir(application_configuration_environment_prefix())) + "/") )
         return true;
 
     return false;
@@ -1181,7 +1193,7 @@ int ProfileModel::importProfilesFromDir(QString dirname, int * skippedCnt, bool 
 {
     int count = 0;
     int skipped = 0;
-    QDir profileDir(gchar_free_to_qstring(get_profiles_dir()));
+    QDir profileDir(gchar_free_to_qstring(get_profiles_dir(application_configuration_environment_prefix())));
     QDir dir(dirname);
 
     if (skippedCnt)
@@ -1273,7 +1285,7 @@ bool ProfileModel::clearImported(QString *msg)
     for (int cnt = 0; cnt < rows.count() && result; cnt++)
     {
         int row = rows.at(cnt);
-        if (delete_persconffile_profile (index(row, ProfileModel::COL_NAME).data().toString().toUtf8().constData(), &ret_path) != 0)
+        if (delete_persconffile_profile(application_configuration_environment_prefix(), index(row, ProfileModel::COL_NAME).data().toString().toUtf8().constData(), &ret_path) != 0)
         {
             if (msg)
             {

@@ -51,7 +51,6 @@ static dissector_handle_t nvmet_tls_handle;
 
 #define NVME_TCP_PORT_RANGE    "4420,8009" /* IANA registered */
 
-#define NVME_FABRICS_TCP "NVMe/TCP"
 #define NVME_TCP_HEADER_SIZE 8
 #define PDU_LEN_OFFSET_FROM_HEADER 4
 static range_t *gPORT_RANGE;
@@ -319,8 +318,8 @@ dissect_nvme_tcp_command(tvbuff_t *tvb,
     cmd_id = tvb_get_uint16(tvb, offset + 2, ENC_LITTLE_ENDIAN);
     cmd_ctx = bind_cmd_to_qctx(pinfo, &queue->n_q_ctx, cmd_id);
 
-    /* if record did not contain connect command we wont know qid,
-     * so lets guess if this is an admin queue */
+    /* if record did not contain connect command we won't know qid,
+     * so let's guess if this is an admin queue */
     if ((queue->n_q_ctx.qid == UINT16_MAX) && !nvme_is_io_queue_opcode(opcode))
         queue->n_q_ctx.qid = 0;
 
@@ -791,10 +790,9 @@ dissect_nvme_tcp_pdu(tvbuff_t *tvb,
     pdo = tvb_get_int8(tvb, offset + 3);
     proto_tree_add_uint(nvme_tcp_tree, hf_nvme_tcp_pdo, tvb, offset + 3, 1,
             pdo);
-    plen = tvb_get_letohl(tvb, offset + 4);
-    proto_tree_add_item(nvme_tcp_tree, hf_nvme_tcp_plen, tvb, offset + 4, 4,
-            ENC_LITTLE_ENDIAN);
-    col_set_str(pinfo->cinfo, COL_PROTOCOL, NVME_FABRICS_TCP);
+    proto_tree_add_item_ret_uint(nvme_tcp_tree, hf_nvme_tcp_plen, tvb, offset + 4, 4,
+            ENC_LITTLE_ENDIAN, &plen);
+    col_set_str(pinfo->cinfo, COL_PROTOCOL, "NVMe/TCP");
 
     if (pdu_flags & NVME_TCP_F_HDGST) {
         unsigned hdgst_flags = PROTO_CHECKSUM_NO_FLAGS;
@@ -897,7 +895,7 @@ dissect_nvme_tcp(tvbuff_t *tvb,
                  void *data)
 {
     col_clear(pinfo->cinfo, COL_INFO);
-    col_set_str(pinfo->cinfo, COL_PROTOCOL, NVME_FABRICS_TCP);
+    col_set_str(pinfo->cinfo, COL_PROTOCOL, "NVMe/TCP");
     tcp_dissect_pdus(tvb, pinfo, tree, true, NVME_TCP_HEADER_SIZE,
             get_nvme_tcp_pdu_len, dissect_nvme_tcp_pdu, data);
 
@@ -1037,7 +1035,7 @@ void proto_register_nvme_tcp(void) {
              NULL, HFILL } },
        { &hf_nvme_tcp_icresp_cpda,
            { "Controller Pdu data alignment", "nvme-tcp.icresp.cpda",
-             FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL } },
+             FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL } },
        { &hf_nvme_tcp_icresp_digest,
            { "Digest types enabled", "nvme-tcp.icresp.digest",
              FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL } },
@@ -1148,7 +1146,7 @@ void proto_register_nvme_tcp(void) {
     };
 
     proto_nvme_tcp = proto_register_protocol("NVM Express Fabrics TCP",
-            NVME_FABRICS_TCP, "nvme-tcp");
+            "NVMe/TCP", "nvme-tcp");
 
     proto_register_field_array(proto_nvme_tcp, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));

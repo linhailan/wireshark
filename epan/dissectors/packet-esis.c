@@ -15,7 +15,6 @@
 
 #include <epan/packet.h>
 #include <epan/expert.h>
-#include <epan/nlpid.h>
 #include <epan/unit_strings.h>
 #include "packet-osi.h"
 #include "packet-osi-options.h"
@@ -291,7 +290,7 @@ dissect_esis(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
    * dispatch the sub-type.
    */
   col_add_str(pinfo->cinfo, COL_INFO,
-                val_to_str( type, esis_vals,
+                val_to_str(pinfo->pool, type, esis_vals,
                             "Unknown (0x%x)" ) );
 
   variable_len = length - ESIS_HDR_FIXED_LENGTH;

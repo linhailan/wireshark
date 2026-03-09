@@ -12,6 +12,7 @@
 #include <ui/qt/models/enabled_protocols_model.h>
 #include <epan/packet.h>
 #include <epan/disabled_protos.h>
+#include <app/application_flavor.h>
 
 #include <ui/qt/utils/variant_pointer.h>
 #include "main_application.h"
@@ -333,7 +334,7 @@ void EnabledProtocolsModel::disableProtocol(struct _protocol *protocol)
 void EnabledProtocolsModel::saveChanges(bool writeChanges)
 {
     if (writeChanges) {
-        save_enabled_and_disabled_lists();
+        save_enabled_and_disabled_lists(application_configuration_environment_prefix());
     }
     mainApp->emitAppSignal(MainApplication::PacketDissectionChanged);
 }
@@ -473,10 +474,17 @@ bool EnabledProtocolsProxyModel::filterAcceptsChild(int sourceRow, const QModelI
 void EnabledProtocolsProxyModel::setFilter(const QString& filter, EnabledProtocolsProxyModel::SearchType type,
     EnabledProtocolItem::EnableProtocolType protocolType)
 {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+    beginFilterChange();
+#endif
     filter_ = filter;
     type_ = type;
     protocolType_ = protocolType;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
+    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+#else
     invalidateFilter();
+#endif
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)

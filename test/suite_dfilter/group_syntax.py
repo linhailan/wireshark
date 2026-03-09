@@ -2,8 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-import pytest
-from suite_dfilter.dfiltertest import *
+# from suite_dfilter.dfiltertest import *
 
 
 class TestDfilterSyntax:
@@ -133,7 +132,7 @@ class TestDfilterSyntax:
         dfilter = "tcp.flags.push == True"
         checkDFilterCount(dfilter, 1)
 
-    def test_bool_2(self, checkDFilterCount):
+    def test_bool_3(self, checkDFilterCount):
         dfilter = "tcp.flags.push == FALSE"
         checkDFilterCount(dfilter, 0)
 
@@ -151,6 +150,10 @@ class TestDfilterSyntax:
         error = "Function 'tcp' does not exist"
         dfilter = 'frame == tcp()'
         checkDFilterFail(dfilter, error)
+
+    def test_between_1(self, checkDFilterCount):
+        dfilter = "tcp.dstport <= '\x50' < tcp.srcport"
+        checkDFilterCount(dfilter, 1)
 
 class TestDfilterEquality:
     trace_file = "sip.pcapng"
@@ -436,6 +439,14 @@ class TestDfilterLayer:
         dfilter = 'ip.dst#[-5] == 2.2.2.2'
         checkDFilterCount(dfilter, 1)
 
+    def test_layer_invalid_1(self, checkDFilterFail):
+        dfilter = r"ip.dst#"
+        checkDFilterFail(dfilter, "layer number or range was missing")
+
+    def test_layer_invalid_2(self, checkDFilterFail):
+        dfilter = r"ip.dst#ip"
+        checkDFilterFail(dfilter, "Expected digit or \"[\"")
+
 class TestDfilterQuantifiers:
     trace_file = "ipoipoip.pcap"
 
@@ -504,6 +515,10 @@ class TestDfilterXor:
     def test_xor_4(self, checkDFilterCount):
         dfilter = 'ip.src == 9.9.9.9 ^^ ip.dst == 9.9.9.9'
         checkDFilterCount(dfilter, 0)
+
+    def test_xor_5(self, checkDFilterCount):
+        dfilter = 'eth ^^ ip.proto in {"udp", "tcp"}'
+        checkDFilterCount(dfilter, 2)
 
 class TestDfilterTFSValueString:
     trace_file = "http.pcap"

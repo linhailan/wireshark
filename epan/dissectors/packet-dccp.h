@@ -24,6 +24,30 @@
 extern "C" {
 #endif /* __cplusplus */
 
+
+/*
+ * DCCP Service Codes.
+ * From https://www.iana.org/assignments/service-codes/service-codes.xhtml
+ * as of 2021-02-19
+ *
+ * Please do not put non-IANA-registered service codes here.  Put them in the
+ * dissector using them instead (and consider registering them!).
+ */
+#define NOT_SPECIFIED_SERVICE_CODE            0
+#define LTP_SERVICE_CODE                7107696
+#define DISC_SERVICE_CODE            1145656131
+#define RTCP_SERVICE_CODE            1381253968
+#define RTPA_SERVICE_CODE            1381257281
+#define RTPO_SERVICE_CODE            1381257295
+#define RTPT_SERVICE_CODE            1381257300
+#define RTPV_SERVICE_CODE            1381257302
+#define SYLG_SERVICE_CODE            1398361159
+#define BUNDLES_SERVICE_CODE         1685351985
+#define NPMP_SERVICE_CODE            1852861808
+#define RESERVED_SERVICE_CODE        4294967295
+
+
+
 /* DCCP structs and definitions */
 typedef struct _e_dccphdr {
     uint16_t sport;
@@ -67,10 +91,10 @@ struct dccp_analysis {
 	 * the source and destination ports.
 	 *
 	 * If the source is greater than the destination, then stuff
-	 * sent from src is in ual1.
+	 * sent from src is in flow1.
 	 *
 	 * If the source is less than the destination, then stuff
-	 * sent from src is in ual2.
+	 * sent from src is in flow2.
 	 *
 	 * XXX - if the addresses and ports are equal, we don't guarantee
 	 * the behavior.
@@ -103,12 +127,6 @@ struct dccp_analysis {
 	 */
 	nstime_t	ts_prev;
 };
-
-/** Get the current number of DCCP streams
- *
- * @return The number of DCCP streams
- */
-WS_DLL_PUBLIC uint32_t get_dccp_stream_count(void);
 
 #ifdef __cplusplus
 }

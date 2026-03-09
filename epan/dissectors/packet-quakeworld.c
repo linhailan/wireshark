@@ -76,10 +76,10 @@ static expert_field ei_quakeworld_connectionless_command_invalid;
 #define MAX_TEXT_SIZE	2048
 
 static const char *
-COM_Parse (const char *data, int data_len, int* token_start, int* token_len)
+COM_Parse (wmem_allocator_t* allocator, const char *data, int data_len, int* token_start, int* token_len)
 {
 	int c;
-	char* com_token = (char*)wmem_alloc(wmem_packet_scope(), data_len+1);
+	char* com_token = (char*)wmem_alloc(allocator, data_len+1);
 
 	com_token[0] = '\0';
 	*token_start = 0;
@@ -186,7 +186,7 @@ Cmd_Argv_length(int arg)
 
 
 static void
-Cmd_TokenizeString(const char* text, int text_len)
+Cmd_TokenizeString(wmem_allocator_t* allocator, const char* text, int text_len)
 {
 	int start;
 	int com_token_start;
@@ -211,7 +211,7 @@ Cmd_TokenizeString(const char* text, int text_len)
 		if ((!*text) || (start == text_len))
 			return;
 
-		text = COM_Parse (text, text_len-start, &com_token_start, &com_token_length);
+		text = COM_Parse (allocator, text, text_len-start, &com_token_start, &com_token_length);
 		if (!text)
 			return;
 
@@ -340,7 +340,7 @@ dissect_quakeworld_ConnectionlessPacket(tvbuff_t *tvb, packet_info *pinfo,
 	proto_tree	*cl_tree;
 	proto_tree	*text_tree = NULL;
 	proto_item	*pi = NULL;
-	uint8_t		*text;
+	const char	*text;
 	int		len;
 	int		offset;
 	uint32_t		marker;
@@ -357,21 +357,17 @@ dissect_quakeworld_ConnectionlessPacket(tvbuff_t *tvb, packet_info *pinfo,
 	/* all the rest of the packet is just text */
 	offset = 4;
 
-	text = tvb_get_stringz_enc(pinfo->pool, tvb, offset, &len, ENC_ASCII|ENC_NA);
 	/* actually, we should look for a eol char and stop already there */
-
-	if (cl_tree) {
-		proto_item *text_item;
-		text_item = proto_tree_add_string(cl_tree, hf_quakeworld_connectionless_text,
-						  tvb, offset, len, text);
-		text_tree = proto_item_add_subtree(text_item, ett_quakeworld_connectionless_text);
-	}
+	proto_item *text_item;
+	text_item = proto_tree_add_item_ret_string_and_length(cl_tree, hf_quakeworld_connectionless_text,
+					  tvb, offset, -1, ENC_ASCII, pinfo->pool, (const uint8_t**)&text, &len);
+	text_tree = proto_item_add_subtree(text_item, ett_quakeworld_connectionless_text);
 
 	if (direction == DIR_C2S) {
 		/* client to server commands */
 		const char *c;
 
-		Cmd_TokenizeString(text, len);
+		Cmd_TokenizeString(pinfo->pool, text, len);
 		c = Cmd_Argv(0);
 
 		/* client to sever commands */
@@ -593,7 +589,7 @@ dissect_quakeworld_GamePacket(tvbuff_t *tvb, packet_info *pinfo,
 	if (game_tree) {
 		proto_tree *seq1_tree = proto_tree_add_subtree_format(game_tree,
 							    tvb, offset, 4, ett_quakeworld_game_seq1, NULL, "Current Sequence: %u (%s)",
-							    seq1, val_to_str(rel1,names_reliable,"%u"));
+							    seq1, val_to_str(pinfo->pool, rel1,names_reliable,"%u"));
 		proto_tree_add_uint(seq1_tree, hf_quakeworld_game_seq1,
 				    tvb, offset, 4, seq1);
 		proto_tree_add_boolean(seq1_tree, hf_quakeworld_game_rel1,
@@ -607,7 +603,7 @@ dissect_quakeworld_GamePacket(tvbuff_t *tvb, packet_info *pinfo,
 	if (game_tree) {
 		proto_tree *seq2_tree = proto_tree_add_subtree_format(game_tree,
 							    tvb, offset, 4, ett_quakeworld_game_seq2, NULL, "Acknowledge Sequence: %u (%s)",
-							    seq2, val_to_str(rel2,names_reliable,"%u"));
+							    seq2, val_to_str(pinfo->pool, rel2,names_reliable,"%u"));
 		proto_tree_add_uint(seq2_tree, hf_quakeworld_game_seq2, tvb, offset, 4, seq2);
 		proto_tree_add_boolean(seq2_tree, hf_quakeworld_game_rel2, tvb, offset+3, 1, rel2);
 	}
@@ -653,7 +649,7 @@ dissect_quakeworld(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 			DIR_C2S : DIR_S2C;
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "QUAKEWORLD");
-	col_add_str(pinfo->cinfo, COL_INFO, val_to_str(direction,
+	col_add_str(pinfo->cinfo, COL_INFO, val_to_str(pinfo->pool, direction,
 			names_direction, "%u"));
 
 	if (tree) {
@@ -666,7 +662,7 @@ dissect_quakeworld(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 					   hf_quakeworld_s2c :
 					   hf_quakeworld_c2s,
 					   tvb, 0, 0, 1,
-					   "Direction: %s", val_to_str(direction, names_direction, "%u"));
+					   "Direction: %s", val_to_str(pinfo->pool, direction, names_direction, "%u"));
 	}
 
 	if (tvb_get_ntohl(tvb, 0) == 0xffffffff) {
@@ -725,7 +721,7 @@ proto_register_quakeworld(void)
 			NULL, HFILL }},
 		{ &hf_quakeworld_connectionless_text,
 			{ "Text", "quakeworld.connectionless.text",
-			FT_STRING, BASE_NONE, NULL, 0x0,
+			FT_STRINGZ, BASE_NONE, NULL, 0x0,
 			NULL, HFILL }},
 		{ &hf_quakeworld_connectionless_command,
 			{ "Command", "quakeworld.connectionless.command",

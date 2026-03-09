@@ -712,7 +712,7 @@ static int Dedicated_MIMO_DL_Control_IE(proto_tree *diuc_tree, int offset, int l
 	/* 8.4.5.3.21 table 286t */
 	tree = proto_tree_add_subtree(diuc_tree, tvb, BITHI(bit, 1), ett_286t, NULL, "Dedicated MIMO DL Control IE");
 
-	XBIT_HF_VALUE(length, 5, hf_dlmap_dedicated_mimo_dl_control_length);
+	XBIT_HF(5, hf_dlmap_dedicated_mimo_dl_control_length);
 	XBIT_HF_VALUE(mci, 1, hf_dlmap_dedicated_mimo_dl_control_control_header_mimo_control_info);
 	XBIT_HF_VALUE(cqi, 1, hf_dlmap_dedicated_mimo_dl_control_control_header_cqi_control_info);
 	XBIT_HF_VALUE(cmi, 1, hf_dlmap_dedicated_mimo_dl_control_control_header_closed_mimo_control_info);
@@ -2858,14 +2858,14 @@ void proto_register_mac_mgmt_msg_dlmap(void)
 		{
 			&hf_dlmap_phy_fdur_ms,
 			{
-				"Frame Duration", "wmx.dlmap.phy_fdur",
+				"Frame Duration", "wmx.dlmap.phy_fdur_ms",
 				FT_UINT8, BASE_HEX, VALS(frame_duration), 0x00, NULL, HFILL
 			}
 		},
 		{
 			&hf_dlmap_phy_fdur_per_sec,
 			{
-				"Frames per second", "wmx.dlmap.phy_fdur",
+				"Frames per second", "wmx.dlmap.phy_fdur_persec",
 				FT_UINT8, BASE_HEX, VALS(frames_per_second), 0x00, NULL, HFILL
 			}
 		},

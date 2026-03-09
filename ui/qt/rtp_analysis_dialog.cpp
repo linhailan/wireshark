@@ -14,11 +14,11 @@
 
 #include "epan/epan_dissect.h"
 #include <epan/addr_resolv.h>
-#include "epan/rtp_pt.h"
 
 #include "epan/dfilter/dfilter.h"
 
 #include "epan/dissectors/packet-rtp.h"
+#include "epan/dissectors/packet-rtp_pt.h"
 
 #include <ui/rtp_media.h>
 
@@ -541,7 +541,7 @@ void RtpAnalysisDialog::updateWidgets()
     ui->actionNextProblem->setEnabled(enable_nav);
 
     if (enable_nav) {
-        hint.append(tr(" %1 streams, ").arg(tabs_.count() - 1));
+        hint.append(tr(" %Ln stream(s), ", "", static_cast<int>(tabs_.count())));
         hint.append(tr(" G: Go to packet, N: Next problem packet"));
     }
 
@@ -576,7 +576,8 @@ void RtpAnalysisDialog::on_actionGoToPacket_triggered()
     QTreeWidgetItem *ti = cur_tree->selectedItems()[0];
     if (ti->type() != rtp_analysis_type_) return;
 
-    RtpAnalysisTreeWidgetItem *ra_ti = dynamic_cast<RtpAnalysisTreeWidgetItem *>((RtpAnalysisTreeWidgetItem *)ti);
+    RtpAnalysisTreeWidgetItem *ra_ti = dynamic_cast<RtpAnalysisTreeWidgetItem *>(ti);
+    if (ra_ti == nullptr) return;
     emit goToPacket(ra_ti->frameNum());
 }
 
@@ -598,7 +599,8 @@ void RtpAnalysisDialog::on_actionNextProblem_triggered()
     QTreeWidgetItem *test_ti = cur_tree->itemBelow(sel_ti);
     if (!test_ti) test_ti = cur_tree->topLevelItem(0);
     while (test_ti != sel_ti) {
-        RtpAnalysisTreeWidgetItem *ra_ti = dynamic_cast<RtpAnalysisTreeWidgetItem *>((RtpAnalysisTreeWidgetItem *)test_ti);
+        RtpAnalysisTreeWidgetItem *ra_ti = dynamic_cast<RtpAnalysisTreeWidgetItem *>(test_ti);
+        if (ra_ti == nullptr) continue;
         if (!ra_ti->frameStatus()) {
             cur_tree->setCurrentItem(ra_ti);
             break;
@@ -623,18 +625,20 @@ void RtpAnalysisDialog::on_actionSaveGraph_triggered()
 {
     ui->tabWidget->setCurrentWidget(ui->graphTab);
 
-    QString file_name, extension;
+    QString file_name;
     QDir path(mainApp->openDialogInitialDir());
     QString pdf_filter = tr("Portable Document Format (*.pdf)");
     QString png_filter = tr("Portable Network Graphics (*.png)");
     QString bmp_filter = tr("Windows Bitmap (*.bmp)");
     // Gaze upon my beautiful graph with lossy artifacts!
     QString jpeg_filter = tr("JPEG File Interchange Format (*.jpeg *.jpg)");
-    QString filter = QStringLiteral("%1;;%2;;%3;;%4")
-            .arg(pdf_filter)
-            .arg(png_filter)
-            .arg(bmp_filter)
-            .arg(jpeg_filter);
+    QString filter = QStringLiteral("%1;;%2;;%3;;%4").arg(
+        pdf_filter,
+        png_filter,
+        bmp_filter,
+        jpeg_filter
+    );
+    QString extension = png_filter;
 
     QString save_file = path.canonicalPath();
     if (!file_closed_) {
@@ -876,7 +880,8 @@ void RtpAnalysisDialog::saveCsvData(QFile *save_file, QTreeWidget *tree)
     for (int row = 0; row < tree->topLevelItemCount(); row++) {
         QTreeWidgetItem *ti = tree->topLevelItem(row);
         if (ti->type() != rtp_analysis_type_) continue;
-        RtpAnalysisTreeWidgetItem *ra_ti = dynamic_cast<RtpAnalysisTreeWidgetItem *>((RtpAnalysisTreeWidgetItem *)ti);
+        RtpAnalysisTreeWidgetItem *ra_ti = dynamic_cast<RtpAnalysisTreeWidgetItem *>(ti);
+        if (ra_ti == nullptr) continue;
         QStringList values;
         foreach (QVariant v, ra_ti->rowData()) {
             if (!v.isValid()) {
@@ -914,7 +919,10 @@ void RtpAnalysisDialog::saveCsv(RtpAnalysisDialog::StreamDirection direction)
     if (file_path.isEmpty()) return;
 
     QFile save_file(file_path);
-    save_file.open(QFile::WriteOnly);
+    if (!save_file.open(QFile::WriteOnly)) {
+        // XXX - Warning dialog on failure?
+        return;
+    }
 
     switch (direction) {
     case dir_one_:
@@ -950,6 +958,7 @@ void RtpAnalysisDialog::saveCsv(RtpAnalysisDialog::StreamDirection direction)
         }
         break;
     }
+    // XXX - Check for failure and warn?
 }
 
 bool RtpAnalysisDialog::eventFilter(QObject *, QEvent *event)

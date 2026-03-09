@@ -24,7 +24,6 @@ You'll find additional dissector related information in the following README
 files:
 
 - doc/README.heuristic      - what are heuristic dissectors and how to write them
-- doc/README.plugins        - how to "pluginize" a dissector
 - doc/README.request_response_tracking - how to track req./resp. times and such
 - doc/README.wmem           - how to obtain "memory leak free" memory
 
@@ -461,7 +460,7 @@ and produces UTF-8 in the buffer. See below for a list of input encoding values.
 The buffer is allocated in the given wmem scope (see README.wmem for more
 information).
 
-uint8_t *tvb_get_stringz_enc(wmem_allocator_t *scope, tvbuff_t *tvb, const int offset, int *lengthp, const unsigned encoding);
+uint8_t *tvb_get_stringz_enc(wmem_allocator_t *scope, tvbuff_t *tvb, const int offset, unsigned int *lengthp, const unsigned encoding);
 
 Returns a null-terminated buffer allocated from the specified scope,
 containing data from the specified tvbuff, starting at the specified
@@ -536,12 +535,12 @@ A pointer to the packet scope allocated string will be returned.
 Note: a tvbuff content of 0xf is considered a 'filler' and will end the conversion.
 
 Copying memory:
-void *tvb_memcpy(tvbuff_t *tvb, void *target, const int offset, size_t length);
+void *tvb_memcpy(tvbuff_t *tvb, void *target, const unsigned offset, size_t length);
 
 Copies into the specified target the specified length's worth of data
 from the specified tvbuff, starting at the specified offset.
 
-void *tvb_memdup(wmem_allocator_t *scope, tvbuff_t *tvb, const int offset, size_t length);
+void *tvb_memdup(wmem_allocator_t *scope, tvbuff_t *tvb, const unsigned offset, size_t length);
 
 Returns a buffer containing a copy of the given TVB bytes. The buffer is
 allocated in the given wmem scope (see README.wmem for more information).
@@ -828,10 +827,7 @@ Here is how the frame "protocol" is registered.
 
         int proto_frame;
 
-        proto_frame = proto_register_protocol (
-                /* name */            "Frame",
-                /* short name */      "Frame",
-                /* abbrev */          "frame" );
+        proto_frame = proto_register_protocol("Frame", "Frame", "frame"); /* name, short name, abbreviation */
 
 A header field is also registered with its name and abbreviation, but
 information about its data type is needed. It helps to look at
@@ -1143,7 +1139,8 @@ Use this macro to initialize the extended value_string at compile time:
 static value_string_ext valstringname_ext = VALUE_STRING_EXT_INIT(valstringname);
 
 Extended value strings can be created at run time by calling
-   value_string_ext_new(<ptr to value_string array>,
+   value_string_ext_new(<wmem scope for the value_string, most likely wmem_epan_scope()>
+                        <ptr to value_string array>,
                         <total number of entries in the value_string_array>, /* include {0, NULL} entry */
                         <value_string_name>);
 
@@ -1170,7 +1167,8 @@ Use this macro to initialize the extended val64_string at compile time:
 static val64_string_ext val64stringname_ext = VAL64_STRING_EXT_INIT(val64stringname);
 
 Extended val64 strings can be created at run time by calling
-   val64_string_ext_new(<ptr to val64_string array>,
+   val64_string_ext_new(<wmem scope for the value_string, most likely wmem_epan_scope()>
+                        <ptr to val64_string array>,
                         <total number of entries in the val64_string_array>, /* include {0, NULL} entry */
                         <val64_string_name>);
 
@@ -1613,9 +1611,14 @@ encodings that are currently supported are:
         NTP time). It's used by the Object Management Group's Real-Time
         Publish-Subscribe Wire Protocol for the Data Distribution Service.
 
-    ENC_TIME_SECS_USECS - 8 bytes; the first 4 bytes are seconds since the
-        UN*X epoch and the next 4 bytes are microseconds since that
-        second. (I.e., a UN*X struct timeval with a 4-byte time_t.)
+    ENC_TIME_SECS_USECS - 8, 12, or 16 bytes. For 8 bytes, the first 4
+        bytes are seconds and the next 4 bytes are microseconds; for 12
+        bytes, the first 8 bytes are seconds and the next 4 bytes are
+        microseconds; for 16 bytes, the first 8 bytes are seconds and
+        the next 8 bytes are microseconds. The seconds are seconds
+        since the UN*X epoch. (I.e., a POSIX struct timeval with a 4-byte
+        time_t and a 4-byte suseconds_t, or an 8-byte time_t and either
+        a 4-byte or 8-byte suseconds_t.)
 
     ENC_TIME_SECS - 4 to 8 bytes, representing a value in seconds since
         the UN*X epoch.
@@ -2218,7 +2221,7 @@ to generate a COL_INFO line for a frame.
 val_to_str() handles the most common case:
 
     const char *
-    val_to_str(uint32_t val, const value_string *vs, const char *fmt)
+    val_to_str(wmem_allocator_t* scope, uint32_t val, const value_string *vs, const char *fmt)
 
 If the value 'val' is found in the 'value_string' table pointed to by
 'vs', 'val_to_str' will return the corresponding string; otherwise, it
@@ -2226,7 +2229,7 @@ will use 'fmt' as an 'sprintf'-style format, with 'val' as an argument,
 to generate a string, and will return a pointer to that string.
 You can use it in a call to generate a COL_INFO line for a frame such as
 
-    col_add_fstr(COL_INFO, ", %s", val_to_str(val, table, "Unknown %d"));
+    col_add_fstr(COL_INFO, ", %s", val_to_str(pinfo->pool, val, table, "Unknown %d"));
 
 If you don't need to display 'val' in your fmt string, you can use
 val_to_str_const() which just takes a string constant instead and returns it
@@ -2285,8 +2288,9 @@ contains the payload portion of the protocol (that is, the bytes
 that are relevant to the next dissector).
 
 To create a new TVBUFF_SUBSET that begins at a specified offset in a
-parent tvbuff, and runs to the end of the parent tvbuff, the routine
-tvbuff_new_subset_remaining() is used:
+parent tvbuff, and runs to the end of the parent tvbuff (i.e., when
+the current protocol doesn't specify the size of the payload), the
+routine tvbuff_new_subset_remaining() is used:
 
     next_tvb = tvb_new_subset_remaining(tvb, offset);
 
@@ -2333,13 +2337,10 @@ Where:
     offset is the byte offset of 'tvb' at which the new tvbuff
     should start. The first byte is the byte at offset 0.
 
-    length is the number of bytes in the new TVBUFF_SUBSET. A length
-    argument of -1 says to use as many bytes as are available in
-    'tvb'.
+    length is the number of bytes in the new TVBUFF_SUBSET.
 
     reported_length is the number of bytes that the current protocol
-    says should be in the payload. A reported_length of -1 says that
-    the protocol doesn't say anything about the size of its payload.
+    says should be in the payload.
 
 To call a dissector you need to get the handle of the dissector using
 find_dissector(), passing it the string name of the dissector. The setting
@@ -2893,8 +2894,8 @@ upon the conversation index and values inside the request packets.
     conversation = find_or_create_conversation(pinfo);
 
     request_key.conversation = conversation->index;
-    request_key.service = pntoh16(&rxh->serviceId);
-    request_key.callnumber = pntoh32(&rxh->callNumber);
+    request_key.service = pntohu16(&rxh->serviceId);
+    request_key.callnumber = pntohu32(&rxh->callNumber);
 
     request_val = (struct afs_request_val *)g_hash_table_lookup(
         afs_request_hash, &request_key);
@@ -2906,12 +2907,86 @@ upon the conversation index and values inside the request packets.
         *new_request_key = request_key;
 
         request_val = wmem_alloc(wmem_file_scope(), sizeof(struct afs_request_val));
-        request_val -> opcode = pntoh32(&afsh->opcode);
+        request_val -> opcode = pntohu32(&afsh->opcode);
         opcode = request_val->opcode;
 
         g_hash_table_insert(afs_request_hash, new_request_key, request_val);
     }
 
+
+2.2.6 Registering your dissector for conversation filtering
+
+In cases where protocols define a conversation, you can register them through
+the UI menu of Wireshark by locating "Analyze -> Conversation Filter". This can
+reduce the task of isolating sessions and viewing them to a single click. For users
+that frequent a specific protocol in a conversation, this may save time and reduce errors.
+
+When you have a protocol to add to the UI, use the add_conversation_filter_protocol() function.
+Using this built-in function will allow you to add your dissector to a conversation, providing
+only the packets relevant to the specified protocol in a conversation.
+
+
+Example using the "example_protocol" protocol:
+    Use the add_conversation_filter_protocol() function with the conversation and your "example_protocol":
+        add_conversation_filter_protocol(example_protocol)
+
+
+
+2.2.7 Initialization and Cleanup in Dissector Plugins
+
+- proto_register_foo() should be used to register protocol fields and can
+  also perform global (once-only) initialization.
+- proto_reg_handoff_foo() is called after registration and is typically used
+  to register the dissector with heuristic or static tables.
+
+There are no built-in dissect_init() or dissect_cleanup() hooks. If your plugin
+needs to allocate temporary memory per-packet or per-frame, use the pinfo->pool
+which is an ephemeral memory pool managed by Wireshark and reset after each packet.
+
+Example:
+
+    static int proto_foo = -1;
+
+    void proto_register_foo(void) {
+        static hf_register_info hf[] = {
+            { &hf_foo_field,
+              { "Foo Field", "foo.field",
+                FT_UINT8, BASE_DEC, NULL, 0x0,
+                NULL, HFILL }
+            }
+        };
+        proto_foo = proto_register_protocol("Foo Protocol", "FOO", "foo");
+        proto_register_field_array(proto_foo, hf, array_length(hf));
+    }
+
+    void proto_reg_handoff_foo(void) {
+        dissector_handle_t foo_handle;
+
+        foo_handle = create_dissector_handle(dissect_foo, proto_foo);
+        dissector_add_uint("udp.port", FOO_PORT, foo_handle);
+    }
+
+2.2.8 Exported PDUs
+
+Wireshark supports Exported PDUs (Protocol Data Units), which allow pre-processed or extracted protocol payloads
+to be re-encapsulated and interpreted as individual packets. This is useful for cases where an external tool extracts
+sessions (e.g., VoIP, HTTP) and reinjects them into a capture for post-analysis.
+
+To handle Exported PDUs, Wireshark uses the `exported_pdu` dissector, which can wrap protocols like TCP, UDP, or any
+other payload into a new frame.
+
+An Exported PDU typically includes the following fields:
+
+- `pdu_type`: The protocol type of the encapsulated PDU.
+- `tvb`: The data buffer containing the payload.
+- `metadata`: (Optional) Custom information passed to the dissector.
+
+Plugins or dissectors can create and register exported PDUs using the internal API or by writing their data in PCAPNG
+format with `block_type` `0x00000BAD`.
+
+This mechanism improves modular analysis and allows tools to reuse Wireshark’s decoding logic.
+
+For more, see: `epan/exported_pdu.h`
 
 
 2.3 Dynamic conversation dissector registration.
@@ -3595,7 +3670,7 @@ instead, the API description here should be good enough.
 2.11.1 ptvcursor API.
 
 ptvcursor_t*
-ptvcursor_new(proto_tree* tree, tvbuff_t* tvb, int offset)
+ptvcursor_new(proto_tree* tree, tvbuff_t* tvb, unsigned offset)
     This creates a new ptvcursor_t object for iterating over a tvbuff.
 You must call this and use this ptvcursor_t object so you can use the
 ptvcursor API.
@@ -3610,11 +3685,11 @@ starts where this call finished. The 'encoding' parameter is relevant for
 certain type of fields (See above under proto_tree_add_item()).
 
 proto_item *
-ptvcursor_add_ret_uint(ptvcursor_t* ptvc, int hf, int length, const unsigned encoding, uint32_t *retval);
+ptvcursor_add_ret_uint(ptvcursor_t* ptvc, int hf, unsigned length, const unsigned encoding, uint32_t *retval);
     Like ptvcursor_add, but returns uint value retrieved
 
 proto_item *
-ptvcursor_add_ret_int(ptvcursor_t* ptvc, int hf, int length, const unsigned encoding, int32_t *retval);
+ptvcursor_add_ret_int(ptvcursor_t* ptvc, int hf, unsigned length, const unsigned encoding, int32_t *retval);
     Like ptvcursor_add, but returns int value retrieved
 
 proto_item *
@@ -3622,7 +3697,7 @@ ptvcursor_add_ret_string(ptvcursor_t* ptvc, int hf, int length, const unsigned e
     Like ptvcursor_add, but returns string retrieved
 
 proto_item *
-ptvcursor_add_ret_boolean(ptvcursor_t* ptvc, int hf, int length, const unsigned encoding, bool *retval);
+ptvcursor_add_ret_boolean(ptvcursor_t* ptvc, int hf, unsigned length, const unsigned encoding, bool *retval);
     Like ptvcursor_add, but returns boolean value retrieved
 
 proto_item *
@@ -3630,7 +3705,7 @@ ptvcursor_add_no_advance(ptvcursor_t* ptvc, int hf, int length, const unsigned e
     Like ptvcursor_add, but does not advance the internal cursor.
 
 void
-ptvcursor_advance(ptvcursor_t* ptvc, int length)
+ptvcursor_advance(ptvcursor_t* ptvc, unsigned length)
     Advances the internal cursor without adding anything to the proto_tree.
 
 void
@@ -3670,7 +3745,7 @@ tvbuff_t *
 ptvcursor_tvbuff(ptvcursor_t* ptvc)
     Returns the tvbuff associated with the ptvcursor.
 
-int
+unsigned
 ptvcursor_current_offset(ptvcursor_t* ptvc)
     Returns the current offset.
 

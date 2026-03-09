@@ -284,7 +284,7 @@ static void dissect_simple_link16(tvbuff_t *tvb, packet_info *pinfo _U_, proto_t
     case SIMPLE_LINK16_FIXED_FORMAT:
         memset(&state, 0, sizeof(state));
         for (i = 0; i < word_count; i += 5) {
-            newtvb = tvb_new_subset_length_caplen(tvb, offset, 10, -1);
+            newtvb = tvb_new_subset_length(tvb, offset, 10);
             add_new_data_source(pinfo, newtvb, "Link 16 Word");
             call_dissector_with_data(link16_handle, newtvb, pinfo, tree, &state);
             offset += 10;
@@ -317,7 +317,7 @@ static void dissect_simple_status(tvbuff_t *tvb, packet_info *pinfo, proto_tree 
     proto_tree_add_item(tree, hf_simple_status_word_count, tvb, offset, 1, ENC_NA);
     offset++;
 
-    name = tvb_get_stringzpad(pinfo->pool, tvb, offset, SIMPLE_STATUS_NAME_LEN, ENC_ASCII|ENC_NA);
+    name = (char*)tvb_get_stringzpad(pinfo->pool, tvb, offset, SIMPLE_STATUS_NAME_LEN, ENC_ASCII|ENC_NA);
     col_append_fstr(pinfo->cinfo, COL_INFO, ", Name: %s", name);
     proto_tree_add_item(tree, hf_simple_status_name, tvb, offset, SIMPLE_STATUS_NAME_LEN, ENC_ASCII);
     offset += SIMPLE_STATUS_NAME_LEN;

@@ -22,9 +22,6 @@
 
 #include "ws_symbol_export.h"
 
-void proto_reg_handoff_camel(void);
-void proto_register_camel(void);
-
 /* Defines for the camel taps */
 #define	camel_MAX_NUM_OPR_CODES	256
 
@@ -49,8 +46,6 @@ WS_DLL_PUBLIC const value_string camel_opr_code_strings[];
 #define CAMELSRT_GPRS_REPORT 8
 
 #define CAMELSRT_SMS_INITIALDP 9
-
-WS_DLL_PUBLIC const value_string  camelSRTtype_naming[];
 
 /** If we have a request message and its response,
    (eg: ApplyCharging, ApplyChargingReport)
@@ -121,7 +116,5 @@ void camelsrt_call_matching(tvbuff_t *tvb,
 			    packet_info * pinfo _U_,
 			    proto_tree *tree,
 			    struct camelsrt_info_t * p_camel_info);
-
-WS_DLL_PUBLIC bool gcamel_StatSRT;
 
 #endif  /* PACKET_camel_H */

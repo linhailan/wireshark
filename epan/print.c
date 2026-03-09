@@ -89,6 +89,7 @@ static char *get_field_hex_value(GSList *src_list, field_info *fi);
 static void proto_tree_print_node(proto_node *node, void *data);
 static void proto_tree_write_node_pdml(proto_node *node, void *data);
 static void proto_tree_write_node_ek(proto_node *node, write_json_data *data);
+static struct data_source* get_field_data_source(GSList *src_list, field_info *fi, uint32_t *idx);
 static const uint8_t *get_field_data(GSList *src_list, field_info *fi);
 static void pdml_write_field_hex_value(write_pdml_data *pdata, field_info *fi);
 static void json_write_field_hex_value(write_json_data *pdata, field_info *fi);
@@ -254,7 +255,7 @@ proto_tree_print_node(proto_node *node, void *data)
 #define PDML2HTML_XSL "pdml2html.xsl"
 #define PDML2HTML_URL "https://gitlab.com/wireshark/wireshark/-/tree/master/resources/share/doc/wireshark/"
 void
-write_pdml_preamble(FILE *fh, const char *filename)
+write_pdml_preamble(FILE *fh, const char *filename, const char* doc_dir)
 {
     time_t t = time(NULL);
     struct tm * timeinfo;
@@ -272,7 +273,7 @@ write_pdml_preamble(FILE *fh, const char *filename)
 
     fprintf(fh, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
     fprintf(fh, "<?xml-stylesheet type=\"text/xsl\" href=\"" PDML2HTML_XSL "\"?>\n");
-    fprintf(fh, "<!-- You can find " PDML2HTML_XSL " in %s or at "PDML2HTML_URL PDML2HTML_XSL ". -->\n", get_doc_dir());
+    fprintf(fh, "<!-- You can find " PDML2HTML_XSL " in %s or at "PDML2HTML_URL PDML2HTML_XSL ". -->\n", doc_dir);
     fprintf(fh, "<pdml version=\"" PDML_VERSION "\" creator=\"%s/%s\" time=\"%s\" capture_file=\"", PACKAGE, VERSION, ts);
     if (filename) {
         /* \todo filename should be converted to UTF-8. */
@@ -958,49 +959,25 @@ static void
 write_json_proto_node_hex_dump(proto_node *node, write_json_data *pdata)
 {
     field_info *fi = node->finfo;
+    uint32_t src_idx;
 
     json_dumper_begin_array(pdata->dumper);
 
-    if (fi->hfinfo->bitmask!=0) {
-        switch (fvalue_type_ftenum(fi->value)) {
-            case FT_INT8:
-            case FT_INT16:
-            case FT_INT24:
-            case FT_INT32:
-                json_dumper_value_anyf(pdata->dumper, "\"%X\"", (unsigned) fvalue_get_sinteger(fi->value));
-                break;
-            case FT_CHAR:
-            case FT_UINT8:
-            case FT_UINT16:
-            case FT_UINT24:
-            case FT_UINT32:
-                json_dumper_value_anyf(pdata->dumper, "\"%X\"", fvalue_get_uinteger(fi->value));
-                break;
-            case FT_INT40:
-            case FT_INT48:
-            case FT_INT56:
-            case FT_INT64:
-                json_dumper_value_anyf(pdata->dumper, "\"%" PRIX64 "\"", fvalue_get_sinteger64(fi->value));
-                break;
-            case FT_UINT40:
-            case FT_UINT48:
-            case FT_UINT56:
-            case FT_UINT64:
-            case FT_BOOLEAN:
-                json_dumper_value_anyf(pdata->dumper, "\"%" PRIX64 "\"", fvalue_get_uinteger64(fi->value));
-                break;
-            default:
-                ws_assert_not_reached();
-        }
-    } else {
-        json_write_field_hex_value(pdata, fi);
-    }
+    json_write_field_hex_value(pdata, fi);
 
-    /* Dump raw hex-encoded dissected information including position, length, bitmask, type */
+    /* Dump raw hex-encoded dissected information including position, length,
+     * bitmask, type, and data source index. */
+    /* These were added for use by json2pcap, but might be useful for others. */
     json_dumper_value_anyf(pdata->dumper, "%" PRId32, fi->start);
     json_dumper_value_anyf(pdata->dumper, "%" PRId32, fi->length);
     json_dumper_value_anyf(pdata->dumper, "%" PRIu64, fi->hfinfo->bitmask);
     json_dumper_value_anyf(pdata->dumper, "%" PRId32, (int32_t)fvalue_type_ftenum(fi->value));
+
+    if (get_field_data_source(pdata->src_list, fi, &src_idx)) {
+        json_dumper_value_anyf(pdata->dumper, "%" PRIu32, src_idx);
+    } else {
+        json_dumper_value_anyf(pdata->dumper, "null");
+    }
 
     json_dumper_end_array(pdata->dumper);
 }
@@ -1194,7 +1171,7 @@ ek_check_protocolfilter(wmem_map_t *protocolfilter, const char *str, pf_flags *f
 static void
 write_ek_summary(column_info *cinfo, write_json_data* pdata)
 {
-    int i;
+    unsigned i;
 
     for (i = 0; i < cinfo->num_cols; i++) {
         if (!get_column_visible(i))
@@ -1278,46 +1255,12 @@ ek_write_name(proto_node *pnode, char* suffix, write_json_data* pdata)
 static void
 ek_write_hex(field_info *fi, write_json_data *pdata)
 {
-    if (fi->hfinfo->bitmask != 0) {
-        switch (fvalue_type_ftenum(fi->value)) {
-            case FT_INT8:
-            case FT_INT16:
-            case FT_INT24:
-            case FT_INT32:
-                json_dumper_value_anyf(pdata->dumper, "\"%X\"", (unsigned) fvalue_get_sinteger(fi->value));
-                break;
-            case FT_CHAR:
-            case FT_UINT8:
-            case FT_UINT16:
-            case FT_UINT24:
-            case FT_UINT32:
-                json_dumper_value_anyf(pdata->dumper, "\"%X\"", fvalue_get_uinteger(fi->value));
-                break;
-            case FT_INT40:
-            case FT_INT48:
-            case FT_INT56:
-            case FT_INT64:
-                json_dumper_value_anyf(pdata->dumper, "\"%" PRIX64 "\"", fvalue_get_sinteger64(fi->value));
-                break;
-            case FT_UINT40:
-            case FT_UINT48:
-            case FT_UINT56:
-            case FT_UINT64:
-            case FT_BOOLEAN:
-                json_dumper_value_anyf(pdata->dumper, "\"%" PRIX64 "\"", fvalue_get_uinteger64(fi->value));
-                break;
-            default:
-                ws_assert_not_reached();
-        }
-    } else {
-        json_write_field_hex_value(pdata, fi);
-    }
+    json_write_field_hex_value(pdata, fi);
 }
 
 static void
 ek_write_field_value(field_info *fi, write_json_data* pdata)
 {
-    char label_str[ITEM_LABEL_LENGTH];
     char *dfilter_string;
 
     /* Text label */
@@ -1331,24 +1274,28 @@ ek_write_field_value(field_info *fi, write_json_data* pdata)
                 json_dumper_value_string(pdata->dumper, fi->rep->representation);
             }
             else {
-                proto_item_fill_label(fi, label_str, NULL);
-                json_dumper_value_string(pdata->dumper, label_str);
+                json_dumper_value_string(pdata->dumper, fi->hfinfo->name);
             }
             break;
-        case FT_NONE:
-            json_dumper_value_string(pdata->dumper, NULL);
-            break;
         case FT_BOOLEAN:
+            /* XXX - This is to use a JSON boolean literal, though ElasticSearch
+             * supports automatic conversion from "true" and "false" for boolean
+             * types*, so this could be handled, albeit less efficiently due to
+             * the string allocation, by the general case. (*But not from other
+             * truthy or falsy strings like "1" and "0" since 6.0. Compare:
+             * https://www.elastic.co/guide/en/elasticsearch/reference/5.0/boolean.html
+             * https://www.elastic.co/guide/en/elasticsearch/reference/6.0/boolean.html
+             * https://www.elastic.co/docs/reference/elasticsearch/mapping-reference/boolean
+             * )
+             */
             if (fvalue_get_uinteger64(fi->value))
                 json_dumper_value_anyf(pdata->dumper, "true");
             else
                 json_dumper_value_anyf(pdata->dumper, "false");
             break;
         default:
-            dfilter_string = fvalue_to_string_repr(NULL, fi->value, FTREPR_JSON, fi->hfinfo->display);
-            if (dfilter_string != NULL) {
-                json_dumper_value_string(pdata->dumper, dfilter_string);
-            }
+            dfilter_string = fvalue_to_string_repr(NULL, fi->value, FTREPR_EK, fi->hfinfo->display);
+            json_dumper_value_string(pdata->dumper, dfilter_string);
             wmem_free(NULL, dfilter_string);
             break;
         }
@@ -1462,7 +1409,7 @@ ek_write_attr(GSList *attr_instances, write_json_data *pdata)
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
-void process_ek_attrs(gpointer key _U_, gpointer value, gpointer pdata)
+void process_ek_attrs(void *key _U_, void *value, void *pdata)
 {
     GSList *attr_instances = (GSList *) value;
     ek_write_attr(attr_instances, pdata);
@@ -1475,7 +1422,7 @@ proto_tree_write_node_ek(proto_node *node, write_json_data *pdata)
 {
     GHashTable *attr_table  = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
     GHashTableIter iter;
-    gpointer key, value;
+    void *key, *value;
     ek_fill_attr(node, attr_table, pdata);
 
     // Print attributes
@@ -1549,8 +1496,8 @@ print_pdml_geninfo(epan_dissect_t *edt, FILE *fh)
 
     /* Print geninfo.timestamp */
     fprintf(fh,
-            "    <field name=\"timestamp\" pos=\"0\" show=\"%s\" showname=\"Captured Time\" value=\"%d.%09d\" size=\"%d\"/>\n",
-            tmp, (int)edt->pi.abs_ts.secs, edt->pi.abs_ts.nsecs, frame_finfo->length);
+            "    <field name=\"timestamp\" pos=\"0\" show=\"%s\" showname=\"Captured Time\" value=\"%jd.%09d\" size=\"%d\"/>\n",
+            tmp, (intmax_t)edt->pi.abs_ts.secs, edt->pi.abs_ts.nsecs, frame_finfo->length);
 
     wmem_free(NULL, tmp);
 
@@ -1568,7 +1515,7 @@ write_pdml_finale(FILE *fh)
 void
 write_psml_preamble(column_info *cinfo, FILE *fh)
 {
-    int i;
+    unsigned i;
 
     fprintf(fh, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
     fprintf(fh, "<psml version=\"" PSML_VERSION "\" creator=\"%s/%s\">\n", PACKAGE, VERSION);
@@ -1588,7 +1535,7 @@ write_psml_preamble(column_info *cinfo, FILE *fh)
 void
 write_psml_columns(epan_dissect_t *edt, FILE *fh, bool use_color)
 {
-    int i;
+    unsigned i;
     const color_filter_t *cfp = edt->pi.fd->color_filter;
 
     if (use_color && (cfp != NULL)) {
@@ -1655,7 +1602,7 @@ static void csv_write_str(const char *str, char sep, FILE *fh, bool print_separa
 void
 write_csv_column_titles(column_info *cinfo, FILE *fh)
 {
-    int i;
+    unsigned i;
     bool print_separator = false;
     // Avoid printing separator for first column
 
@@ -1673,7 +1620,7 @@ write_csv_column_titles(column_info *cinfo, FILE *fh)
 void
 write_csv_columns(epan_dissect_t *edt, FILE *fh)
 {
-    int i;
+    unsigned i;
     bool print_separator = false;
     // Avoid printing separator for first column
 
@@ -1694,7 +1641,7 @@ write_carrays_hex_data(uint32_t num, FILE *fh, epan_dissect_t *edt)
     uint32_t      i = 0, src_num = 0;
     GSList       *src_le;
     tvbuff_t     *tvb;
-    char         *name;
+    char         *description;
     const unsigned char *cp;
     unsigned      length;
     char          ascii[9];
@@ -1710,10 +1657,10 @@ write_carrays_hex_data(uint32_t num, FILE *fh, epan_dissect_t *edt)
 
         cp = tvb_get_ptr(tvb, 0, length);
 
-        name = get_data_source_name(src);
-        if (name) {
-            fprintf(fh, "// %s\n", name);
-            wmem_free(NULL, name);
+        description = get_data_source_description(src);
+        if (description) {
+            fprintf(fh, "// %s\n", description);
+            wmem_free(NULL, description);
         }
         if (src_num) {
             fprintf(fh, "static const unsigned char pkt%u_%u[%u] = {\n",
@@ -1751,6 +1698,35 @@ write_carrays_hex_data(uint32_t num, FILE *fh, epan_dissect_t *edt)
 }
 
 /*
+ * Find the data source for a specified field, and return a pointer to it.
+ * Also returns the index of the data source in the list of data sources
+ * Returns NULL if the field's data source is not in the list of data sources,
+ * in which case idx is not valid.
+ */
+static struct data_source*
+get_field_data_source(GSList *src_list, field_info *fi, uint32_t *idx)
+{
+    GSList   *src_le;
+    struct data_source *src;
+    uint32_t  src_idx = 0;
+
+    for (src_le = src_list; src_le != NULL; src_le = src_le->next) {
+        src = (struct data_source *)src_le->data;
+        if (fi->ds_tvb == get_data_source_tvb(src)) {
+            /*
+             * Found it.
+             */
+            if (idx) {
+                *idx = src_idx;
+            }
+            return src;
+        }
+        src_idx++;
+    }
+    return NULL;  /* not found */
+}
+
+/*
  * Find the data source for a specified field, and return a pointer
  * to the data in it. Returns NULL if the data is out of bounds.
  */
@@ -1758,40 +1734,40 @@ write_carrays_hex_data(uint32_t num, FILE *fh, epan_dissect_t *edt)
  *      Why bother searching for fi->ds_tvb for the matching tvb
  *       in the data_source list ?
  *      IOW: Why not just use fi->ds_tvb for the arg to tvb_get_ptr() ?
+ *
+ *      The effect is that if the field was added to the tree with a
+ *      a tvb whose data source tvb was *not* added to pinfo with
+ *      add_new_data_source, then it won't get printed. But why?
  */
-
 static const uint8_t *
 get_field_data(GSList *src_list, field_info *fi)
 {
-    GSList   *src_le;
     tvbuff_t *src_tvb;
     int       length, tvbuff_length;
     struct data_source *src;
 
-    for (src_le = src_list; src_le != NULL; src_le = src_le->next) {
-        src = (struct data_source *)src_le->data;
+    src = get_field_data_source(src_list, fi, NULL);
+    if (src) {
         src_tvb = get_data_source_tvb(src);
-        if (fi->ds_tvb == src_tvb) {
-            /*
-             * Found it.
-             *
-             * XXX - a field can have a length that runs past
-             * the end of the tvbuff.  Ideally, that should
-             * be fixed when adding an item to the protocol
-             * tree, but checking the length when doing
-             * that could be expensive.  Until we fix that,
-             * we'll do the check here.
-             */
-            tvbuff_length = tvb_captured_length_remaining(src_tvb,
-                                                 fi->start);
-            if (tvbuff_length < 0) {
-                return NULL;
-            }
-            length = fi->length;
-            if (length > tvbuff_length)
-                length = tvbuff_length;
-            return tvb_get_ptr(src_tvb, fi->start, length);
+        /*
+         * Found it.
+         *
+         * XXX - a field can have a length that runs past
+         * the end of the tvbuff.  Ideally, that should
+         * be fixed when adding an item to the protocol
+         * tree, but checking the length when doing
+         * that could be expensive.  Until we fix that,
+         * we'll do the check here.
+         */
+        tvbuff_length = tvb_captured_length_remaining(src_tvb,
+                                             fi->start);
+        if (tvbuff_length < 0) {
+            return NULL;
         }
+        length = fi->length;
+        if (length > tvbuff_length)
+            length = tvbuff_length;
+        return tvb_get_ptr(src_tvb, fi->start, length);
     }
     return NULL;  /* not found */
 }
@@ -1840,13 +1816,13 @@ print_escaped_csv(FILE *fh, const char *unescaped_string, char delimiter, char q
 static void
 pdml_write_field_hex_value(write_pdml_data *pdata, field_info *fi)
 {
-    int           i;
+    unsigned       i;
     const uint8_t *pd;
 
     if (!fi->ds_tvb)
         return;
 
-    if (fi->length > tvb_captured_length_remaining(fi->ds_tvb, fi->start)) {
+    if (fi->length > (unsigned)tvb_captured_length_remaining(fi->ds_tvb, fi->start)) {
         fprintf(pdata->fh, "field length invalid!");
         return;
     }
@@ -1882,10 +1858,48 @@ json_write_field_hex_value(write_json_data *pdata, field_info *fi)
 {
     const uint8_t *pd;
 
-    if (!fi->ds_tvb)
-        return;
+    // XXX - Why are uppercase hex digits used if the bitmask is non zero,
+    // and lowercase otherwise? To give a hint that there was a bitmask?
+    if (fi->hfinfo->bitmask!=0) {
+        switch (fvalue_type_ftenum(fi->value)) {
+            case FT_INT8:
+            case FT_INT16:
+            case FT_INT24:
+            case FT_INT32:
+                json_dumper_value_anyf(pdata->dumper, "\"%X\"", (unsigned) fvalue_get_sinteger(fi->value));
+                return;
+            case FT_CHAR:
+            case FT_UINT8:
+            case FT_UINT16:
+            case FT_UINT24:
+            case FT_UINT32:
+                json_dumper_value_anyf(pdata->dumper, "\"%X\"", fvalue_get_uinteger(fi->value));
+                return;
+            case FT_INT40:
+            case FT_INT48:
+            case FT_INT56:
+            case FT_INT64:
+                json_dumper_value_anyf(pdata->dumper, "\"%" PRIX64 "\"", fvalue_get_sinteger64(fi->value));
+                return;
+            case FT_UINT40:
+            case FT_UINT48:
+            case FT_UINT56:
+            case FT_UINT64:
+            case FT_BOOLEAN:
+                json_dumper_value_anyf(pdata->dumper, "\"%" PRIX64 "\"", fvalue_get_uinteger64(fi->value));
+                return;
+            default:
+                ws_assert_not_reached();
+        }
+    }
 
-    if (fi->length > tvb_captured_length_remaining(fi->ds_tvb, fi->start)) {
+    if (!fi->ds_tvb) {
+        // Should this be null instead of the empty string?
+        json_dumper_value_string(pdata->dumper, "");
+        return;
+    }
+
+    if (fi->length > (unsigned)tvb_captured_length_remaining(fi->ds_tvb, fi->start)) {
         json_dumper_value_string(pdata->dumper, "field length invalid!");
         return;
     }
@@ -1894,7 +1908,7 @@ json_write_field_hex_value(write_json_data *pdata, field_info *fi)
     pd = get_field_data(pdata->src_list, fi);
 
     if (pd) {
-        int i;
+        unsigned i;
         char* str = (char*)g_malloc(fi->length*2 + 1);    /* no need to zero */
         static const char hex[] = "0123456789abcdef";
         /* Print a simple hex dump */
@@ -1907,6 +1921,7 @@ json_write_field_hex_value(write_json_data *pdata, field_info *fi)
         json_dumper_value_string(pdata->dumper, str);
         g_free(str);
     } else {
+        // Should this be null instead of the empty string?
         json_dumper_value_string(pdata->dumper, "");
     }
 }
@@ -1917,7 +1932,7 @@ print_hex_data(print_stream_t *stream, epan_dissect_t *edt, unsigned hexdump_opt
     bool          multiple_sources;
     GSList       *src_le;
     tvbuff_t     *tvb;
-    char         *line, *name;
+    char         *line, *description;
     const unsigned char *cp;
     unsigned      length;
     struct data_source *src;
@@ -1940,9 +1955,9 @@ print_hex_data(print_stream_t *stream, epan_dissect_t *edt, unsigned hexdump_opt
         src = (struct data_source *)src_le->data;
         tvb = get_data_source_tvb(src);
         if (multiple_sources && (HEXDUMP_SOURCE_OPTION(hexdump_options) == HEXDUMP_SOURCE_MULTI)) {
-            name = get_data_source_name(src);
-            line = ws_strdup_printf("%s:", name);
-            wmem_free(NULL, name);
+            description = get_data_source_description(src);
+            line = ws_strdup_printf("%s:", description);
+            wmem_free(NULL, description);
             print_line(stream, 0, line);
             g_free(line);
         }
@@ -2715,7 +2730,7 @@ get_field_hex_value(GSList *src_list, field_info *fi)
     if (!fi->ds_tvb)
         return NULL;
 
-    if (fi->length > tvb_captured_length_remaining(fi->ds_tvb, fi->start)) {
+    if (fi->length > (unsigned)tvb_captured_length_remaining(fi->ds_tvb, fi->start)) {
         return g_strdup("field length invalid!");
     }
 
@@ -2723,10 +2738,10 @@ get_field_hex_value(GSList *src_list, field_info *fi)
     pd = get_field_data(src_list, fi);
 
     if (pd) {
-        int        i;
+        unsigned   i;
         char      *buffer;
         char      *p;
-        int        len;
+        unsigned   len;
         const int  chars_per_byte = 2;
 
         len    = chars_per_byte * fi->length;

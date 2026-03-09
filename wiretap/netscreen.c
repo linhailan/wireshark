@@ -12,7 +12,7 @@
 
 #include "config.h"
 #include "netscreen.h"
-#include "wtap-int.h"
+#include "wtap_module.h"
 #include "file_wrappers.h"
 
 #include <stdlib.h>
@@ -267,7 +267,7 @@ netscreen_seek_read(wtap *wth, int64_t seek_off, wtap_rec *rec,
  *   <length> is the length of the packet on the network;
  *
  *   <llinfo>, at least for Ethernet, appears to be a source MAC
- *     address, folowed by "->", folowed by a destination MAC
+ *     address, followed by "->", followed by a destination MAC
  *     address, followed by a sequence of Ethertypes, each
  *     preceded by a "/" (multiple Ethertypes if there are VLAN
  *     tags and the like), possibly followed by ", tag <tag>".
@@ -296,7 +296,7 @@ parse_netscreen_packet(FILE_T fh, wtap_rec *rec, char *line,
 	int		offset = 0;
 	char		dststr[13];
 
-	rec->rec_type = REC_TYPE_PACKET;
+	wtap_setup_packet_rec(rec, WTAP_ENCAP_UNKNOWN);
 	rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
 	rec->presence_flags = WTAP_HAS_TS|WTAP_HAS_CAP_LEN;
 	/* Suppress compiler warnings */
@@ -307,7 +307,7 @@ parse_netscreen_packet(FILE_T fh, wtap_rec *rec, char *line,
 		   &sec, &dsec, cap_int, direction, &pkt_len, cap_src, cap_dst) < 5) {
 		*err = WTAP_ERR_BAD_FILE;
 		*err_info = g_strdup("netscreen: Can't parse packet-header");
-		return -1;
+		return false;
 	}
 	if (pkt_len > WTAP_MAX_PACKET_SIZE_STANDARD) {
 		/*

@@ -41,7 +41,7 @@ void proto_register_simulcrypt(void);
  */
 typedef struct Tecm_interpretation
 {
-	int ca_system_id;
+	unsigned ca_system_id;
 	const char *protocol_name;
 	dissector_handle_t protocol_handle;
 	unsigned ecmg_port;
@@ -68,7 +68,7 @@ static int proto_simulcrypt;
 static dissector_handle_t simulcrypt_handle;
 
 /* Preferences (with default values) */
-static int ca_system_id_mikey = CA_SYSTEM_ID_MIKEY; /* MIKEY ECM CA_system_ID */
+static unsigned ca_system_id_mikey = CA_SYSTEM_ID_MIKEY; /* MIKEY ECM CA_system_ID */
 
 /* MIKEY payload start bytes */
 /*unsigned char mikey_start[3]={0x01,0x00,0x15};
@@ -767,7 +767,7 @@ dissect_ecmg_parameter_value (proto_tree *tree, tvbuff_t *tvb, packet_info *pinf
 	proto_tree *simulcrypt_ecm_datagram_tree;
 	tvbuff_t   *next_tvb;
 	uint32_t    pvaluedec;    /* parameter decimal value */
-	int         ca_system_id;
+	unsigned    ca_system_id;
 	unsigned    i;
 
 	switch (ptype) {
@@ -954,7 +954,7 @@ dissect_eis_parameter_value (proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo
 	proto_tree *simulcrypt_ecm_group_tree;
 	proto_tree *simulcrypt_activation_time_tree;
 	uint32_t    pvaluedec;    /* parameter decimal value */
-	int         ca_system_id;
+	unsigned    ca_system_id;
 	unsigned    i;
 
 	switch (ptype) {
@@ -1213,7 +1213,7 @@ dissect_simulcrypt_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
 
 	col_add_fstr(pinfo->cinfo, COL_INFO, "%d > %d Info Type:[%s]",
 		     pinfo->srcport, pinfo->destport,
-		     val_to_str_ext(type, &messagetypenames_ext, "Unknown Type:0x%02x"));
+		     val_to_str_ext(pinfo->pool, type, &messagetypenames_ext, "Unknown Type:0x%02x"));
 
 	if (tree)
 	{
@@ -1224,7 +1224,7 @@ dissect_simulcrypt_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
 		simulcrypt_item = proto_tree_add_item(tree, proto_simulcrypt, tvb, 0, -1, ENC_NA);
 		simulcrypt_tree = proto_item_add_subtree(simulcrypt_item, ett_simulcrypt);
 
-		proto_item_append_text(simulcrypt_item, ", Interface: %s", val_to_str(iftype, interfacenames, "Unknown (0x%02x)"));
+		proto_item_append_text(simulcrypt_item, ", Interface: %s", val_to_str(pinfo->pool, iftype, interfacenames, "Unknown (0x%02x)"));
 
 		/* Simulcrypt_tree analysis */
 		/* we are being asked for details */
@@ -1308,18 +1308,18 @@ dissect_simulcrypt_data(proto_tree *simulcrypt_tree, proto_item *simulcrypt_item
 		/* add length and value info to type */
 		switch (iftype) {
 		case SIMULCRYPT_ECMG_SCS:
-			proto_item_append_text(simulcrypt_item, ": Type=%s", val_to_str_ext(ptype, &ecmg_parametertypenames_ext, "Unknown Type:0x%02x"));
+			proto_item_append_text(simulcrypt_item, ": Type=%s", val_to_str_ext(pinfo->pool, ptype, &ecmg_parametertypenames_ext, "Unknown Type:0x%02x"));
 			break;
 		case SIMULCRYPT_EMMG_MUX:
-			proto_item_append_text(simulcrypt_item, ": Type=%s", val_to_str_ext(ptype, &emmg_parametertypenames_ext, "Unknown Type:0x%02x"));
+			proto_item_append_text(simulcrypt_item, ": Type=%s", val_to_str_ext(pinfo->pool, ptype, &emmg_parametertypenames_ext, "Unknown Type:0x%02x"));
 			break;
 		case SIMULCRYPT_EIS_SCS:
-			proto_item_append_text(simulcrypt_item, ": Type=%s", val_to_str_ext(ptype, &eis_parametertypenames_ext, "Unknown Type:0x%02x"));
+			proto_item_append_text(simulcrypt_item, ": Type=%s", val_to_str_ext(pinfo->pool, ptype, &eis_parametertypenames_ext, "Unknown Type:0x%02x"));
 			break;
 		case SIMULCRYPT_PSIG_MUX:
 		case SIMULCRYPT_MUX_CIM:
 		case SIMULCRYPT_PSIG_CIP:
-			proto_item_append_text(simulcrypt_item, ": Type=%s", val_to_str_ext(ptype, &psig_parametertypenames_ext, "Unknown Type:0x%02x"));
+			proto_item_append_text(simulcrypt_item, ": Type=%s", val_to_str_ext(pinfo->pool, ptype, &psig_parametertypenames_ext, "Unknown Type:0x%02x"));
 			break;
 		default:
 			proto_item_append_text(simulcrypt_item, ": Type=0x%02x", ptype);

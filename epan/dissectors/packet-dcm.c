@@ -756,25 +756,39 @@ dcm_init(void)
     unsigned   i;
 
     /* Create three hash tables for quick lookups */
+    /* XXX - These are constant hashmaps based on constant structs,
+     * produced by tools/make-packet-dcm.py
+     * The two with integer keys could use binary search (alter the
+     * Python script to sort). If a hash table is desired, GNU gperf
+     * or some perfect hash function generator should be used instead
+     * of inserting these on startup. */
     /* Add UID objects to hash table */
-    dcm_uid_table = wmem_map_new(wmem_file_scope(), wmem_str_hash, g_str_equal);
-    for (i = 0; i < array_length(dcm_uid_data); i++) {
-        wmem_map_insert(dcm_uid_table, (void *) dcm_uid_data[i].value,
-        (void *) &dcm_uid_data[i]);
+    if (dcm_uid_table == NULL) {
+        dcm_uid_table = wmem_map_new(wmem_epan_scope(), wmem_str_hash, g_str_equal);
+        wmem_map_reserve(dcm_uid_table, array_length(dcm_uid_data));
+        for (i = 0; i < array_length(dcm_uid_data); i++) {
+            wmem_map_insert(dcm_uid_table, (void *) dcm_uid_data[i].value,
+            (void *) &dcm_uid_data[i]);
+        }
     }
 
     /* Add Tag objects to hash table */
-    dcm_tag_table = wmem_map_new(wmem_file_scope(), g_direct_hash, g_direct_equal);
-    for (i = 0; i < array_length(dcm_tag_data); i++) {
-        wmem_map_insert(dcm_tag_table, GUINT_TO_POINTER(dcm_tag_data[i].tag),
-        (void *) &dcm_tag_data[i]);
+    if (dcm_tag_table == NULL) {
+        dcm_tag_table = wmem_map_new(wmem_epan_scope(), g_direct_hash, g_direct_equal);
+        wmem_map_reserve(dcm_tag_table, array_length(dcm_tag_data));
+        for (i = 0; i < array_length(dcm_tag_data); i++) {
+            wmem_map_insert(dcm_tag_table, GUINT_TO_POINTER(dcm_tag_data[i].tag),
+            (void *) &dcm_tag_data[i]);
+        }
     }
 
-   /* Add Status Values to hash table */
-    dcm_status_table = wmem_map_new(wmem_file_scope(), g_direct_hash, g_direct_equal);
-    for (i = 0; i < array_length(dcm_status_data); i++) {
-        wmem_map_insert(dcm_status_table, GUINT_TO_POINTER((uint32_t)dcm_status_data[i].value),
-        (void *)&dcm_status_data[i]);
+    /* Add Status Values to hash table */
+    if (dcm_status_table == NULL) {
+        dcm_status_table = wmem_map_new(wmem_epan_scope(), g_direct_hash, g_direct_equal);
+        for (i = 0; i < array_length(dcm_status_data); i++) {
+            wmem_map_insert(dcm_status_table, GUINT_TO_POINTER((uint32_t)dcm_status_data[i].value),
+            (void *)&dcm_status_data[i]);
+        }
     }
 }
 
@@ -1843,15 +1857,13 @@ dissect_dcm_assoc_user_identify(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
     proto_tree_add_item(assoc_item_user_identify_tree, hf_dcm_assoc_item_len, tvb, offset, 2, ENC_BIG_ENDIAN);
     offset += 2;
 
-    type = tvb_get_uint8(tvb, offset);
-    proto_tree_add_item(assoc_item_user_identify_tree, hf_dcm_info_user_identify_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint8(assoc_item_user_identify_tree, hf_dcm_info_user_identify_type, tvb, offset, 1, ENC_BIG_ENDIAN, &type);
     offset += 1;
 
     proto_tree_add_item(assoc_item_user_identify_tree, hf_dcm_info_user_identify_response_requested, tvb, offset, 1, ENC_BIG_ENDIAN);
     offset += 1;
 
-    primary_field_length = tvb_get_ntohs(tvb, offset);
-    proto_tree_add_item(assoc_item_user_identify_tree, hf_dcm_info_user_identify_primary_field_length, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint16(assoc_item_user_identify_tree, hf_dcm_info_user_identify_primary_field_length, tvb, offset, 2, ENC_BIG_ENDIAN, &primary_field_length);
     offset += 2;
 
     proto_tree_add_item(assoc_item_user_identify_tree, hf_dcm_info_user_identify_primary_field, tvb, offset, primary_field_length, ENC_UTF_8);
@@ -1859,8 +1871,8 @@ dissect_dcm_assoc_user_identify(tvbuff_t *tvb, packet_info *pinfo, proto_tree *t
     offset += primary_field_length;
 
     if (type == 2) {
-        secondary_field_length = tvb_get_ntohs(tvb, offset);
-        proto_tree_add_item(assoc_item_user_identify_tree, hf_dcm_info_user_identify_secondary_field_length, tvb, offset, 2, ENC_BIG_ENDIAN);
+        proto_tree_add_item_ret_uint16(assoc_item_user_identify_tree, hf_dcm_info_user_identify_secondary_field_length, tvb, offset, 2,
+                                       ENC_BIG_ENDIAN, &secondary_field_length);
         offset += 2;
 
         proto_tree_add_item(assoc_item_user_identify_tree, hf_dcm_info_user_identify_secondary_field, tvb, offset, secondary_field_length, ENC_UTF_8);
@@ -3980,12 +3992,10 @@ dissect_dcm_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t of
     dcm_ptree = proto_item_add_subtree(dcm_pitem, ett_dcm);
 
     /* PDU type is only one byte, then one byte reserved */
-    pdu_type = tvb_get_uint8(tvb, offset);
-    proto_tree_add_item(dcm_ptree, hf_dcm_pdu_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint8(dcm_ptree, hf_dcm_pdu_type, tvb, offset, 1, ENC_BIG_ENDIAN, &pdu_type);
     offset += 2;
 
-    pdu_len = tvb_get_ntohl(tvb, offset);
-    proto_tree_add_item(dcm_ptree, hf_dcm_pdu_len, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint(dcm_ptree, hf_dcm_pdu_len, tvb, offset, 4, ENC_BIG_ENDIAN, &pdu_len);
     offset += 4;
 
     /* Find previously detected association, else create a new one object*/

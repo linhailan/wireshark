@@ -14,10 +14,10 @@
 #include <stdio.h>
 
 #include <epan/packet.h>
-#include <epan/eap.h>
 #include <epan/expert.h>
 #include <wsutil/pint.h>
 #include <epan/proto_data.h>
+#include "packet-eap.h"
 
 void proto_register_peap(void);
 void proto_reg_handoff_peap(void);
@@ -79,7 +79,7 @@ dissect_peap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
            ))) {
     eap_len_buf = (unsigned char *)wmem_alloc(pinfo->pool, 2);
     eap_len_tvb = tvb_new_child_real_data(tvb, eap_len_buf, 2, 2);
-    phton16(eap_len_buf, 4 + len);
+    phtonu16(eap_len_buf, 4 + len);
 
     next_tvb = tvb_new_composite();
     tvb_composite_append(next_tvb, tvb_new_subset_length(eap_tvb, 0, 2));

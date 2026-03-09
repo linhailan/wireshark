@@ -24,7 +24,6 @@
 #include <epan/packet.h>
 
 #include "packet-gsm_a_common.h"
-#include "lapd_sapi.h"
 #include <epan/prefs.h>
 #include <epan/expert.h>
 #include <epan/conversation.h>
@@ -33,6 +32,7 @@
 
 #include <wsutil/array.h>
 
+#include "packet-lapd.h"
 #include "packet-rtp.h"
 #include "packet-rtcp.h"
 
@@ -1661,7 +1661,7 @@ dissect_rsl_phy_ctx_ab_rx_lvl_err_bits(tvbuff_t *tvb, packet_info *pinfo _U_, pr
     offset++;
     return offset;
 }
-/* Physcial Context dissection*
+/* Physical Context dissection*
  * Ext RandAccess *
  *
  */
@@ -3934,8 +3934,7 @@ dissct_rsl_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
     uint8_t paging_package_number;
 
     msg_disc = tvb_get_uint8(tvb, offset++) >> 1;
-    msg_type = tvb_get_uint8(tvb, offset) & 0x7f;
-    proto_tree_add_item(tree, hf_rsl_msg_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint8(tree, hf_rsl_msg_type, tvb, offset, 1, ENC_BIG_ENDIAN, &msg_type);
 
     if (msg_disc == RSL_MSGDISC_IPACCESS) {
         offset = dissct_rsl_ipaccess_msg(tvb, pinfo, tree, offset);
@@ -4720,7 +4719,7 @@ dissect_rsl(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 
     msg_type = tvb_get_uint8(tvb, offset+1) & 0x7f;
 
-    col_append_fstr(pinfo->cinfo, COL_INFO, "%s ", val_to_str_ext(msg_type, &rsl_msg_type_vals_ext, "unknown %u"));
+    col_append_fstr(pinfo->cinfo, COL_INFO, "%s ", val_to_str_ext(pinfo->pool, msg_type, &rsl_msg_type_vals_ext, "unknown %u"));
 
     top_tree = tree;
     ti = proto_tree_add_item(tree, proto_rsl, tvb, 0, -1, ENC_NA);

@@ -14,8 +14,8 @@
 
 #include <epan/packet.h>
 #include <epan/etypes.h>
-#include <epan/ppptypes.h>
 #include <epan/tfs.h>
+#include "packet-ppp.h"
 
 /* Offsets of fields within a BPDU */
 
@@ -102,7 +102,7 @@ dissect_dec_bpdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
     bpdu_type = tvb_get_uint8(tvb, BPDU_TYPE);
 
     col_add_str(pinfo->cinfo, COL_INFO,
-                val_to_str(bpdu_type, bpdu_type_vals,
+                val_to_str(pinfo->pool, bpdu_type, bpdu_type_vals,
                            "Unknown BPDU type (%u)"));
 
     set_actual_length(tvb, DEC_BPDU_SIZE);

@@ -37,7 +37,7 @@ Strict mode:
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/to_str.h>
-#include <epan/cisco_pid.h>
+#include "packet-cisco-pid.h"
 
 void proto_register_mcp(void);
 void proto_reg_handoff_mcp(void);
@@ -67,9 +67,6 @@ static expert_field ei_mcp_unexpected_tlv_length;
 
 static int ett_mcp;
 static int ett_mcp_tlv_header;
-
-#define PROTO_SHORT_NAME "MCP"
-#define PROTO_LONG_NAME "Miscabling Protocol"
 
 // non-strict mode
 typedef enum { // Total length of MCPDU = 62
@@ -134,7 +131,7 @@ dissect_mcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 	uint32_t fabricid, nodeid, vpcdomain, vpcid, portid, sendtime, strictmode;
 	char *sendtime_str, *vpcvtep_str;
 
-	col_set_str(pinfo->cinfo, COL_PROTOCOL, PROTO_SHORT_NAME);
+	col_set_str(pinfo->cinfo, COL_PROTOCOL, "MCP");
 	col_clear(pinfo->cinfo, COL_INFO);
 
 	ti = proto_tree_add_item(tree, proto_mcp, tvb, offset, -1,
@@ -162,11 +159,11 @@ dissect_mcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 
 		if (strict_mode) {
 			tlv_tree = proto_tree_add_subtree_format(mcp_tree, tvb, offset, tlv_length + 2,
-				ett_mcp_tlv_header, NULL, "%s", val_to_str(tlv_type, mcp_strict_type_vals, "Unknown (0x%02x)"));
+				ett_mcp_tlv_header, NULL, "%s", val_to_str(pinfo->pool, tlv_type, mcp_strict_type_vals, "Unknown (0x%02x)"));
 			proto_tree_add_uint(tlv_tree, hf_mcp_strict_tlv_type, tvb, offset, 1, tlv_type);
 		} else {
 			tlv_tree = proto_tree_add_subtree_format(mcp_tree, tvb, offset, tlv_length + 2,
-				ett_mcp_tlv_header, NULL, "%s", val_to_str(tlv_type, mcp_type_vals, "Unknown (0x%02x)"));
+				ett_mcp_tlv_header, NULL, "%s", val_to_str(pinfo->pool, tlv_type, mcp_type_vals, "Unknown (0x%02x)"));
 		proto_tree_add_uint(tlv_tree, hf_mcp_tlv_type, tvb, offset, 1, tlv_type);
 		}
 		offset += 1;
@@ -203,9 +200,9 @@ dissect_mcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 			}
 			break;
 		case MCPS_TYPE_VPC_INFO:
-			proto_tree_add_item_ret_uint(tlv_tree, hf_mcp_vpc_domain, tvb, offset, 4, ENC_NA, &vpcdomain);
-			proto_tree_add_item_ret_uint(tlv_tree, hf_mcp_vpc_id, tvb, offset + 4, 4, ENC_NA, &vpcid);
-			proto_tree_add_item(tlv_tree, hf_mcp_vpc_vtep, tvb, offset + 8, 4, ENC_NA);
+			proto_tree_add_item_ret_uint(tlv_tree, hf_mcp_vpc_domain, tvb, offset, 4, ENC_BIG_ENDIAN, &vpcdomain);
+			proto_tree_add_item_ret_uint(tlv_tree, hf_mcp_vpc_id, tvb, offset + 4, 4, ENC_BIG_ENDIAN, &vpcid);
+			proto_tree_add_item(tlv_tree, hf_mcp_vpc_vtep, tvb, offset + 8, 4, ENC_BIG_ENDIAN);
 			vpcvtep_str = tvb_address_to_str(pinfo->pool, tvb, AT_IPv4, offset + 8);
 			proto_item_append_text(tlv_tree, ": %u/%u/%s", vpcdomain, vpcid, vpcvtep_str);
 			col_append_fstr(pinfo->cinfo, COL_INFO, "VpcInfo/%u,%u,%s ", vpcdomain, vpcid, vpcvtep_str);
@@ -358,7 +355,7 @@ proto_register_mcp(void)
 
 	expert_module_t* expert_mcp;
 
-	proto_mcp = proto_register_protocol(PROTO_LONG_NAME, PROTO_SHORT_NAME, "mcp");
+	proto_mcp = proto_register_protocol("Miscabling Protocol", "MCP", "mcp");
 	proto_register_field_array(proto_mcp, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
 	expert_mcp = expert_register_protocol(proto_mcp);

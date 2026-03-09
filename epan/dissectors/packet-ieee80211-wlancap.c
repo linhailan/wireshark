@@ -76,7 +76,7 @@ capture_wlancap(const unsigned char *pd, int offset, int len, capture_packet_inf
   if (!BYTES_ARE_IN_FRAME(offset, len, sizeof(uint32_t)*2))
     return false;
 
-  length = pntoh32(pd+sizeof(uint32_t));
+  length = pntohu32(pd+sizeof(uint32_t));
 
   if (!BYTES_ARE_IN_FRAME(offset, len, length))
     return false;
@@ -843,7 +843,7 @@ static hf_register_info hf_wlancap[] = {
       NULL, HFILL }}
 };
 
-static int *tree_array[] = {
+static int *ett[] = {
   &ett_wlancap
 };
 
@@ -857,7 +857,7 @@ void proto_register_ieee80211_wlancap(void)
 
   dissector_add_uint("wtap_encap", WTAP_ENCAP_IEEE_802_11_AVS,
                      wlancap_handle);
-  proto_register_subtree_array(tree_array, array_length(tree_array));
+  proto_register_subtree_array(ett, array_length(ett));
 
   wlancap_cap_handle = register_capture_dissector("wlancap", capture_wlancap, proto_wlancap);
 }

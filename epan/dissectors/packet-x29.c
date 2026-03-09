@@ -11,7 +11,7 @@
 #include "config.h"
 
 #include <epan/packet.h>
-#include <epan/nlpid.h>
+#include "packet-osi.h"
 
 void proto_register_x29(void);
 void proto_reg_handoff_x29(void);
@@ -82,14 +82,14 @@ static const value_string reference_type_vals[] = {
 static int
 dissect_x29(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 {
-	int         offset = 0;
+	unsigned    offset = 0;
 	proto_tree *x29_tree;
 	proto_item *ti;
 	bool       *q_bit_set;
 	uint8_t     msg_code;
 	uint8_t     error_type;
 	uint8_t     type_ref;
-	int         next_offset;
+	unsigned    next_offset;
 	int         linelen;
 
 	/* Reject the packet if data is NULL */
@@ -109,7 +109,7 @@ dissect_x29(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 		 */
 		msg_code = tvb_get_uint8(tvb, offset);
 		col_add_fstr(pinfo->cinfo, COL_INFO, "%s PAD message",
-			    val_to_str(msg_code, message_code_vals,
+			    val_to_str(pinfo->pool, msg_code, message_code_vals,
 			        "Unknown (0x%02x)"));
 
 		proto_tree_add_uint(x29_tree, hf_msg_code, tvb,
@@ -207,8 +207,7 @@ dissect_x29(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 				/*
 				 * Find the end of the line.
 				 */
-				tvb_find_line_end(tvb, offset, -1,
-				    &next_offset, false);
+				tvb_find_line_end_remaining(tvb, offset, NULL, &next_offset);
 
 				/*
 				 * Now compute the length of the line
@@ -217,7 +216,7 @@ dissect_x29(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 				 */
 				linelen = next_offset - offset;
 
-				proto_tree_add_item(x29_tree, hf_x29_data, tvb, offset, linelen, ENC_NA|ENC_ASCII);
+				proto_tree_add_item(x29_tree, hf_x29_data, tvb, offset, linelen, ENC_ASCII);
 				offset = next_offset;
 			}
 		}

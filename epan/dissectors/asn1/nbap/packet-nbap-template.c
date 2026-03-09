@@ -17,7 +17,6 @@
 
 #include <epan/to_str.h>
 #include <epan/packet.h>
-#include <epan/sctpppids.h>
 #include <epan/asn1.h>
 #include <epan/conversation.h>
 #include <epan/expert.h>
@@ -33,16 +32,7 @@
 #include "packet-rrc.h"
 #include "packet-umts_rlc.h"
 #include "packet-nbap.h"
-
-#ifdef _MSC_VER
-/* disable: "warning C4146: unary minus operator applied to unsigned type, result still unsigned" */
-#pragma warning(disable:4146)
-#endif
-
-#define PNAME  "UTRAN Iub interface NBAP signalling"
-#define PSNAME "NBAP"
-#define PFNAME "nbap"
-
+#include "packet-sctp.h"
 
 #define NBAP_IGNORE_PORT 255
 
@@ -216,7 +206,7 @@ typedef struct nbap_private_data_t
   uint32_t ul_scrambling_code;
   uint32_t com_context_id;
   int num_dch_in_flow;
-  int hrnti;
+  unsigned hrnti;
   uint32_t protocol_ie_id;
   uint32_t dd_mode;
   uint32_t transaction_id;
@@ -662,8 +652,8 @@ dissect_nbap_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
 
   pdu_type = tvb_get_uint8(tvb, PDU_TYPE_OFFSET);
   if (pdu_type & 0x1f) {
-    /* pdu_type is not 0x00 (initiatingMessage), 0x20 (succesfulOutcome),
-       0x40 (unsuccesfulOutcome) or 0x60 (outcome), ignore extension bit (0x80) */
+    /* pdu_type is not 0x00 (initiatingMessage), 0x20 (successfulOutcome),
+       0x40 (unsuccessfulOutcome) or 0x60 (outcome), ignore extension bit (0x80) */
     return false;
   }
 
@@ -761,7 +751,7 @@ void proto_register_nbap(void)
   expert_module_t* expert_nbap;
 
   /* Register protocol */
-  proto_nbap = proto_register_protocol(PNAME, PSNAME, PFNAME);
+  proto_nbap = proto_register_protocol("UTRAN Iub interface NBAP signalling", "NBAP", "nbap");
   /* Register fields and subtrees */
   proto_register_field_array(proto_nbap, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));

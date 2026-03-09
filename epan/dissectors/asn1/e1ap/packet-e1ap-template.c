@@ -1,6 +1,6 @@
 /* packet-e1ap.c
  * Routines for E-UTRAN E1 Application Protocol (E1AP) packet dissection
- * Copyright 2018-2024, Pascal Quantin <pascal@wireshark.org>
+ * Copyright 2018-2026, Pascal Quantin <pascal@wireshark.org>
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -8,7 +8,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * References: 3GPP TS 37.483 V18.2.0 (2024-06)
+ * References: 3GPP TS 37.483 V19.1.0 (2025-12)
  */
 
 #include "config.h"
@@ -16,7 +16,6 @@
 #include <epan/packet.h>
 
 #include <epan/asn1.h>
-#include <epan/sctpppids.h>
 #include <epan/proto_data.h>
 #include <epan/tfs.h>
 #include <epan/unit_strings.h>
@@ -28,10 +27,7 @@
 #include "packet-ntp.h"
 #include "packet-nr-rrc.h"
 #include "packet-tcp.h"
-
-#define PNAME  "E1 Application Protocol"
-#define PSNAME "E1AP"
-#define PFNAME "e1ap"
+#include "packet-sctp.h"
 
 #define SCTP_PORT_E1AP 38462
 
@@ -216,7 +212,7 @@ dissect_e1ap_tcp_pdu(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* 
 {
   tvbuff_t *new_tvb;
 
-  proto_tree_add_item(tree, hf_e1ap_tcp_pdu_len, tvb, 0, 4, ENC_NA);
+  proto_tree_add_item(tree, hf_e1ap_tcp_pdu_len, tvb, 0, 4, ENC_BIG_ENDIAN);
   new_tvb = tvb_new_subset_remaining(tvb, 4);
 
   return dissect_e1ap(new_tvb, pinfo, tree, data);
@@ -319,7 +315,7 @@ void proto_register_e1ap(void) {
   };
 
   /* Register protocol */
-  proto_e1ap = proto_register_protocol(PNAME, PSNAME, PFNAME);
+  proto_e1ap = proto_register_protocol("E1 Application Protocol", "E1AP", "e1ap");
   /* Register fields and subtrees */
   proto_register_field_array(proto_e1ap, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));

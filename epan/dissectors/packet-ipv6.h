@@ -82,7 +82,11 @@ struct ipv6_analysis {
     uint32_t stream;
 };
 
+WS_DLL_PUBLIC const char* ipv6extprotostr(int proto);
+
 WS_DLL_PUBLIC struct ipv6_analysis *get_ipv6_conversation_data(conversation_t *conv,
                                 packet_info *pinfo);
+
+bool dissect_ipv6_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data);
 
 #endif

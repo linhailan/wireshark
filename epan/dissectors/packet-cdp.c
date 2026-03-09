@@ -15,11 +15,11 @@
 #include <epan/expert.h>
 #include <epan/to_str.h>
 #include <epan/in_cksum.h>
-#include <epan/nlpid.h>
 #include <epan/etypes.h>
-#include <epan/cisco_pid.h>
 #include <epan/tfs.h>
 #include <epan/unit_strings.h>
+#include "packet-osi.h"
+#include "packet-cisco-pid.h"
 
 /*
  *
@@ -165,7 +165,7 @@ dissect_nrgyz_tlv(tvbuff_t *tvb, packet_info* pinfo, int offset, uint16_t length
 static void
 dissect_spare_poe_tlv(tvbuff_t *tvb, int offset, int length, proto_tree *tree);
 static void
-add_multi_line_string_to_tree(wmem_allocator_t *scope, proto_tree *tree, tvbuff_t *tvb, int start,
+add_multi_line_string_to_tree(wmem_allocator_t *scope, proto_tree *tree, tvbuff_t *tvb, unsigned start,
   int len, int hf);
 
 #define TYPE_DEVICE_ID          0x0001
@@ -283,10 +283,10 @@ dissect_cdp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
     proto_tree *cdp_tree;
     int         offset   = 0;
     uint16_t    type;
-    uint16_t    length, data_length;
+    uint32_t    length, data_length;
     proto_item *tlvi;
     proto_tree *tlv_tree;
-    int         real_length;
+    unsigned    real_length;
     uint32_t    naddresses;
     uint32_t    power_avail_len, power_avail;
     uint32_t    power_req_len, power_req;
@@ -517,7 +517,7 @@ dissect_cdp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
             if (tree) {
                 tlv_tree = proto_tree_add_subtree_format(cdp_tree, tvb,
                                            offset,length, ett_cdp_tlv, NULL, "Protocol Hello: %s",
-                                           val_to_str(tvb_get_ntohs(tvb, offset+7), type_hello_vals, "Unknown (0x%04x)"));
+                                           val_to_str(pinfo->pool, tvb_get_ntohs(tvb, offset+7), type_hello_vals, "Unknown (0x%04x)"));
                 proto_tree_add_item(tlv_tree, hf_cdp_tlvtype, tvb, offset + TLV_TYPE, 2, ENC_BIG_ENDIAN);
                 proto_tree_add_item(tlv_tree, hf_cdp_tlvlength, tvb, offset + TLV_LENGTH, 2, ENC_BIG_ENDIAN);
                 proto_tree_add_item(tlv_tree, hf_cdp_oui, tvb, offset+4, 3, ENC_BIG_ENDIAN);
@@ -552,7 +552,7 @@ dissect_cdp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
                                            tvb_format_text(pinfo->pool, tvb, offset + 4, length - 4));
                 proto_tree_add_item(tlv_tree, hf_cdp_tlvtype, tvb, offset + TLV_TYPE, 2, ENC_BIG_ENDIAN);
                 proto_tree_add_item(tlv_tree, hf_cdp_tlvlength, tvb, offset + TLV_LENGTH, 2, ENC_BIG_ENDIAN);
-                proto_tree_add_item(tlv_tree, hf_cdp_vtp_management_domain, tvb, offset + 4, length - 4, ENC_NA|ENC_ASCII);
+                proto_tree_add_item(tlv_tree, hf_cdp_vtp_management_domain, tvb, offset + 4, length - 4, ENC_ASCII);
             }
             offset += length;
             break;
@@ -695,7 +695,7 @@ dissect_cdp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
                                            tvb_format_text(pinfo->pool, tvb, offset + 4, length - 4));
                 proto_tree_add_item(tlv_tree, hf_cdp_tlvtype, tvb, offset + TLV_TYPE, 2, ENC_BIG_ENDIAN);
                 proto_tree_add_item(tlv_tree, hf_cdp_tlvlength, tvb, offset + TLV_LENGTH, 2, ENC_BIG_ENDIAN);
-                proto_tree_add_item(tlv_tree, hf_cdp_system_name, tvb, offset + 4, length - 4, ENC_NA|ENC_ASCII);
+                proto_tree_add_item(tlv_tree, hf_cdp_system_name, tvb, offset + 4, length - 4, ENC_ASCII);
             }
             offset += length;
             break;
@@ -747,7 +747,7 @@ dissect_cdp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
                 proto_tree_add_item(tlv_tree, hf_cdp_tlvtype, tvb, offset + TLV_TYPE, 2, ENC_BIG_ENDIAN);
                 proto_tree_add_item(tlv_tree, hf_cdp_tlvlength, tvb, offset + TLV_LENGTH, 2, ENC_BIG_ENDIAN);
                 proto_tree_add_item(tlv_tree, hf_cdp_location_unknown, tvb, offset + 4, 1, ENC_BIG_ENDIAN);
-                proto_tree_add_item(tlv_tree, hf_cdp_location, tvb, offset + 5, length - 5, ENC_NA|ENC_ASCII);
+                proto_tree_add_item(tlv_tree, hf_cdp_location, tvb, offset + 5, length - 5, ENC_ASCII);
             }
             offset += length;
             break;
@@ -827,10 +827,10 @@ dissect_cdp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
                 proto_tree_add_item(tlv_tree, hf_cdp_encrypted_data, tvb, offset + 4, 20, ENC_NA);
                 proto_tree_add_item(tlv_tree, hf_cdp_seen_sequence, tvb, offset + 24, 4, ENC_BIG_ENDIAN);
                 proto_tree_add_item(tlv_tree, hf_cdp_sequence_number, tvb, offset + 28, 4, ENC_BIG_ENDIAN);
-                proto_tree_add_item(tlv_tree, hf_cdp_model_number, tvb, offset + 32, 16, ENC_NA|ENC_ASCII);
+                proto_tree_add_item(tlv_tree, hf_cdp_model_number, tvb, offset + 32, 16, ENC_ASCII);
                 proto_tree_add_item(tlv_tree, hf_cdp_unknown_pad, tvb, offset + 48, 2, ENC_BIG_ENDIAN);
-                proto_tree_add_item(tlv_tree, hf_cdp_hardware_version_id, tvb, offset + 50, 3, ENC_NA|ENC_ASCII);
-                proto_tree_add_item(tlv_tree, hf_cdp_system_serial_number, tvb, offset + 53, 11, ENC_NA|ENC_ASCII);
+                proto_tree_add_item(tlv_tree, hf_cdp_hardware_version_id, tvb, offset + 50, 3, ENC_ASCII);
+                proto_tree_add_item(tlv_tree, hf_cdp_system_serial_number, tvb, offset + 53, 11, ENC_ASCII);
                 proto_tree_add_item(tlv_tree, hf_cdp_nrgyz_unknown_values, tvb, offset + 64, 8, ENC_NA);
                 proto_tree_add_item(tlv_tree, hf_cdp_len_tlv_table, tvb, offset + 72, 2, ENC_BIG_ENDIAN);
                 proto_tree_add_item(tlv_tree, hf_cdp_num_tlvs_table, tvb, offset + 74, 2, ENC_BIG_ENDIAN);
@@ -1026,7 +1026,7 @@ dissect_cdp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
             if (tree) {
                 tlv_tree = proto_tree_add_subtree_format(cdp_tree, tvb, offset,
                                            length, ett_cdp_tlv, NULL, "Type: %s, length: %u",
-                                           val_to_str(type, type_vals, "Unknown (0x%04x)"),
+                                           val_to_str(pinfo->pool, type, type_vals, "Unknown (0x%04x)"),
                                            length);
                 proto_tree_add_item(tlv_tree, hf_cdp_tlvtype, tvb, offset + TLV_TYPE, 2, ENC_BIG_ENDIAN);
                 proto_tree_add_item(tlv_tree, hf_cdp_tlvlength, tvb, offset + TLV_LENGTH, 2, ENC_BIG_ENDIAN);
@@ -1067,15 +1067,13 @@ dissect_address_tlv(tvbuff_t *tvb, packet_info* pinfo, int offset, int length, p
     if (length < 1)
         return -1;
     address_tree = proto_tree_add_subtree(tree, tvb, offset, length, ett_cdp_address, &ti, "Truncated address");
-    protocol_type = tvb_get_uint8(tvb, offset);
-    proto_tree_add_item(address_tree, hf_cdp_protocol_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint8(address_tree, hf_cdp_protocol_type, tvb, offset, 1, ENC_BIG_ENDIAN, &protocol_type);
     offset += 1;
     length -= 1;
 
     if (length < 1)
         return -1;
-    protocol_length = tvb_get_uint8(tvb, offset);
-    proto_tree_add_item(address_tree, hf_cdp_protocol_length, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint8(address_tree, hf_cdp_protocol_length, tvb, offset, 1, ENC_BIG_ENDIAN, &protocol_length);
     offset += 1;
     length -= 1;
 
@@ -1090,11 +1088,11 @@ dissect_address_tlv(tvbuff_t *tvb, packet_info* pinfo, int offset, int length, p
     if ((protocol_type == PROTO_TYPE_NLPID) && (protocol_length == 1)) {
         nlpid = tvb_get_uint8(tvb, offset);
         proto_tree_add_bytes_format_value(address_tree, hf_cdp_protocol, tvb, offset, protocol_length, NULL, "%s",
-                            val_to_str(nlpid, nlpid_vals, "Unknown (0x%02x)"));
+                            val_to_str(pinfo->pool, nlpid, nlpid_vals, "Unknown (0x%02x)"));
     } else if ((protocol_type == PROTO_TYPE_IEEE_802_2) && (protocol_length == 8) && (tvb_get_ntoh48(tvb, offset) == 0xAAAA03000000)) {
         etypeid = tvb_get_ntohs(tvb, offset + 6);
         proto_tree_add_bytes_format_value(address_tree, hf_cdp_protocol, tvb, offset, protocol_length, NULL, "%s",
-                            val_to_str(etypeid, etype_vals, "Unknown (0x%04x)"));
+                            val_to_str(pinfo->pool, etypeid, etype_vals, "Unknown (0x%04x)"));
     } else {
         nlpid = -1;
         proto_tree_add_item(address_tree, hf_cdp_protocol, tvb, offset, protocol_length, ENC_NA);
@@ -1104,8 +1102,7 @@ dissect_address_tlv(tvbuff_t *tvb, packet_info* pinfo, int offset, int length, p
 
     if (length < 2)
         return -1;
-    address_length = tvb_get_ntohs(tvb, offset);
-    proto_tree_add_item(address_tree, hf_cdp_address_length, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint16(address_tree, hf_cdp_address_length, tvb, offset, 2, ENC_BIG_ENDIAN, &address_length);
     offset += 2;
     length -= 2;
 
@@ -1212,7 +1209,7 @@ dissect_nrgyz_tlv(tvbuff_t *tvb, packet_info* pinfo, int offset, uint16_t length
             break;
         }
         else {
-            ttext = val_to_str(tlvt, type_nrgyz_vals, "Unknown (0x%04x)");
+            ttext = val_to_str(pinfo->pool, tlvt, type_nrgyz_vals, "Unknown (0x%04x)");
             switch (tlvt) {
             case TYPE_NRGYZ_ROLE:
             case TYPE_NRGYZ_DOMAIN:
@@ -1238,13 +1235,13 @@ dissect_nrgyz_tlv(tvbuff_t *tvb, packet_info* pinfo, int offset, uint16_t length
             proto_tree_add_item(etree, hf_cdp_nrgyz_tlvlength, tvb, offset + 4, 4, ENC_BIG_ENDIAN);
             switch (tlvt) {
             case TYPE_NRGYZ_ROLE:
-                proto_tree_add_item(etree, hf_cdp_nrgyz_reply_to_role, tvb, offset + 8, tlvl - 8, ENC_NA|ENC_ASCII);
+                proto_tree_add_item(etree, hf_cdp_nrgyz_reply_to_role, tvb, offset + 8, tlvl - 8, ENC_ASCII);
                 break;
             case TYPE_NRGYZ_DOMAIN:
-                proto_tree_add_item(etree, hf_cdp_nrgyz_reply_to_domain, tvb, offset + 8, tlvl - 8, ENC_NA|ENC_ASCII);
+                proto_tree_add_item(etree, hf_cdp_nrgyz_reply_to_domain, tvb, offset + 8, tlvl - 8, ENC_ASCII);
                 break;
             case TYPE_NRGYZ_NAME:
-                proto_tree_add_item(etree, hf_cdp_nrgyz_reply_to_name, tvb, offset + 8, tlvl - 8, ENC_NA|ENC_ASCII);
+                proto_tree_add_item(etree, hf_cdp_nrgyz_reply_to_name, tvb, offset + 8, tlvl - 8, ENC_ASCII);
                 break;
             case TYPE_NRGYZ_REPLYTO:
                 proto_tree_add_item(etree, hf_cdp_nrgyz_reply_to_unknown_field, tvb, offset + 8, 2, ENC_BIG_ENDIAN);
@@ -1286,15 +1283,15 @@ dissect_spare_poe_tlv(tvbuff_t *tvb, int offset, int length,
 }
 
 static void
-add_multi_line_string_to_tree(wmem_allocator_t *scope, proto_tree *tree, tvbuff_t *tvb, int start,
+add_multi_line_string_to_tree(wmem_allocator_t *scope, proto_tree *tree, tvbuff_t *tvb, unsigned start,
   int len, int hf)
 {
-    int next;
-    int  line_len;
-    int  data_len;
+    unsigned next;
+    unsigned  line_len;
+    unsigned  data_len;
 
     while (len > 0) {
-        line_len = tvb_find_line_end(tvb, start, len, &next, false);
+        tvb_find_line_end_length(tvb, start, len, &line_len , &next);
         data_len = next - start;
         proto_tree_add_string(tree, hf, tvb, start, data_len, tvb_format_stringzpad(scope, tvb, start, line_len));
         start += data_len;

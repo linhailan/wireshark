@@ -27,7 +27,9 @@
 #include <epan/etypes.h>
 #include <epan/tfs.h>
 #include <epan/unit_strings.h>
-#include <proto.h>
+#include <epan/proto.h>
+
+#include <wsutil/ws_roundup.h>
 
 #include "epan/dissectors/packet-ptp.h"
 
@@ -459,7 +461,7 @@ typedef struct {
 static dissector_handle_t oran_fh_handle;
 
 /**************************************************************************************************/
-/* Implementation of the functions                                                                */
+/* Main dissection function                                                                       */
 /**************************************************************************************************/
 static int dissect_ecpri(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
@@ -527,11 +529,8 @@ static int dissect_ecpri(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
     bool concatenation_bit;
     do
     {
-        /* 4-byte boundary check for concatenation */
-        if (offset % 4 != 0)
-        {
-            offset = offset + 4 - (offset % 4);
-        }
+        /* align on a 4-byte boundary before checking for concatenation */
+        offset = WS_ROUNDUP_4(offset);
 
         /* Read ahead to eCPRI Payload Size */
         payload_size = tvb_get_ntohs(tvb, offset+2);
@@ -569,12 +568,15 @@ static int dissect_ecpri(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
         proto_tree_add_item_ret_uint(header_tree, hf_common_header_ecpri_message_type, tvb, offset, 1, ENC_NA, &msg_type);
         /* Append Message Type into info column & header item */
         col_append_sep_fstr(pinfo->cinfo, COL_INFO, ",", "Message Type: %s", try_rval_to_str(msg_type, ecpri_msg_types));
-        proto_item_append_text(header_item, "   MessageType: %s", try_rval_to_str(msg_type, ecpri_msg_types));
         offset += 1;
 
         /* eCPRI Payload Size */
         ti_payload_size = proto_tree_add_item(header_tree, hf_common_header_ecpri_payload_size, tvb, offset, 2, ENC_BIG_ENDIAN);
         offset += 2;
+
+        /* Summaries (type and payload length) for protocol and header roots */
+        proto_item_append_text(ecpri_item,  "   MessageType: %s  PayloadSize: %u)", try_rval_to_str(msg_type, ecpri_msg_types), payload_size);
+        proto_item_append_text(header_item, "   MessageType: %s  PayloadSize: %u)", try_rval_to_str(msg_type, ecpri_msg_types), payload_size);
 
         /* Note if C is set (i.e. further messages to follow after this one) */
         if (concatenation_bit) {
@@ -1367,9 +1369,7 @@ void proto_register_ecpri(void)
     module_t* ecpri_module;
 
     /* Register the protocol name and description */
-    proto_ecpri = proto_register_protocol("evolved Common Public Radio Interface",    /* Protoname */
-                                          "eCPRI",                                    /* Proto Shortname */
-                                          "ecpri");                                   /* Proto Abbrev */
+    proto_ecpri = proto_register_protocol("evolved Common Public Radio Interface", "eCPRI", "ecpri"); /* name, short name, abbreviation */
     ecpri_handle = register_dissector("ecpri", dissect_ecpri, proto_ecpri);
 
 

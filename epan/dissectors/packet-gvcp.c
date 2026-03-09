@@ -2124,7 +2124,7 @@ static void dissect_discovery_ack(proto_tree *gvcp_telegram_tree, tvbuff_t *tvb,
 	int offset;
 	const uint8_t* string_manufacturer_name = NULL;
 	const uint8_t* string_serial_number = NULL;
-	int string_length = 0;
+	unsigned string_length = 0;
 	proto_tree *tree = NULL;
 
 	offset = startoffset;
@@ -2496,7 +2496,7 @@ static int dissect_gvcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 	if (key_code == 0x42)
 	{
 		command = tvb_get_ntohs(tvb, offset+2);
-		command_string = val_to_str(command, commandnames,"Unknown Command (0x%x)");
+		command_string = val_to_str(pinfo->pool, command, commandnames,"Unknown Command (0x%x)");
 
 		/* Add the Command name string to the Info column */
 		col_append_fstr(pinfo->cinfo, COL_INFO, "> %s ", command_string);
@@ -2542,7 +2542,7 @@ static int dissect_gvcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 	{
 		int status = tvb_get_ntohs(tvb, offset);
 		col_append_fstr(pinfo->cinfo, COL_INFO, "< %s %s",
-			ack_string, val_to_str(status, statusnames_short, "Unknown status (0x%04X)"));
+			ack_string, val_to_str(pinfo->pool, status, statusnames_short, "Unknown status (0x%04X)"));
 
 		gvcp_tree = proto_tree_add_subtree_format(gvcp_tree, tvb, offset+2, tvb_captured_length(tvb)-2,
 												ett_gvcp_ack, NULL, "Acknowledge Header: %s", ack_string);

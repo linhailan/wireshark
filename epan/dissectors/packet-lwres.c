@@ -1,5 +1,6 @@
 /* packet-lwres.c
- * Routines for light weight reslover (lwres, part of BIND9) packet disassembly
+ * Routines for lightweight resolver (lwresd, formerly part of BIND9) packet disassembly
+ * lwresd was removed in Bind 9.12. It ran on the IPv4 loopback interface only.
  *
  * Copyright (c) 2003 by Oleg Terletsky <oleg.terletsky@comverse.com>
  *
@@ -170,8 +171,9 @@ static int ett_ns_rec;
 static int ett_ns_rec_item;
 
 
-
+#if 0
 #define LWRES_UDP_PORT 921 /* Not IANA registered */
+#endif
 
 /* Define the lwres proto */
 static int proto_lwres;
@@ -270,7 +272,7 @@ static void dissect_getnamebyaddr_response(tvbuff_t* tvb, packet_info *pinfo, pr
         for(i=0; i<naliases; i++)
         {
             aliaslen = tvb_get_ntohs(tvb, offset);
-            aliasname = tvb_get_string_enc(pinfo->pool, tvb, offset + 2, aliaslen, ENC_ASCII);
+            aliasname = (char*)tvb_get_string_enc(pinfo->pool, tvb, offset + 2, aliaslen, ENC_ASCII);
 
             alias_tree = proto_tree_add_subtree_format(nba_resp_tree, tvb, offset, 2 + aliaslen,
                                 ett_adn_alias, NULL, "Alias %s",aliasname);
@@ -388,7 +390,7 @@ static void dissect_getaddrsbyname_response(tvbuff_t* tvb, packet_info *pinfo, p
         for(i=0; i<naliases; i++)
         {
             aliaslen = tvb_get_ntohs(tvb, offset);
-            aliasname = tvb_get_string_enc(pinfo->pool, tvb, offset + 2, aliaslen, ENC_ASCII);
+            aliasname = (char*)tvb_get_string_enc(pinfo->pool, tvb, offset + 2, aliaslen, ENC_ASCII);
 
             alias_tree = proto_tree_add_subtree_format(adn_resp_tree, tvb, offset, 2 + aliaslen,
                                                         ett_adn_alias, NULL, "Alias %s",aliasname);
@@ -487,7 +489,7 @@ static void dissect_srv_records(tvbuff_t* tvb, packet_info *pinfo, proto_tree* t
         port     = tvb_get_ntohs(tvb, curr + 6);
         /*namelen = len - 8;*/
 
-        used_bytes = get_dns_name(tvb, curr + 8, 0, curr + 8, &dname, &dlen);
+        used_bytes = get_dns_name(pinfo->pool, tvb, curr + 8, 0, curr + 8, &dname, &dlen);
 
         rec_tree = proto_tree_add_subtree_format(srv_rec_tree, tvb, curr, 6,
                     ett_srv_rec_item, NULL,
@@ -553,7 +555,7 @@ static void dissect_mx_records(tvbuff_t* tvb, packet_info *pinfo, proto_tree* tr
         priority = tvb_get_ntohs(tvb, curr + 2);
         /*namelen  =  len - 4;*/
 
-        used_bytes  = get_dns_name(tvb, curr + 4, 0, curr + 4, &dname, &dlen);
+        used_bytes  = get_dns_name(pinfo->pool, tvb, curr + 4, 0, curr + 4, &dname, &dlen);
 
         rec_tree = proto_tree_add_subtree_format(mx_rec_tree, tvb, curr,6,ett_mx_rec_item,NULL,
                         "MX record: pri=%d,dname=%s", priority,
@@ -602,7 +604,7 @@ static void dissect_ns_records(tvbuff_t* tvb, packet_info *pinfo, proto_tree* tr
         /*len = tvb_get_ntohs(tvb, curr);*/
         /*namelen = len - 2;*/
 
-        used_bytes = get_dns_name(tvb, curr + 2, 0, curr + 2, &dname, &dlen);
+        used_bytes = get_dns_name(pinfo->pool, tvb, curr + 2, 0, curr + 2, &dname, &dlen);
 
         rec_tree = proto_tree_add_subtree_format(ns_rec_tree, tvb, curr,4, ett_ns_rec_item, NULL, "NS record: dname=%s",
                         format_text(pinfo->pool, dname, dlen));
@@ -1136,7 +1138,7 @@ proto_register_lwres(void)
 void
 proto_reg_handoff_lwres(void)
 {
-    dissector_add_uint_with_preference("udp.port", LWRES_UDP_PORT, lwres_handle);
+    dissector_add_for_decode_as_with_preference("udp.port", lwres_handle);
 }
 
 /*

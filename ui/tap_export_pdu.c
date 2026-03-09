@@ -17,7 +17,7 @@
 #include <wiretap/wtap_opttypes.h>
 #include <wsutil/os_version_info.h>
 #include <wsutil/report_message.h>
-#include "wsutil/version_info.h"
+#include <wsutil/version_info.h>
 
 #include "tap_export_pdu.h"
 
@@ -49,14 +49,12 @@ export_pdu_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt, const 
     if(exp_pdu_data->tvb_captured_length > 0){
         tvb_memcpy(exp_pdu_data->pdu_tvb, packet_buf+exp_pdu_data->tlv_buffer_len, 0, exp_pdu_data->tvb_captured_length);
     }
-    rec.rec_type                           = REC_TYPE_PACKET;
+    wtap_setup_packet_rec(&rec, exp_pdu_tap_data->pkt_encap);
     rec.presence_flags                     = WTAP_HAS_CAP_LEN|WTAP_HAS_INTERFACE_ID|WTAP_HAS_TS;
     rec.ts.secs                            = pinfo->abs_ts.secs;
     rec.ts.nsecs                           = pinfo->abs_ts.nsecs;
     rec.rec_header.packet_header.caplen    = buffer_len;
     rec.rec_header.packet_header.len       = exp_pdu_data->tvb_reported_length + exp_pdu_data->tlv_buffer_len;
-
-    rec.rec_header.packet_header.pkt_encap = exp_pdu_tap_data->pkt_encap;
 
     /* rec.opt_block is not modified by wtap_dump, but if for some reason the
      * epan_get_modified_block() or pinfo->rec->block are invalidated,
@@ -166,10 +164,10 @@ exp_pdu_open(exp_pdu_t *exp_pdu_tap_data, char *pathname,
     };
     if (fd == 1) {
         exp_pdu_tap_data->wdh = wtap_dump_open_stdout(file_type_subtype,
-                WTAP_UNCOMPRESSED, &params, err, err_info);
+                WS_FILE_UNCOMPRESSED, &params, err, err_info);
     } else {
         exp_pdu_tap_data->wdh = wtap_dump_fdopen(fd, file_type_subtype,
-                WTAP_UNCOMPRESSED, &params, err, err_info);
+                WS_FILE_UNCOMPRESSED, &params, err, err_info);
     }
     if (exp_pdu_tap_data->wdh == NULL)
         return false;

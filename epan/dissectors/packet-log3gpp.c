@@ -42,6 +42,12 @@ static int hf_log3gpp_dissected_length;
 /* Protocol subtree. */
 static int ett_log3gpp;
 
+/* Cached protocol identifiers */
+static int proto_mac_lte;
+static int proto_rlc_lte;
+static int proto_pdcp_lte;
+
+
 /* Variables used to select a version for RRC and NAS */
 static int lte_rrc_prot_version = REL8;
 static int nas_eps_prot_version = REL8;
@@ -242,13 +248,6 @@ lte_mac_pseudo_hdr(char* option_str, packet_info* pinfo, uint16_t length, packet
     struct mac_lte_info* p_mac_lte_info;
     char* par_opt_field;
     char option[30];
-    static int proto_mac_lte = 0;
-
-    /* look up for protocol handle */
-    if (proto_mac_lte == 0)
-    {
-        proto_mac_lte = proto_get_id_by_filter_name("mac-lte");
-    }
 
     /* Need to copy the string in a local buffer since strtok will modify it */
     (void) g_strlcpy(option, option_str, 30);
@@ -316,7 +315,7 @@ lte_mac_pseudo_hdr(char* option_str, packet_info* pinfo, uint16_t length, packet
     par_opt_field = strtok(NULL, " ");
     if (par_opt_field)
     {
-        ws_strtoi16(par_opt_field, NULL, &p_mac_lte_info->rnti);
+        ws_strtou16(par_opt_field, NULL, &p_mac_lte_info->rnti);
     }
     else
     {
@@ -335,7 +334,7 @@ lte_mac_pseudo_hdr(char* option_str, packet_info* pinfo, uint16_t length, packet
         par_opt_field = strtok(NULL, " ");
         if (par_opt_field != NULL)
         {
-            ws_strtoi16(par_opt_field, NULL, &p_mac_lte_info->subframeNumber);
+            ws_strtou16(par_opt_field, NULL, &p_mac_lte_info->subframeNumber);
         }
     }
     p_mac_lte_info->direction = (direction == UPLINK) ? DIRECTION_UPLINK : DIRECTION_DOWNLINK;
@@ -359,13 +358,7 @@ lte_rlc_pseudo_hdr(char* option_str, packet_info* pinfo, uint16_t length, packet
     struct rlc_lte_info* p_rlc_lte_info;
     char* par_opt_field;
     char option[30];
-    static int proto_rlc_lte = 0;
 
-    /* look up for protocol handle */
-    if (proto_rlc_lte == 0)
-    {
-        proto_rlc_lte = proto_get_id_by_filter_name("rlc-lte");
-    }
     (void) g_strlcpy(option, option_str, 30);
 
     /* Only need to set info once per session. */
@@ -464,13 +457,8 @@ lte_pdcp_pseudo_hdr(char* option_str, packet_info* pinfo, uint16_t length _U_, p
     struct pdcp_lte_info* p_pdcp_lte_info;
     char* par_opt_field;
     char option[30];
-    static int proto_pdcp_lte = 0;
 
     /* look up for protocol handle */
-    if (proto_pdcp_lte == 0)
-    {
-        proto_pdcp_lte = proto_get_id_by_filter_name("pdcp-lte");
-    }
     (void) g_strlcpy(option, option_str, 30);
 
     /* Only need to set info once per session. */
@@ -579,7 +567,7 @@ dissect_log3gpp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data 
     protocol_name_start = offset;
     protocol_name_length = tvb_strsize(tvb, offset);
     if (prot3gpp_tree) {
-        proto_tree_add_item(prot3gpp_tree, hf_log3gpp_protocol, tvb, offset, protocol_name_length, ENC_ASCII | ENC_NA);
+        proto_tree_add_item(prot3gpp_tree, hf_log3gpp_protocol, tvb, offset, protocol_name_length, ENC_ASCII);
     }
     offset += protocol_name_length;
 
@@ -594,7 +582,7 @@ dissect_log3gpp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data 
     protocol_option_start = offset;
     protocol_option_length = tvb_strsize(tvb, offset);
     if (prot3gpp_tree) {
-        proto_tree_add_item(prot3gpp_tree, hf_log3gpp_dissector_option, tvb, offset, protocol_option_length, ENC_ASCII | ENC_NA);
+        proto_tree_add_item(prot3gpp_tree, hf_log3gpp_dissector_option, tvb, offset, protocol_option_length, ENC_ASCII);
     }
     offset += protocol_option_length;
 
@@ -634,7 +622,7 @@ dissect_log3gpp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data 
         if (protocol_handle != 0)
         {
             /* Dissect the remainder of the frame using chosen protocol handle */
-            next_tvb = tvb_new_subset_length_caplen(tvb, offset, -1, tvb_reported_length(tvb) - offset);
+            next_tvb = tvb_new_subset_remaining(tvb, offset);
 
             /* This part is optional, only for dissector that need pseudo header information */
             if (func_ptr != NULL && strlen(protocol_option) != 0)
@@ -660,7 +648,7 @@ dissect_log3gpp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data 
         if (!is_hex_data)
         {
             col_add_str(pinfo->cinfo, COL_INFO,
-                tvb_get_string_enc(pinfo->pool, tvb, offset, tvb_reported_length(tvb) - offset, ENC_UTF_8 | ENC_NA));
+                (char*)tvb_get_string_enc(pinfo->pool, tvb, offset, tvb_reported_length_remaining(tvb, offset), ENC_UTF_8 | ENC_NA));
         }
         else
         {
@@ -695,6 +683,11 @@ void proto_reg_handoff_log3gpp(void)
 
         log3gpp_handle = find_dissector("prot3gpp");
         dissector_add_uint("wtap_encap", WTAP_ENCAP_LOG_3GPP, log3gpp_handle);
+
+        proto_mac_lte = proto_get_id_by_filter_name("mac-lte");
+        proto_rlc_lte = proto_get_id_by_filter_name("rlc-lte");
+        proto_pdcp_lte = proto_get_id_by_filter_name("pdcp-lte");
+
         init = true;
     }
     if (lte_rrc_prot_version == REL8)

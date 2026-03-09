@@ -29,7 +29,7 @@ extern uint16_t crc16_table[256];
 /*
   void wimax_mac_gen_crc32_table(void)
 
-  REQUIRES: The functions must be called only once to initialze CRC table
+  REQUIRES: The functions must be called only once to initialize CRC table
 
   DESCRIPTION:  Generate the table of CRC remainders
                 for all possible bytes
@@ -64,7 +64,7 @@ void wimax_mac_gen_crc32_table(void)
 /*
   void wimax_mac_gen_crc8_table(void)
 
-  REQUIRES: The functions must be called only once to initialze CRC table
+  REQUIRES: The functions must be called only once to initialize CRC table
 
   DESCRIPTION:  Generate the table of CRC remainders
                 for all possible bytes
@@ -98,7 +98,7 @@ void wimax_mac_gen_crc8_table(void)
 
 /*
 
-  uint32_t wimax_mac_calc_crc32(uint8_t *data, unsigned data_len)
+  uint32_t wimax_mac_calc_crc32(const uint8_t *data, unsigned data_len)
 
   REQUIRES: wimax_mac_gen_crc32_table() must be called before
 
@@ -127,7 +127,7 @@ uint32_t wimax_mac_calc_crc32(const uint8_t *data, unsigned data_len)
 
 /*
 
-  uint16_t wimax_mac_calc_crc16(uint8_t *data, unsigned data_len)
+  uint16_t wimax_mac_calc_crc16(const uint8_t *data, unsigned data_len)
 
   REQUIRES: crc16_table[] in crc_data.c
 
@@ -158,7 +158,7 @@ uint16_t wimax_mac_calc_crc16(const uint8_t *data, unsigned data_len)
 
 /*
 
-  uint8_t wimax_mac_calc_crc8(uint8_t *data, unsigned data_len)
+  uint8_t wimax_mac_calc_crc8(const uint8_t *data, unsigned data_len)
 
   REQUIRES: wimax_mac_gen_crc8_table() must be called before
 

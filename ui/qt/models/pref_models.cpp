@@ -116,10 +116,8 @@ QString PrefsItem::getModuleName() const
 
 QString PrefsItem::getModuleTitle() const
 {
-    if ((module_ == NULL) && (pref_ == NULL))
+    if (module_ == NULL)
         return name_;
-
-    Q_ASSERT(module_);
 
     return QString(module_->title);
 }
@@ -274,7 +272,7 @@ fill_prefs(module_t *module, void *root_ptr)
     for (GList *pref_l = module->prefs; pref_l && pref_l->data; pref_l = gxx_list_next(pref_l)) {
         pref_t *pref = gxx_list_data(pref_t *, pref_l);
 
-        if (prefs_get_type(pref) == PREF_OBSOLETE || prefs_get_type(pref) == PREF_STATIC_TEXT)
+        if (prefs_is_preference_obsolete(pref) || (prefs_get_type(pref) == PREF_STATIC_TEXT))
             continue;
 
         const char *type_name = prefs_pref_type_name(pref);
@@ -293,14 +291,14 @@ fill_prefs(module_t *module, void *root_ptr)
     }
 
     if (prefs_module_has_submodules(module))
-        return prefs_modules_foreach_submodules(module, fill_prefs, module_item);
+        return prefs_modules_foreach_submodules(module->submodules, fill_prefs, module_item);
 
     return 0;
 }
 
 void PrefsModel::populate()
 {
-    prefs_modules_foreach_submodules(NULL, fill_prefs, (void *)root_);
+    prefs_modules_for_all_modules(fill_prefs, (void *)root_);
 
     //Add the "specially handled" preferences
     PrefsItem *appearance_item, *appearance_subitem, *special_item;
@@ -329,7 +327,7 @@ void PrefsModel::populate()
     root_->prependChild(special_item);
 }
 
-QString PrefsModel::typeToString(int type)
+QString PrefsModel::typeToString(PrefsModelType type)
 {
     QString typeStr;
 
@@ -349,7 +347,7 @@ QString PrefsModel::typeToString(int type)
     return typeStr;
 }
 
-QString PrefsModel::typeToHelp(int type)
+QString PrefsModel::typeToHelp(PrefsModelType type)
 {
     QString helpStr;
 
@@ -542,6 +540,24 @@ bool AdvancedPrefsModel::setData(const QModelIndex &dataindex, const QVariant &v
                 prefs_set_uint_value(item->getPref(), new_val, pref_stashed);
             }
             break;
+        case PREF_INT:
+        {
+            bool ok = true;
+            int new_val = value.toInt(&ok);
+
+            if (ok)
+                prefs_set_int_value(item->getPref(), new_val, pref_stashed);
+        }
+        break;
+        case PREF_FLOAT:
+        {
+            bool ok = true;
+            double new_val = value.toDouble(&ok);
+
+            if (ok)
+                prefs_set_float_value(item->getPref(), new_val, pref_stashed);
+        }
+        break;
         case PREF_BOOL:
             prefs_invert_bool_value(item->getPref(), pref_stashed);
             break;
@@ -710,14 +726,28 @@ bool AdvancedPrefsModel::filterAcceptsRow(int sourceRow, const QModelIndex &sour
 
 void AdvancedPrefsModel::setFilter(const QString& filter)
 {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+    beginFilterChange();
+#endif
     filter_ = filter;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
+    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+#else
     invalidateFilter();
+#endif
 }
 
 void AdvancedPrefsModel::setShowChangedValues(bool show_changed_values)
 {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+    beginFilterChange();
+#endif
     show_changed_values_ = show_changed_values;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
+    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+#else
     invalidateFilter();
+#endif
 }
 
 

@@ -13,7 +13,7 @@
 #include <epan/packet.h>
 #include "ws_symbol_export.h"
 
-WS_DLL_PUBLIC const value_string vals_http_status_code[];
+extern const value_string vals_http_status_code[];
 
 WS_DLL_PUBLIC
 void http_tcp_dissector_add(uint32_t port, dissector_handle_t handle);
@@ -23,14 +23,17 @@ WS_DLL_PUBLIC
 void http_tcp_port_add(uint32_t port);
 
 WS_DLL_PUBLIC
-void http_add_path_components_to_tree(tvbuff_t* tvb, packet_info* pinfo _U_, proto_item* item, int offset, int length);
+void http_add_path_components_to_tree(tvbuff_t* tvb, packet_info* pinfo _U_, proto_item* item, unsigned offset, unsigned length);
+
+WS_DLL_PUBLIC
+dissector_handle_t http_upgrade_dissector(const char *protocol);
 
 /* Used for HTTP statistics */
 typedef struct _http_info_value_t {
-	uint32_t framenum;
-	char	*request_method;
-	unsigned	 response_code;
-	char    *http_host;
+	uint32_t       framenum;
+	unsigned       response_code;
+	char	      *request_method;
+	char	      *http_host;
 	const char    *request_uri;
 	const char    *referer_uri;
 	const char    *full_uri;
@@ -49,19 +52,30 @@ typedef struct _http_req_res_t {
 	uint32_t req_framenum;
 	/** frame number of the corresponding response */
 	uint32_t res_framenum;
+	unsigned response_code;
 	/** timestamp of the request */
 	nstime_t req_ts;
-	unsigned response_code;
 	char    *request_method;
 	char    *http_host;
 	char    *request_uri;
 	char    *full_uri;
-	bool req_has_range;
-	bool resp_has_range;
-
 	/** private data used by http dissector */
 	void* private_data;
+	bool req_has_range;
+	bool resp_has_range;
 } http_req_res_t;
+
+/** Used for version-independent HTTP information for upgrade protocols */
+typedef struct _http_upgrade_info_t {
+	/** Lookup header value */
+	const char *(*get_header_value)(packet_info *, const char *, bool);
+	/** Server port. Can be used for protocol heuristics */
+	uint16_t    server_port;
+	/** HTTP version (1, 2 or 3) */
+	uint8_t     http_version;
+	/** Direction of the message */
+	bool	    from_server;
+} http_upgrade_info_t;
 
 /** Conversation data of a HTTP connection. */
 typedef struct _http_conv_t {
@@ -72,14 +86,10 @@ typedef struct _http_conv_t {
 
 	/* Fields related to proxied/tunneled/Upgraded connections. */
 	uint32_t	 startframe;	/* First frame of proxied connection */
-	int    	 startoffset;	/* Offset within the frame where the new protocol begins. */
+	unsigned	 startoffset;	/* Offset within the frame where the new protocol begins. */
 	dissector_handle_t next_handle;	/* New protocol */
+	http_upgrade_info_t *upgrade_info; /* Data for new protocol */
 
-	char    *websocket_protocol;	/* Negotiated WebSocket protocol */
-	char    *websocket_extensions;	/* Negotiated WebSocket extensions */
-	/* Server address and port, known after first server response */
-	uint16_t server_port;
-	address server_addr;
 	/** the tail node of req_res */
 	http_req_res_t *req_res_tail;
 	/** Information from the last request or response can
@@ -88,14 +98,19 @@ typedef struct _http_conv_t {
 	 * startoffset on connections that have proxied/tunneled/Upgraded.
 	 */
 
+	/* Used for req/res matching */
+	GSList *req_list;
+        wmem_map_t *matches_table;
+
+	/* Server address and port, known after first server response */
+	address server_addr;
+	uint16_t server_port;
+
 	/* true means current message is chunked streaming, and not ended yet.
 	 * This is only meaningful during the first scan.
 	 */
 	bool message_ended;
 
-	/* Used for req/res matching */
-	GSList *req_list;
-        wmem_map_t *matches_table;
 
 } http_conv_t;
 
@@ -106,5 +121,19 @@ typedef struct _http_eo_t {
 	char    *content_type;
 	tvbuff_t *payload;
 } http_eo_t;
+
+/* Resolves a URI reference that might be relative to a given base URI and
+ * returns a string. Roughly similar to the algorithm in RFC 3986 5.2 but
+ * not entirely accurate to it (sacrificing some accuracy for simplicity.)
+ *
+ * @param scope wmem allocator scope for the returned string
+ * @param base_url base URI
+ * @param location_url a URI reference that might be relative to base_url
+ * (or might be an absolute URI)
+ * @return A string allocated in scope that represents a target URI after
+ * resolving location_url, using base_url as the possible base URI
+ */
+extern char *
+determine_http_location_target(wmem_allocator_t *scope, const char *base_url, const char * location_url);
 
 #endif /* __PACKET_HTTP_H__ */

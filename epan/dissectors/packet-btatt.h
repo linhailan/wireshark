@@ -1,4 +1,4 @@
-/* packet-btaatt.h
+/* packet-btatt.h
  * Headers for ATT
  *
  * Copyright 2015, Michal Labedzki for Tieto Corporation
@@ -15,6 +15,7 @@
 
 #include <epan/expert.h>
 #include "packet-bluetooth.h"
+#include "packet-btl2cap.h"
 
 #define ATT_OPCODE_ERROR_RESPONSE               0x01
 #define ATT_OPCODE_EXCHANGE_MTU_REQUEST         0x02
@@ -41,15 +42,18 @@
 #define ATT_OPCODE_WRITE_PREPARE_RESPONSE       0x17
 #define ATT_OPCODE_WRITE_EXECUTE_REQUEST        0x18
 #define ATT_OPCODE_WRITE_EXECUTE_RESPONSE       0x19
+#define ATT_OPCODE_READ_MULTIPLE_VARIABLE_REQUEST       0x20
+#define ATT_OPCODE_READ_MULTIPLE_VARIABLE_RESPONSE      0x21
 #define ATT_OPCODE_WRITE_COMMAND                0x52
 #define ATT_OPCODE_WRITE_SIGNED_COMMAND         0xD2
 
 #define ATT_OPCODE_HANDLE_VALUE_NOTIFICATION    0x1B
+#define ATT_OPCODE_MULTIPLE_HANDLE_VALUE_NOTIFICATION   0x23
 #define ATT_OPCODE_HANDLE_VALUE_INDICATION      0x1D
 #define ATT_OPCODE_HANDLE_VALUE_CONFIRMATION    0x1E
 
 typedef struct _btatt_data_t {
-    bluetooth_data_t  *bluetooth_data;
+    btl2cap_data_t  *l2cap_data;
     uint8_t   opcode;
     /* ATT handle for currently processed packet (optional) */
     uint32_t  handle;
@@ -64,6 +68,9 @@ enum attribute_type {
 typedef struct _tap_handles_t {
     uint32_t  handle;
     bluetooth_uuid_t uuid;
+    const char* uuid_str;
+    const char* numeric_uuid_str;
+
     enum attribute_type attribute_type;
 
     /** Store the service and characteristic declaration.
@@ -86,9 +93,8 @@ extern const value_string characteristic_presentation_namespace_description_btsi
 
 bluetooth_uuid_t
 get_gatt_bluetooth_uuid_from_handle(packet_info *pinfo, uint32_t handle, uint8_t opcode,
-    bluetooth_data_t *bluetooth_data);
+    btl2cap_data_t *l2cap_data);
 
-WS_DLL_PUBLIC bool bluetooth_gatt_has_no_parameter(uint8_t opcode);
 WS_DLL_PUBLIC expert_field ei_btatt_invalid_usage;
 
 #endif

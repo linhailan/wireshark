@@ -218,6 +218,7 @@ public slots:
      */
     void useAbsoluteTime(bool absolute);
     void limitToDisplayFilter(bool limit);
+    void setMachineReadable(bool machine);
 
     void setOpenTabs(QList<int> protocols);
 
@@ -244,6 +245,10 @@ private:
 
     bool _disableTaps;
     bool _nameResolution;
+    bool _absoluteTime;
+    bool _limitToDisplayFilter;
+    bool _nanoseconds;
+    bool _machineReadable;
 
     QTreeView * createTree(int protoId);
     TrafficDataFilterProxy * modelForTabIndex(int tabIdx = -1);

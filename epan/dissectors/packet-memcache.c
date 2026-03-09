@@ -31,10 +31,6 @@
 void proto_register_memcache (void);
 void proto_reg_handoff_memcache(void);
 
-#define PNAME  "Memcache Protocol"
-#define PSNAME "MEMCACHE"
-#define PFNAME "memcache"
-
 #define MEMCACHE_DEFAULT_RANGE  "11211"
 #define MEMCACHE_HEADER_LEN   24
 
@@ -215,7 +211,7 @@ static bool memcache_desegment_body = true;
 /* should refer to either the request or the response dissector.
  */
 typedef int (*ReqRespDissector)(tvbuff_t*, packet_info *, proto_tree *,
-                                int, const unsigned char*, const unsigned char*, uint8_t);
+                                unsigned, const unsigned char*, const unsigned char*, uint8_t);
 
 /* determines if a packet contains a memcache
  * request or reply by looking at its first token.
@@ -240,7 +236,7 @@ get_memcache_pdu_len (packet_info *pinfo _U_, tvbuff_t *tvb,
 
 static void
 dissect_extras (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
-                int offset, uint8_t extras_len, uint8_t opcode, bool request)
+                unsigned offset, uint8_t extras_len, uint8_t opcode, bool request)
 {
   proto_tree *extras_tree = NULL;
   proto_item *extras_item = NULL, *ti;
@@ -356,12 +352,12 @@ dissect_extras (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   if (illegal) {
     ti = proto_tree_add_item (extras_tree, hf_extras_unknown, tvb, offset, extras_len, ENC_NA);
     expert_add_info_format(pinfo, ti, &ei_extras_unknown, "%s %s shall not have Extras",
-                    val_to_str (opcode, opcode_vals, "Opcode %d"),
+                    val_to_str(pinfo->pool, opcode, opcode_vals, "Opcode %d"),
                     request ? "Request" : "Response");
     offset += extras_len;
   } else if (missing) {
     proto_tree_add_expert_format(tree, pinfo, &ei_extras_missing, tvb, offset, 0, "%s %s must have Extras",
-                            val_to_str (opcode, opcode_vals, "Opcode %d"),
+                            val_to_str(pinfo->pool, opcode, opcode_vals, "Opcode %d"),
                             request ? "Request" : "Response");
   }
 
@@ -372,7 +368,7 @@ dissect_extras (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
 static void
 dissect_key (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
-             int offset, int key_len, uint8_t opcode, bool request)
+             unsigned offset, int key_len, uint8_t opcode, bool request)
 {
   proto_item *ti = NULL;
   bool        illegal = false;  /* Set when key shall not be present */
@@ -411,17 +407,17 @@ dissect_key (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
   if (illegal) {
     expert_add_info_format(pinfo, ti, &ei_key_unknown, "%s %s shall not have Key",
-            val_to_str (opcode, opcode_vals, "Opcode %d"),
+            val_to_str(pinfo->pool, opcode, opcode_vals, "Opcode %d"),
             request ? "Request" : "Response");
   } else if (missing) {
     proto_tree_add_expert_format(tree, pinfo, &ei_key_missing, tvb, offset, 0, "%s Request must have Key",
-                            val_to_str (opcode, opcode_vals, "Opcode %d"));
+                            val_to_str(pinfo->pool, opcode, opcode_vals, "Opcode %d"));
   }
 }
 
 static void
 dissect_value (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
-               int offset, uint32_t value_len, uint8_t opcode, bool request)
+               unsigned offset, uint32_t value_len, uint8_t opcode, bool request)
 {
   proto_item *ti = NULL;
   bool        illegal = false;  /* Set when value shall not be present */
@@ -431,7 +427,7 @@ dissect_value (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     if (!request && ((opcode == OP_INCREMENT) || (opcode == OP_DECREMENT))) {
       ti = proto_tree_add_item (tree, hf_uint64_response, tvb, offset, 8, ENC_BIG_ENDIAN);
       if (value_len != 8) {
-        expert_add_info_format(pinfo, ti, &ei_value_length, "Illegal Value length, should be 8");
+        expert_add_info(pinfo, ti, &ei_value_length);
       }
     } else {
       ti = proto_tree_add_item (tree, hf_value, tvb, offset, value_len, ENC_ASCII);
@@ -479,11 +475,11 @@ dissect_value (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
   if (illegal) {
     expert_add_info_format(pinfo, ti, &ei_value_unknown, "%s %s shall not have Value",
-            val_to_str (opcode, opcode_vals, "Opcode %d"),
+            val_to_str(pinfo->pool, opcode, opcode_vals, "Opcode %d"),
             request ? "Request" : "Response");
   } else if (missing) {
     proto_tree_add_expert_format(tree, pinfo, &ei_value_missing, tvb, offset, 0, "%s %s must have Value",
-                            val_to_str (opcode, opcode_vals, "Opcode %d"),
+                            val_to_str(pinfo->pool, opcode, opcode_vals, "Opcode %d"),
                             request ? "Request" : "Response");
   }
 }
@@ -499,34 +495,32 @@ dissect_memcache (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
   uint32_t    body_len, value_len;
   bool        request;
 
-  col_set_str (pinfo->cinfo, COL_PROTOCOL, PSNAME);
+  col_set_str (pinfo->cinfo, COL_PROTOCOL, "MEMCACHE");
   col_clear (pinfo->cinfo, COL_INFO);
 
   memcache_item = proto_tree_add_item (tree, proto_memcache, tvb, offset, -1, ENC_NA);
   memcache_tree = proto_item_add_subtree (memcache_item, ett_memcache);
 
-  magic = tvb_get_uint8 (tvb, offset);
-  ti = proto_tree_add_item (memcache_tree, hf_magic, tvb, offset, 1, ENC_BIG_ENDIAN);
+  ti = proto_tree_add_item_ret_uint8 (memcache_tree, hf_magic, tvb, offset, 1, ENC_BIG_ENDIAN, &magic);
   offset += 1;
 
   if (try_val_to_str (magic, magic_vals) == NULL) {
     expert_add_info_format(pinfo, ti, &ei_magic_unknown, "Unknown magic byte: %d", magic);
   }
 
-  opcode = tvb_get_uint8 (tvb, offset);
-  ti = proto_tree_add_item (memcache_tree, hf_opcode, tvb, offset, 1, ENC_BIG_ENDIAN);
+  ti = proto_tree_add_item_ret_uint8 (memcache_tree, hf_opcode, tvb, offset, 1, ENC_BIG_ENDIAN, &opcode);
   offset += 1;
 
   if (try_val_to_str (opcode, opcode_vals) == NULL) {
     expert_add_info_format(pinfo, ti, &ei_opcode_unknown, "Unknown opcode: %d", opcode);
   }
 
-  proto_item_append_text (memcache_item, ", %s %s", val_to_str (opcode, opcode_vals, "Unknown opcode (%d)"),
-                          val_to_str (magic, magic_vals, "Unknown magic (%d)"));
+  proto_item_append_text (memcache_item, ", %s %s", val_to_str(pinfo->pool, opcode, opcode_vals, "Unknown opcode (%d)"),
+                          val_to_str(pinfo->pool, magic, magic_vals, "Unknown magic (%d)"));
 
   col_append_fstr (pinfo->cinfo, COL_INFO, "%s %s",
-                   val_to_str (opcode, opcode_vals, "Unknown opcode (%d)"),
-                   val_to_str (magic, magic_vals, "Unknown magic (%d)"));
+                   val_to_str(pinfo->pool, opcode, opcode_vals, "Unknown opcode (%d)"),
+                   val_to_str(pinfo->pool, magic, magic_vals, "Unknown magic (%d)"));
 
   key_len = tvb_get_ntohs (tvb, offset);
   proto_tree_add_item (memcache_tree, hf_key_length, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -545,8 +539,8 @@ dissect_memcache (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
     ti = proto_tree_add_item (memcache_tree, hf_status, tvb, offset, 2, ENC_BIG_ENDIAN);
     if (status != 0) {
       expert_add_info_format(pinfo, ti, &ei_status_response, "%s: %s",
-                              val_to_str (opcode, opcode_vals, "Unknown opcode (%d)"),
-                              val_to_str (status, status_vals, "Status: %d"));
+                              val_to_str(pinfo->pool, opcode, opcode_vals, "Unknown opcode (%d)"),
+                              val_to_str(pinfo->pool, status, status_vals, "Status: %d"));
     }
   } else {
     request = true;
@@ -585,10 +579,10 @@ dissect_memcache (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
     /*offset += body_len;*/
 
     col_append_fstr (pinfo->cinfo, COL_INFO, " (%s)",
-                     val_to_str (status, status_vals, "Unknown status: %d"));
+                     val_to_str(pinfo->pool, status, status_vals, "Unknown status: %d"));
   } else {
     proto_tree_add_expert_format(memcache_tree, pinfo, &ei_value_missing, tvb, offset, 0, "%s with status %s (%d) must have Value",
-                            val_to_str (opcode, opcode_vals, "Opcode %d"),
+                            val_to_str(pinfo->pool, opcode, opcode_vals, "Opcode %d"),
                             val_to_str_const (status, status_vals, "Unknown"), status);
   }
 
@@ -598,19 +592,17 @@ dissect_memcache (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 /* Obtain the content length by peeping into the header.
  */
 static bool
-get_payload_length (tvbuff_t *tvb, packet_info *pinfo, const int token_number, int offset,
+get_payload_length (tvbuff_t *tvb, packet_info *pinfo, const unsigned token_number, unsigned offset,
                     uint32_t *bytes, bool *content_length_found)
 {
   const unsigned char *next_token;
   const unsigned char *line, *lineend;
-  unsigned char       *bytes_val;
-  int           tokenlen, i = 0, linelen;
-  int           next_offset;
+  const char          *bytes_val;
+  unsigned             tokenlen, i = 0, linelen = 0;
+  unsigned             next_offset;
 
   /* get the header line. */
-  linelen = tvb_find_line_end (tvb, offset, -1, &next_offset,
-                               false);
-  if (linelen < 0) {
+  if (!tvb_find_line_end_remaining(tvb, offset, &linelen, &next_offset)) {
     return false;
   }
 
@@ -622,7 +614,7 @@ get_payload_length (tvbuff_t *tvb, packet_info *pinfo, const int token_number, i
     if (tokenlen == 0) {
       return false;
     }
-    offset += (int) (next_token - line);
+    offset += (unsigned) (next_token - line);
     line = next_token;
   }
 
@@ -632,7 +624,7 @@ get_payload_length (tvbuff_t *tvb, packet_info *pinfo, const int token_number, i
     return false;
   }
 
-  bytes_val = tvb_get_string_enc(pinfo->pool, tvb, offset, tokenlen, ENC_ASCII);
+  bytes_val = (char*)tvb_get_string_enc(pinfo->pool, tvb, offset, tokenlen, ENC_ASCII);
   if (bytes_val) {
     if (sscanf (bytes_val, "%u", bytes) == 1) {
       *content_length_found = true;
@@ -649,10 +641,10 @@ get_payload_length (tvbuff_t *tvb, packet_info *pinfo, const int token_number, i
 
 /* check if a PDU needs to be desegmented. */
 static bool
-desegment_pdus (tvbuff_t *tvb, packet_info *pinfo, const int offset,
+desegment_pdus (tvbuff_t *tvb, packet_info *pinfo, const unsigned offset,
                 const int data_offset, uint32_t content_length)
 {
-  int length_remaining, reported_length_remaining;
+  unsigned length_remaining, reported_length_remaining;
 
   /* data_offset has been set to start of the data block. */
   if (!tvb_bytes_exist (tvb, data_offset, content_length)) {
@@ -665,10 +657,6 @@ desegment_pdus (tvbuff_t *tvb, packet_info *pinfo, const int offset,
        * data, because that data wasn't captured.
        */
       return false;
-    }
-
-    if (length_remaining == -1) {
-      length_remaining = 0;
     }
 
     pinfo->desegment_offset = offset; /* start of the packet. */
@@ -684,14 +672,14 @@ desegment_pdus (tvbuff_t *tvb, packet_info *pinfo, const int offset,
  */
 static bool
 memcache_req_resp_hdrs_do_reassembly (
-    tvbuff_t *tvb, const int offset, packet_info *pinfo,
+    tvbuff_t *tvb, const unsigned offset, packet_info *pinfo,
     const bool desegment_headers, const bool desegment_body,
     const memcache_type_t type, const bool expect_content_length)
 {
-  int       linelen;
-  int       next_offset;
-  int       length_remaining;
-  int       reported_length_remaining;
+  unsigned  linelen;
+  unsigned  next_offset;
+  unsigned  length_remaining;
+  unsigned  reported_length_remaining;
   uint32_t  content_length          = 0;
   bool      content_length_found    = false;
   bool      ret                     = false;
@@ -724,8 +712,8 @@ memcache_req_resp_hdrs_do_reassembly (
     /* Request one more byte if we cannot find a
      * header (i.e. a line end).
      */
-    linelen = tvb_find_line_end (tvb, next_offset, -1, &next_offset, true);
-    if (linelen == -1 && length_remaining >= reported_length_remaining) {
+    bool found = tvb_find_line_end_remaining(tvb, next_offset,&linelen, &next_offset);
+    if (!found && length_remaining >= reported_length_remaining) {
       /* Not enough data; ask for one more byte. */
       pinfo->desegment_offset = offset;
       pinfo->desegment_len = DESEGMENT_ONE_MORE_SEGMENT;
@@ -783,15 +771,16 @@ memcache_req_resp_hdrs_do_reassembly (
 
 /* Dissect a memcache message. */
 static int
-dissect_memcache_message (tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *tree)
+dissect_memcache_message (tvbuff_t *tvb, unsigned offset, packet_info *pinfo, proto_tree *tree)
 {
   const unsigned char      *line;
   const unsigned char      *lineend;
-  int                orig_offset;
-  int                first_linelen;
-  int                datalen;
+  unsigned           orig_offset;
+  unsigned           first_linelen;
+  unsigned           datalen;
   bool               expect_content_length = false;
-  int                next_offset;
+  unsigned           next_offset;
+  int                toffset;
 
   bool               is_request_or_reply;
   memcache_type_t    memcache_type;
@@ -801,13 +790,11 @@ dissect_memcache_message (tvbuff_t *tvb, int offset, packet_info *pinfo, proto_t
   uint8_t            opcode = 0xff; /* set to something that is not in the list. */
 
   /* Find a line end in the packet.
-   * Note that "tvb_find_line_end ()" will return a value that
+   * Note that "tvb_find_line_end_remaining()" will return a value that
    * is not longer than what's in the buffer, so the
    * "tvb_get_ptr ()" call won't throw an exception.
    */
-  first_linelen = tvb_find_line_end (tvb, offset, -1, &next_offset,
-                                     false);
-  if (first_linelen < 0) {
+  if (!tvb_find_line_end_remaining(tvb, offset, &first_linelen, &next_offset)) {
     return -1;
   }
 
@@ -838,16 +825,15 @@ dissect_memcache_message (tvbuff_t *tvb, int offset, packet_info *pinfo, proto_t
   }
 
   /* Columns and summary display. */
-  col_set_str (pinfo->cinfo, COL_PROTOCOL, PSNAME);
+  col_set_str (pinfo->cinfo, COL_PROTOCOL, "MEMCACHE");
 
   /* If the packet is a memcache request or reply,
    * put the first line from the buffer into the summary
    * Otherwise, just call it a continuation.
    */
   if (is_request_or_reply) {
-    line = tvb_get_ptr (tvb, offset, first_linelen);
     col_add_fstr (pinfo->cinfo, COL_INFO, "%s ",
-                 format_text(pinfo->pool, line, first_linelen));
+                 tvb_format_text(pinfo->pool, tvb, offset, first_linelen));
   } else {
     col_set_str (pinfo->cinfo, COL_INFO, "MEMCACHE Continuation");
   }
@@ -865,13 +851,12 @@ dissect_memcache_message (tvbuff_t *tvb, int offset, packet_info *pinfo, proto_t
   if (tvb_reported_length_remaining (tvb, offset) != 0) {
     /* Dissect a request or a response. */
     if (is_request_or_reply && reqresp_dissector) {
-      next_offset = reqresp_dissector (tvb, pinfo, memcache_tree,
-                                       offset, line, lineend, opcode);
-      if (next_offset == -1) {
+      toffset = reqresp_dissector (tvb, pinfo, memcache_tree, offset, line, lineend, opcode);
+      if (toffset == -1) {
         /* Error in dissecting. */
         return -1;
       }
-      offset = next_offset;
+      offset = toffset;
     }
   }
 
@@ -898,10 +883,10 @@ dissect_memcache_message (tvbuff_t *tvb, int offset, packet_info *pinfo, proto_t
  * <data block>\r\n
  */
 static int
-content_data_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset,
-                       int content_length, uint8_t opcode)
+content_data_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, unsigned offset,
+  unsigned content_length, uint8_t opcode)
 {
-  int           datalen;
+  unsigned      datalen;
   bool          short_pkt = false;
 
   /*
@@ -912,7 +897,7 @@ content_data_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
   if (tvb_reported_length_remaining (tvb, offset) != 0) {
     /* bytes actually remaining in this tvbuff. */
     datalen = tvb_captured_length_remaining (tvb, offset);
-    if (content_length >= 0) {
+    if (content_length > 0) {
       if (datalen >= (content_length + 2)) { /* also consider \r\n*/
         datalen = content_length;
       } else {
@@ -977,20 +962,19 @@ find_stat_colon (const unsigned char *line, const unsigned char *lineend,
 
 /* incr/decr response dissector */
 static int
-incr_dissector (tvbuff_t *tvb, proto_tree *tree, int offset)
+incr_dissector (tvbuff_t *tvb, proto_tree *tree, unsigned offset)
 {
-  int            next_offset;
-  int            linelen;
+  unsigned       next_offset = 0;
+  unsigned       linelen;
   const unsigned char  *line, *lineend;
 
   const unsigned char  *next_token;
-  int            tokenlen;
+  unsigned       tokenlen;
 
   /* expecting to read 'bytes' number of bytes from the buffer. */
   if (tvb_offset_exists (tvb, offset)) {
     /* Find the end of the line. */
-    linelen = tvb_find_line_end (tvb, offset, -1, &next_offset, false);
-    if (linelen < 0) {
+    if (!tvb_find_line_end_remaining(tvb, offset, &linelen, &next_offset)) {
       /* header is out of the packet limits. */
       return -1;
     }
@@ -1025,22 +1009,20 @@ incr_dissector (tvbuff_t *tvb, proto_tree *tree, int offset)
 
 /* stats response dissector */
 static int
-stat_dissector (tvbuff_t *tvb, proto_tree *tree, int offset)
+stat_dissector (tvbuff_t *tvb, proto_tree *tree, unsigned offset)
 {
   unsigned      occurrences = 0;
   const unsigned char *first_colon = NULL, *last_colon = NULL;
-  int           tokenlen, linelen;
-  int           next_offset;
+  unsigned      tokenlen, linelen;
+  unsigned      next_offset = 0;
   const unsigned char *next_token;
   const unsigned char *line, *lineend;
   uint32_t      slabclass;
-  unsigned char response_chars[21];
+  char          response_chars[21];
 
   while (tvb_offset_exists (tvb, offset)) {
     /* Find the end of the line. */
-    linelen = tvb_find_line_end (tvb, offset, -1, &next_offset,
-                                 false);
-    if (linelen < 0) {
+    if (!tvb_find_line_end_remaining(tvb, offset, &linelen, &next_offset)) {
       return -1;
     }
 
@@ -1051,12 +1033,12 @@ stat_dissector (tvbuff_t *tvb, proto_tree *tree, int offset)
     lineend = line + linelen;
 
     tokenlen = get_token_len (line, lineend, &next_token);
-    if ((tokenlen == 4) && strncmp (line, "STAT", tokenlen) == 0) {
+    if ((tokenlen == 4) && strncmp ((char*)line, "STAT", tokenlen) == 0) {
       proto_tree_add_item (tree, hf_command, tvb, offset, tokenlen, ENC_ASCII);
       offset += (int) (next_token - line);
       line = next_token;
       occurrences = find_stat_colon (line, lineend, &first_colon, &last_colon);
-    } else if ((tokenlen == 3) && strncmp (line, "END", tokenlen) == 0) {
+    } else if ((tokenlen == 3) && strncmp ((char*)line, "END", tokenlen) == 0) {
       /* done. reached an end of response. */
       offset += (int) (next_token - line);
       return offset;
@@ -1134,10 +1116,10 @@ stat_dissector (tvbuff_t *tvb, proto_tree *tree, int offset)
 
 /* get/gets response dissector */
 static int
-get_response_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
+get_response_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, unsigned offset)
 {
-  int            next_offset;
-  int            linelen;
+  unsigned       next_offset;
+  unsigned       linelen;
   const unsigned char  *line, *lineend;
   const unsigned char  *next_token;
   int            tokenlen;
@@ -1150,9 +1132,7 @@ get_response_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
   /* expecting to read 'bytes' number of bytes from the buffer. */
   while (tvb_offset_exists (tvb, offset)) {
     /* Find the end of the line. */
-    linelen = tvb_find_line_end (tvb, offset, -1, &next_offset,
-                                 false);
-    if (linelen < 0) {
+    if (!tvb_find_line_end_remaining(tvb, offset, &linelen, &next_offset)) {
       /* header is out of the packet limits. */
       return -1;
     }
@@ -1172,9 +1152,9 @@ get_response_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
       return -1;
     }
 
-    if ((tokenlen == 5) && strncmp (line, "VALUE", tokenlen) == 0) {
+    if ((tokenlen == 5) && strncmp ((char*)line, "VALUE", tokenlen) == 0) {
       /* proceed */
-    } else if ((tokenlen == 3) && strncmp (line, "END", tokenlen) == 0) {
+    } else if ((tokenlen == 3) && strncmp ((char*)line, "END", tokenlen) == 0) {
       /* done. reached an end of response. */
       offset += (int) (next_token - line);
       return offset;
@@ -1246,9 +1226,6 @@ get_response_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
     offset = next_offset;
     /* <datablock>\r\n */
     offset = content_data_dissector (tvb, pinfo, tree, offset, bytes, opcode);
-    if (offset == -1) {
-      return offset;
-    }
   }
 
   return offset;
@@ -1256,11 +1233,11 @@ get_response_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
 
 /* Basic memcache response dissector. */
 static int
-memcache_response_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset,
+memcache_response_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, unsigned offset,
                              const unsigned char *line, const unsigned char *lineend, uint8_t opcode)
 {
   const unsigned char *next_token;
-  int           tokenlen;
+  unsigned     tokenlen;
 
   switch (opcode) {
 
@@ -1274,7 +1251,7 @@ memcache_response_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
     if (tokenlen == 0) {
       return -1;
     }
-    if ((tokenlen == 7) && strncmp (line, "VERSION", tokenlen) == 0) {
+    if ((tokenlen == 7) && strncmp ((char*)line, "VERSION", tokenlen) == 0) {
       offset += (int) (next_token - line);
       line = next_token;
     } else {
@@ -1319,13 +1296,13 @@ memcache_response_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
    * prepend, flush_all, verbosity, delete and to an extent
    * incr, decr and stat commands.
    */
-  if ((tokenlen == 6 && strncmp (line, "STORED", tokenlen) == 0) ||
-      (tokenlen == 10 && strncmp (line, "NOT_STORED", tokenlen) == 0) ||
-      (tokenlen == 6 && strncmp (line, "EXISTS", tokenlen) == 0) ||
-      (tokenlen == 9 && strncmp (line, "NOT_FOUND", tokenlen) == 0) ||
-      (tokenlen == 7 && strncmp (line, "DELETED", tokenlen) == 0) ||
-      (tokenlen == 2 && strncmp (line, "OK", tokenlen) == 0) ||
-      (tokenlen == 3 && strncmp (line, "END", tokenlen) == 0))
+  if ((tokenlen == 6 && strncmp ((char*)line, "STORED", tokenlen) == 0) ||
+      (tokenlen == 10 && strncmp((char*)line, "NOT_STORED", tokenlen) == 0) ||
+      (tokenlen == 6 && strncmp ((char*)line, "EXISTS", tokenlen) == 0) ||
+      (tokenlen == 9 && strncmp ((char*)line, "NOT_FOUND", tokenlen) == 0) ||
+      (tokenlen == 7 && strncmp ((char*)line, "DELETED", tokenlen) == 0) ||
+      (tokenlen == 2 && strncmp ((char*)line, "OK", tokenlen) == 0) ||
+      (tokenlen == 3 && strncmp ((char*)line, "END", tokenlen) == 0))
   {
     proto_tree_add_item (tree, hf_response, tvb, offset, tokenlen, ENC_ASCII);
     offset += (int) (next_token - line);
@@ -1348,11 +1325,11 @@ memcache_response_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
 
 /* Basic memcache request dissector. */
 static int
-memcache_request_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset,
+memcache_request_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, unsigned offset,
                             const unsigned char *line, const unsigned char *lineend, uint8_t opcode)
 {
   const unsigned char *next_token;
-  int           tokenlen;
+  unsigned      tokenlen;
 
   uint16_t      flags;
   uint32_t      expiration;
@@ -1451,7 +1428,7 @@ memcache_request_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
      */
     tokenlen = get_token_len (line, lineend, &next_token);
     if (tokenlen != 0) {
-      if (tokenlen == 7 && strncmp (line, "noreply", 7) == 0) {
+      if (tokenlen == 7 && strncmp ((char*)line, "noreply", 7) == 0) {
         proto_tree_add_item (tree, hf_noreply, tvb, offset, tokenlen, ENC_ASCII);
       }
       offset += (int) (next_token - line);
@@ -1460,9 +1437,6 @@ memcache_request_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     offset += 2 ; /* go past /r/n*/
     /* <datablock>\r\n */
     offset = content_data_dissector (tvb, pinfo, tree, offset, bytes, opcode);
-    if (offset == -1) {
-      return offset;
-    }
     break;
 
   case OP_INCREMENT:
@@ -1490,7 +1464,7 @@ memcache_request_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     if (tokenlen == 0) {
       return offset; /* reached CRLF */
     }
-    if (tokenlen == 7 && strncmp (line, "noreply", 7) == 0) {
+    if (tokenlen == 7 && strncmp ((char*)line, "noreply", 7) == 0) {
       proto_tree_add_item (tree, hf_noreply, tvb, offset, tokenlen, ENC_ASCII);
       offset += (int) (next_token - line);
       line = next_token;
@@ -1525,7 +1499,7 @@ memcache_request_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       return offset; /* neither expiration nor noreply; CRLF */
     }
     if (tokenlen <= 10) {
-      if (tokenlen == 7 && strncmp (line, "noreply", 7) == 0) {
+      if (tokenlen == 7 && strncmp ((char*)line, "noreply", 7) == 0) {
         /* noreply */
         proto_tree_add_item (tree, hf_noreply, tvb, offset, tokenlen, ENC_ASCII);
       } else {
@@ -1596,7 +1570,7 @@ memcache_request_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       return offset; /* neither expiration nor noreply; CRLF */
     }
     if (tokenlen <= 10) {
-      if (tokenlen == 7 && strncmp (line, "noreply", 7) == 0) {
+      if (tokenlen == 7 && strncmp ((char*)line, "noreply", 7) == 0) {
         /* noreply */
         proto_tree_add_item (tree, hf_noreply, tvb, offset, tokenlen, ENC_ASCII);
       } else {
@@ -1618,7 +1592,7 @@ memcache_request_dissector (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     if (tokenlen == 0) {
       return offset;
     }
-    if (tokenlen == 7 && strncmp (line, "noreply", 7) == 0) {
+    if (tokenlen == 7 && strncmp ((char*)line, "noreply", 7) == 0) {
       /* noreply */
       proto_tree_add_item (tree, hf_noreply, tvb, offset, tokenlen, ENC_ASCII);
       offset += (int) (next_token - line);
@@ -1884,10 +1858,9 @@ dissect_memcache_text (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 static int
 dissect_memcache_tcp (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 {
-  int         offset = 0;
   uint8_t     magic;
 
-  magic = tvb_get_uint8 (tvb, offset);
+  magic = tvb_get_uint8 (tvb, 0);
 
   if (try_val_to_str (magic, magic_vals) != NULL) {
     tcp_dissect_pdus (tvb, pinfo, tree, memcache_desegment_body, 12,
@@ -1903,10 +1876,9 @@ dissect_memcache_tcp (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void*
 static int
 dissect_memcache_udp (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 {
-  int         offset = 0;
   uint8_t     magic;
 
-  magic = tvb_get_uint8 (tvb, offset);
+  magic = tvb_get_uint8 (tvb, 0);
 
   if (try_val_to_str (magic, magic_vals) != NULL) {
     dissect_memcache (tvb, pinfo, tree, data);
@@ -2098,7 +2070,7 @@ proto_register_memcache (void)
   module_t        *memcache_module;
   expert_module_t *expert_memcache;
 
-  proto_memcache = proto_register_protocol (PNAME, PSNAME, PFNAME);
+  proto_memcache = proto_register_protocol ("Memcache Protocol", "MEMCACHE", "memcache");
   memcache_tcp_handle = register_dissector ("memcache.tcp", dissect_memcache_tcp, proto_memcache);
   memcache_udp_handle = register_dissector ("memcache.udp", dissect_memcache_udp, proto_memcache);
 

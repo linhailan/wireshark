@@ -30,12 +30,6 @@
 #include "packet-udp.h"
 #include "packet-someip.h"
 
-#define VSOMEIP_NAME                            "vSomeIP"
-#define VSOMEIP_NAME_LONG                       "vSomeIP"
-#define VSOMEIP_NAME_FILTER                     "vsomeip"
-
-#define VSOMEIP_NOT_IMPLEMENTED_STRING          "Not implemented yet. Please consider creating a ticket and attaching an example trace."
-
 #define VSOMEIP_MESSAGE_SIZE_WITH_OFFSET         13
 #define VSOMEIP_SIZE_OFFSET                      9
 #define VSOMEIP_MESSAGE_MIN_SIZE                 17
@@ -126,6 +120,7 @@ static int ett_vsomeip_config_entry;
 
 /* expert info items */
 static expert_field ei_vsomeip_unknown_version;
+static expert_field ei_vsomeip_not_implemented;
 
 /* value strings */
 #define VSOMEIP_ASSIGN_CLIENT                   0x00
@@ -407,7 +402,7 @@ dissect_vsomeip_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree_root
 
     int             offset = 0;
 
-    col_set_str(pinfo->cinfo, COL_PROTOCOL, VSOMEIP_NAME);
+    col_set_str(pinfo->cinfo, COL_PROTOCOL, "vSomeIP");
     ti_root = proto_tree_add_item(tree_root, proto_vsomeip, tvb, offset, -1, ENC_NA);
     tree = proto_item_add_subtree(ti_root, ett_vsomeip);
 
@@ -421,7 +416,7 @@ dissect_vsomeip_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree_root
 
     uint32_t cmd;
     proto_tree_add_item_ret_uint(tree, hf_vsomeip_command, tvb, offset, 1, ENC_NA, &cmd);
-    col_set_str(pinfo->cinfo, COL_INFO, val_to_str(cmd, vsomeip_command_type, "VSOMEIP CMD 0x%02x"));
+    col_set_str(pinfo->cinfo, COL_INFO, val_to_str(pinfo->pool, cmd, vsomeip_command_type, "VSOMEIP CMD 0x%02x"));
     offset += 1;
 
     proto_tree_add_item(tree, hf_vsomeip_version, tvb, offset, 2, ENC_LITTLE_ENDIAN);
@@ -438,7 +433,7 @@ dissect_vsomeip_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree_root
     proto_tree_add_item_ret_uint(tree, hf_vsomeip_size, tvb, offset, 4, ENC_LITTLE_ENDIAN, &size);
     offset += 4;
 
-    proto_item_append_text(ti_root, ": %s", val_to_str(cmd, vsomeip_command_type, "VSOMEIP CMD 0x%02x"));
+    proto_item_append_text(ti_root, ": %s", val_to_str(pinfo->pool, cmd, vsomeip_command_type, "VSOMEIP CMD 0x%02x"));
 
     int offset_end = offset + size;
 
@@ -480,7 +475,7 @@ dissect_vsomeip_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree_root
             uint32_t subcmd_size = tvb_get_uint32(tvb, offset + 1, ENC_LITTLE_ENDIAN);
 
             uint32_t subcmd = tvb_get_uint8(tvb, offset);
-            const char *subcmd_text = val_to_str(subcmd, vsomeip_rie_subcmd_type, " Unknown Subcommand: %02x");
+            const char *subcmd_text = val_to_str(pinfo->pool, subcmd, vsomeip_rie_subcmd_type, " Unknown Subcommand: %02x");
 
             proto_item *ti_subcmd;
             proto_tree *tree_subcmd = proto_tree_add_subtree_format(tree_ri, tvb, offset, 5 + subcmd_size, ett_vsomeip_ri_subcmd, &ti_subcmd, "%s", subcmd_text);
@@ -630,7 +625,7 @@ dissect_vsomeip_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree_root
         offset += 1;
 
         uint32_t dest;
-        proto_tree_add_item_ret_uint(tree, hf_vsomeip_dest, tvb, offset, 2, ENC_NA, &dest);
+        proto_tree_add_item_ret_uint(tree, hf_vsomeip_dest, tvb, offset, 2, ENC_BIG_ENDIAN, &dest);
         offset += 2;
 
         /* A SOME/IP messages follows with the layout (all big endian!):
@@ -793,44 +788,14 @@ dissect_vsomeip_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree_root
     /* yes, fall through */
     case VSOMEIP_UPDATE_SECURITY_POLICY:
     case VSOMEIP_UPDATE_SECURITY_POLICY_INT:
-        /* TODO ! */
-
-        proto_tree_add_text_internal(tree, tvb, offset, size, VSOMEIP_NOT_IMPLEMENTED_STRING);
-        col_append_str(pinfo->cinfo, COL_INFO, "   *** NOT IMPLEMENTED YET ***");
-        break;
-
     case VSOMEIP_UPDATE_SECURITY_POLICY_RESPONSE:
-        /* TODO ! */
-
-        proto_tree_add_text_internal(tree, tvb, offset, size, VSOMEIP_NOT_IMPLEMENTED_STRING);
-        col_append_str(pinfo->cinfo, COL_INFO, "   *** NOT IMPLEMENTED YET ***");
-        break;
-
     case VSOMEIP_REMOVE_SECURITY_POLICY:
-        /* TODO ! */
-
-        proto_tree_add_text_internal(tree, tvb, offset, size, VSOMEIP_NOT_IMPLEMENTED_STRING);
-        col_append_str(pinfo->cinfo, COL_INFO, "   *** NOT IMPLEMENTED YET ***");
-        break;
-
     case VSOMEIP_REMOVE_SECURITY_POLICY_RESPONSE:
-        /* TODO ! */
-
-        proto_tree_add_text_internal(tree, tvb, offset, size, VSOMEIP_NOT_IMPLEMENTED_STRING);
-        col_append_str(pinfo->cinfo, COL_INFO, "   *** NOT IMPLEMENTED YET ***");
-        break;
-
     case VSOMEIP_UPDATE_SECURITY_CREDENTIALS:
-        /* TODO ! */
-
-        proto_tree_add_text_internal(tree, tvb, offset, size, VSOMEIP_NOT_IMPLEMENTED_STRING);
-        col_append_str(pinfo->cinfo, COL_INFO, "   *** NOT IMPLEMENTED YET ***");
-        break;
-
     case VSOMEIP_DISTRIBUTE_SECURITY_POLICIES:
         /* TODO ! */
 
-        proto_tree_add_text_internal(tree, tvb, offset, size, VSOMEIP_NOT_IMPLEMENTED_STRING);
+        proto_tree_add_expert(tree, pinfo, &ei_vsomeip_not_implemented, tvb, offset, size);
         col_append_str(pinfo->cinfo, COL_INFO, "   *** NOT IMPLEMENTED YET ***");
         break;
 
@@ -958,7 +923,7 @@ proto_register_vsomeip(void) {
 
         { &hf_vsomeip_serviceid,    { "Service ID", "vsomeip.service_id", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
         { &hf_vsomeip_instanceid,   { "Instance ID", "vsomeip.instance_id", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
-        { &hf_vsomeip_majorver,     { "Major Version", "vsomeip.major_version", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+        { &hf_vsomeip_majorver,     { "Major Version", "vsomeip.major_version", FT_UINT8,  BASE_DEC, NULL, 0x0, NULL, HFILL }},
         { &hf_vsomeip_minorver,     { "Minor Version", "vsomeip.minor_version", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }},
         { &hf_vsomeip_eventgroupid, { "Eventgroup ID", "vsomeip.eventgroup_id", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
         { &hf_vsomeip_eventid,      { "Event ID", "vsomeip.event_id", FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
@@ -1007,10 +972,11 @@ proto_register_vsomeip(void) {
 
     static ei_register_info ei[] = {
         { &ei_vsomeip_unknown_version,{ "vsomeip.unknown_protocol_version", PI_PROTOCOL, PI_WARN, "vSomeIP Unknown Protocol Version!", EXPFILL } },
+        { &ei_vsomeip_not_implemented,{ "vsomeip.not_implemented", PI_UNDECODED, PI_WARN, "Not implemented yet. Please consider creating a ticket and attaching an example trace.", EXPFILL } },
     };
 
     /* Register Protocol, Handles, Fields, ETTs, Expert Info */
-    proto_vsomeip = proto_register_protocol(VSOMEIP_NAME_LONG, VSOMEIP_NAME, VSOMEIP_NAME_FILTER);
+    proto_vsomeip = proto_register_protocol("vSomeIP", "vSomeIP", "vsomeip");
     vsomeip_handle_udp = register_dissector("vsomeip_udp", dissect_vsomeip_udp, proto_vsomeip);
     vsomeip_handle_tcp = register_dissector("vsomeip_tcp", dissect_vsomeip_tcp, proto_vsomeip);
     register_dissector("vsomeip", dissect_vsomeip_message, proto_vsomeip);

@@ -1,5 +1,5 @@
 /* packet-hyperscsi.c
- * Routines for dissassembly of the Hyper SCSI protocol.
+ * Routines for disassembly of the Hyper SCSI protocol.
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -126,7 +126,7 @@ dissect_hyperscsi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
   hs_cmd &= OPCODE_MASK;
 
   col_append_str(pinfo->cinfo, COL_INFO,
-                   val_to_str(hs_cmd, hscsi_opcodes, "Unknown HyperSCSI Request or Response (%u)"));
+                   val_to_str(pinfo->pool, hs_cmd, hscsi_opcodes, "Unknown HyperSCSI Request or Response (%u)"));
 
   if (tree) {
     hs_pdu_tree = proto_tree_add_subtree(hs_tree, tvb, 3, -1, ett_hs_pdu, NULL, "HyperSCSI PDU");

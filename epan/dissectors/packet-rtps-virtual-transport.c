@@ -387,7 +387,7 @@ static int dissect_rtps_virtual_transport_rtps_type(
         return 0;
     }
 
-    advanced_payload = tvb_new_subset_length(tvb, offset, -1);
+    advanced_payload = tvb_new_subset_remaining(tvb, offset);
     advanced_handle = find_dissector("rtpsproc");
     call_dissector_with_data(
             advanced_handle,
@@ -427,7 +427,7 @@ static int dissect_parameter_transport_rtps_type(
             {
                 proto_tree *rtpsvt_tree_information_class;
                 int32_t classId = tvb_get_int32(tvb, OFFSET_TO_VAL, ENC_BIG_ENDIAN);
-                const char *className = val_to_str(
+                const char *className = val_to_str(pinfo->pool,
                         classId,
                         ndds_transport_class_id_vals,
                         "%d");

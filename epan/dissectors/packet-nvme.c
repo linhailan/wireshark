@@ -1194,7 +1194,7 @@ nvme_add_cmd_cqe_to_done_list(struct nvme_q_ctx *q_ctx,
 
     nvme_build_done_frame_key(cmd_key, &key, &frame_num);
 
-    /* found matchng entry. Add entries to the matched table for both cmd and cqe.
+    /* found matching entry. Add entries to the matched table for both cmd and cqe.
      */
     frame_num = cmd_ctx->cqe_pkt_num;
     wmem_tree_insert32_array(q_ctx->done_cmds, cmd_key, (void*)cmd_ctx);
@@ -1371,7 +1371,7 @@ dissect_nvme_rwc_common_word_10_11_12_14_15(tvbuff_t *cmd_tvb, proto_tree *cmd_t
                         50, 2, ENC_LITTLE_ENDIAN);
 
     ti = proto_tree_add_item(cmd_tree, hf_nvme_cmd_prinfo, cmd_tvb, 50,
-                             1, ENC_NA);
+                             2, ENC_LITTLE_ENDIAN);
     prinfo_tree = proto_item_add_subtree(ti, ett_data);
 
     proto_tree_add_item(prinfo_tree, hf_nvme_cmd_prinfo_prchk_lbrtag, cmd_tvb,
@@ -2284,7 +2284,7 @@ static const value_string sub_type_tbl[] = {
     { 0, NULL }
 };
 
-static void dissect_nvme_get_logpage_ify_rcrd_resp(tvbuff_t *cmd_tvb, proto_tree *tree, uint64_t rcrd, unsigned roff, int off, unsigned len)
+static void dissect_nvme_get_logpage_ify_rcrd_resp(tvbuff_t *cmd_tvb, struct nvme_cmd_ctx *cmd_ctx, proto_tree *tree, uint64_t rcrd, unsigned roff, int off, unsigned len)
 {
     proto_item *ti;
     proto_tree *grp;
@@ -2294,8 +2294,12 @@ static void dissect_nvme_get_logpage_ify_rcrd_resp(tvbuff_t *cmd_tvb, proto_tree
         (len < 1024) ? len : 1024, NULL, "Discovery Log Entry %"PRIu64" (DLE%"PRIu64")", rcrd, rcrd);
     grp =  proto_item_add_subtree(ti, ett_data);
 
-    if (!roff)
+    if (!roff) {
         proto_tree_add_item_ret_uint(grp, hf_nvme_get_logpage_ify_rcrd_trtype, cmd_tvb, off, 1, ENC_LITTLE_ENDIAN, &tr_type);
+        cmd_ctx->cmd_ctx.get_logpage.tr_type = tr_type;
+    } else {
+        tr_type = cmd_ctx->cmd_ctx.get_logpage.tr_type;
+    }
 
     if (roff <= 1 && (2-roff) <= len)
         proto_tree_add_item(grp, hf_nvme_get_logpage_ify_rcrd_adrfam, cmd_tvb, off-roff+1, 1, ENC_LITTLE_ENDIAN);
@@ -2387,7 +2391,7 @@ static void dissect_nvme_get_logpage_ify_resp(proto_item *ti, tvbuff_t *cmd_tvb,
     }
 
     max_bytes = (max_bytes <= len) ? max_bytes : len;
-    dissect_nvme_get_logpage_ify_rcrd_resp(cmd_tvb, grp, rcrd, roff, poff, len);
+    dissect_nvme_get_logpage_ify_rcrd_resp(cmd_tvb, cmd_ctx, grp, rcrd, roff, poff, len);
     poff += max_bytes;
     len -= max_bytes;
     rcrd++;
@@ -2398,7 +2402,7 @@ static void dissect_nvme_get_logpage_ify_resp(proto_item *ti, tvbuff_t *cmd_tvb,
 
     while (len && rcrd_ctr <= recnum) {
         max_bytes = (len >= 1024) ? 1024 : len;
-        dissect_nvme_get_logpage_ify_rcrd_resp(cmd_tvb, grp, rcrd, 0, poff, len);
+        dissect_nvme_get_logpage_ify_rcrd_resp(cmd_tvb, cmd_ctx, grp, rcrd, 0, poff, len);
         poff += max_bytes;
         len -= max_bytes;
         rcrd++;
@@ -2435,7 +2439,7 @@ static void dissect_nvme_get_logpage_err_inf_resp(proto_item *ti, tvbuff_t *cmd_
     if (off <= 29 && (30-off) <= len)
         proto_tree_add_item(grp, hf_nvme_get_logpage_errinf_trtype, cmd_tvb, 29-off, 1, ENC_LITTLE_ENDIAN);
     if (off <= 30 && (32-off) <= len)
-        proto_tree_add_item(grp, hf_nvme_get_logpage_errinf_rsvd0, cmd_tvb, 30-off, 2, ENC_NA);
+        proto_tree_add_item(grp, hf_nvme_get_logpage_errinf_rsvd0, cmd_tvb, 30-off, 2, ENC_LITTLE_ENDIAN);
     if (off <= 32 && (40-off) <= len)
         proto_tree_add_item(grp, hf_nvme_get_logpage_errinf_csi, cmd_tvb, 32-off, 8, ENC_LITTLE_ENDIAN);
     if (off <= 40 && (42-off) <= len)
@@ -2619,7 +2623,7 @@ static void dissect_nvme_get_logpage_fw_slot_resp(proto_item *ti, tvbuff_t *cmd_
     if (!off && len > 1)
         add_group_mask_entry(cmd_tvb, grp, 0, 1, ASPEC(hf_nvme_get_logpage_fw_slot_afi));
     if (off <= 1 && (8-off) <= len)
-        proto_tree_add_item(grp, hf_nvme_get_logpage_fw_slot_rsvd0,  cmd_tvb, 1-off, 7, ENC_NA);
+        proto_tree_add_item(grp, hf_nvme_get_logpage_fw_slot_rsvd0,  cmd_tvb, 1-off, 7, ENC_LITTLE_ENDIAN);
 
     decode_fw_slot_frs(grp, cmd_tvb, off, len);
 
@@ -3759,7 +3763,7 @@ dissect_nvme_data_response(tvbuff_t *nvme_tvb, packet_info *pinfo, proto_tree *r
 {
     proto_tree *cmd_tree;
     proto_item *ti;
-    const uint8_t *str_opcode;
+    const char *str_opcode;
     uint32_t off;
 
     off = (PINFO_FD_VISITED(pinfo)) ? nvme_lookup_data_tr_off(q_ctx, pinfo->num) : cmd_ctx->tr_bytes;
@@ -4041,12 +4045,12 @@ dissect_nvmeof_fabric_connect_cmd_data(tvbuff_t *data_tvb, proto_tree *data_tree
     if (off <= 256) {
         CHECK_STOP_PARSE(256, 256);
         proto_tree_add_item(data_tree, hf_nvmeof_cmd_connect_data_subnqn, data_tvb,
-                            pkt_off + 256 - off, 256, ENC_ASCII | ENC_NA);
+                            pkt_off + 256 - off, 256, ENC_ASCII);
     }
     if (off <= 512) {
         CHECK_STOP_PARSE(512, 256);
         proto_tree_add_item(data_tree, hf_nvmeof_cmd_connect_data_hostnqn, data_tvb,
-                            pkt_off + 512 - off, 256, ENC_ASCII | ENC_NA);
+                            pkt_off + 512 - off, 256, ENC_ASCII);
     }
     if (off <= 768) {
         CHECK_STOP_PARSE(768, 256);
@@ -5046,7 +5050,7 @@ proto_register_nvme(void)
         { &hf_nvme_cmd_prinfo,
             { "Protection info fields",
               "nvme.cmd.prinfo",
-               FT_UINT16, BASE_HEX, NULL, 0x0400, NULL, HFILL}
+               FT_UINT16, BASE_HEX, NULL, 0x3c00, NULL, HFILL}
         },
         { &hf_nvme_cmd_prinfo_prchk_lbrtag,
             { "check Logical block reference tag",
@@ -8072,6 +8076,10 @@ proto_register_nvme(void)
         { &hf_nvme_cqe_get_features_dword0_arb[1],
             { "Arbitration Burst", "nvme.cqe.dword0.get_features.arb.ab",
                FT_UINT32, BASE_HEX, NULL, 0x7, NULL, HFILL}
+        },
+        { &hf_nvme_cqe_get_features_dword0_arb[2],
+            { "Reserved", "nvme.cqe.dword0.get_features.arb.rsvd",
+               FT_UINT32, BASE_HEX, NULL, 0x000000f8, NULL, HFILL}
         },
         { &hf_nvme_cqe_get_features_dword0_arb[3],
             { "Low Priority Weight", "nvme.cqe.dword0.get_features.arb.lpw",

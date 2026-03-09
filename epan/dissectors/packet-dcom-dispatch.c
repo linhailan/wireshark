@@ -96,8 +96,8 @@ static const value_string dcom_lcid_vals[] = {
 
 
 
-int
-dissect_IDispatch_GetTypeInfoCount_resp(tvbuff_t *tvb, int offset,
+unsigned
+dissect_IDispatch_GetTypeInfoCount_resp(tvbuff_t *tvb, unsigned offset,
                                         packet_info *pinfo, proto_tree *tree, dcerpc_info *di, uint8_t *drep)
 {
     uint32_t u32TInfo;
@@ -114,13 +114,13 @@ dissect_IDispatch_GetTypeInfoCount_resp(tvbuff_t *tvb, int offset,
                                   &u32HResult);
 
     col_append_fstr(pinfo->cinfo, COL_INFO, " -> %s",
-                    val_to_str(u32HResult, dcom_hresult_vals, "Unknown (0x%08x)") );
+                    val_to_str(pinfo->pool, u32HResult, dcom_hresult_vals, "Unknown (0x%08x)") );
 
     return offset;
 }
 
-int
-dissect_IDispatch_GetTypeInfo_rqst(tvbuff_t *tvb, int offset,
+unsigned
+dissect_IDispatch_GetTypeInfo_rqst(tvbuff_t *tvb, unsigned offset,
                                    packet_info *pinfo, proto_tree *tree, dcerpc_info *di, uint8_t *drep)
 {
     uint32_t u32TInfo;
@@ -137,8 +137,8 @@ dissect_IDispatch_GetTypeInfo_rqst(tvbuff_t *tvb, int offset,
 }
 
 
-int
-dissect_IDispatch_GetTypeInfo_resp(tvbuff_t *tvb, int offset,
+unsigned
+dissect_IDispatch_GetTypeInfo_resp(tvbuff_t *tvb, unsigned offset,
                                    packet_info *pinfo, proto_tree *tree, dcerpc_info *di, uint8_t *drep)
 {
     uint32_t u32HResult;
@@ -158,14 +158,14 @@ dissect_IDispatch_GetTypeInfo_resp(tvbuff_t *tvb, int offset,
                                   &u32HResult);
 
     col_append_fstr(pinfo->cinfo, COL_INFO, " -> %s",
-                    val_to_str(u32HResult, dcom_hresult_vals, "Unknown (0x%08x)") );
+                    val_to_str(pinfo->pool, u32HResult, dcom_hresult_vals, "Unknown (0x%08x)") );
 
     return offset;
 }
 
 
-int
-dissect_IDispatch_GetIDsOfNames_rqst(tvbuff_t *tvb, int offset,
+unsigned
+dissect_IDispatch_GetIDsOfNames_rqst(tvbuff_t *tvb, unsigned offset,
                                      packet_info *pinfo, proto_tree *tree, dcerpc_info *di, uint8_t *drep)
 {
     e_guid_t riid;
@@ -212,8 +212,8 @@ dissect_IDispatch_GetIDsOfNames_rqst(tvbuff_t *tvb, int offset,
 
 
 
-int
-dissect_IDispatch_GetIDsOfNames_resp(tvbuff_t *tvb, int offset,
+unsigned
+dissect_IDispatch_GetIDsOfNames_resp(tvbuff_t *tvb, unsigned offset,
                                      packet_info *pinfo, proto_tree *tree, dcerpc_info *di, uint8_t *drep)
 {
     uint32_t u32DispId;
@@ -228,10 +228,11 @@ dissect_IDispatch_GetIDsOfNames_resp(tvbuff_t *tvb, int offset,
                                             &u32ArraySize);
 
     u32Tmp = u32ArraySize;
-    while (u32Tmp--) {
+    while (u32Tmp != 0) {
         offset = dissect_dcom_DWORD(tvb, offset, pinfo, tree, di, drep,
                                     hf_dispatch_id, &u32DispId);
         col_append_fstr(pinfo->cinfo, COL_INFO, " ID=0x%x", u32DispId);
+        u32Tmp--;
     }
 
     /* HRESULT of call */
@@ -239,15 +240,15 @@ dissect_IDispatch_GetIDsOfNames_resp(tvbuff_t *tvb, int offset,
                                   &u32HResult);
 
     col_append_fstr(pinfo->cinfo, COL_INFO, " -> %s",
-                    val_to_str(u32HResult, dcom_hresult_vals, "Unknown (0x%08x)") );
+                    val_to_str(pinfo->pool, u32HResult, dcom_hresult_vals, "Unknown (0x%08x)") );
 
     return offset;
 }
 
 
 
-int
-dissect_IDispatch_Invoke_rqst(tvbuff_t *tvb, int offset,
+unsigned
+dissect_IDispatch_Invoke_rqst(tvbuff_t *tvb, unsigned offset,
                               packet_info *pinfo, proto_tree *tree, dcerpc_info *di, uint8_t *drep)
 {
     uint32_t u32DispIdMember;
@@ -385,8 +386,8 @@ dissect_IDispatch_Invoke_rqst(tvbuff_t *tvb, int offset,
     return u32VariableOffset;
 }
 
-int
-dissect_IDispatch_Invoke_resp(tvbuff_t *tvb, int offset,
+unsigned
+dissect_IDispatch_Invoke_resp(tvbuff_t *tvb, unsigned offset,
                               packet_info *pinfo, proto_tree *tree, dcerpc_info *di, uint8_t *drep)
 {
     uint32_t u32Pointer;
@@ -455,7 +456,7 @@ dissect_IDispatch_Invoke_resp(tvbuff_t *tvb, int offset,
     }
 
     proto_item_append_text(excepinfo_item, ", SCode: %s",
-                           val_to_str(u32SCode, dcom_hresult_vals, "Unknown (0x%08x)"));
+                           val_to_str(pinfo->pool, u32SCode, dcom_hresult_vals, "Unknown (0x%08x)"));
     proto_item_set_len(excepinfo_item, offset - u32SubStart);
     /* end of ExcepInfo */
 
@@ -481,9 +482,9 @@ dissect_IDispatch_Invoke_resp(tvbuff_t *tvb, int offset,
                                   &u32HResult);
 
     col_append_fstr(pinfo->cinfo, COL_INFO, " SCode=%s VarRef=%u -> %s",
-                    val_to_str(u32SCode, dcom_hresult_vals, "Unknown (0x%08x)"),
+                    val_to_str(pinfo->pool, u32SCode, dcom_hresult_vals, "Unknown (0x%08x)"),
                     u32VarRef,
-                    val_to_str(u32HResult, dcom_hresult_vals, "Unknown (0x%08x)") );
+                    val_to_str(pinfo->pool, u32HResult, dcom_hresult_vals, "Unknown (0x%08x)") );
 
     return offset;
 }

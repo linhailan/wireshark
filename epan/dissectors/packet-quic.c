@@ -24,7 +24,8 @@
  * https://tools.ietf.org/html/draft-huitema-quic-ts-02
  * https://tools.ietf.org/html/draft-ietf-quic-ack-frequency-07 (and also draft-04/05)
  * https://tools.ietf.org/html/draft-banks-quic-cibir-01
- * https://tools.ietf.org/html/draft-ietf-quic-multipath-13 (and also >= draft-07)
+ * https://tools.ietf.org/html/draft-ietf-quic-multipath-15 (and also >= draft-07)
+ * https://tools.ietf.org/html/draft-ietf-quic-address-discovery-00
 
  *
  * Currently supported QUIC version(s): draft-21, draft-22, draft-23, draft-24,
@@ -42,7 +43,6 @@
  * - STREAM offsets larger than 32-bit are unsupported.
  * - STREAM with sizes larger than 32 bit are unsupported. STREAM sizes can be
  *   up to 62 bit in QUIC, but the TVB and reassembly API is limited to 32 bit.
- * - Out-of-order and overlapping STREAM frame data is not handled.
  * - "Follow QUIC Stream" doesn't work with STREAM IDs larger than 32 bit
  */
 
@@ -169,6 +169,10 @@ static int hf_quic_af_reordering_threshold;
 //static int hf_quic_af_ignore_order;
 //static int hf_quic_af_ignore_ce;
 static int hf_quic_ts;
+static int hf_quic_oa_seq_num;
+static int hf_quic_oa_ipv4;
+static int hf_quic_oa_ipv6;
+static int hf_quic_oa_port;
 static int hf_quic_unpredictable_bits;
 static int hf_quic_stateless_reset_token;
 static int hf_quic_reassembled_in;
@@ -228,6 +232,7 @@ static dissector_handle_t quic_handle;
 static dissector_handle_t tls13_handshake_handle;
 
 static dissector_table_t quic_proto_dissector_table;
+static dissector_table_t quic_datagram_proto_dissector_table; // Dissector of QUIC DATAGRAM frames
 
 /* Fields for showing reassembly results for fragments of QUIC stream data. */
 static const fragment_items quic_stream_fragment_items = {
@@ -320,7 +325,7 @@ static const fragment_items quic_crypto_fragment_items = {
 */
 
 typedef struct quic_decrypt_result {
-    const unsigned char   *error;      /**< Error message or NULL for success. */
+    const char     *error;      /**< Error message or NULL for success. */
     const uint8_t  *data;       /**< Decrypted result on success (file-scoped). */
     unsigned        data_len;   /**< Size of decrypted data. */
 } quic_decrypt_result_t;
@@ -378,7 +383,10 @@ typedef struct _quic_crypto_state {
  */
 typedef struct _quic_stream_state {
     uint64_t        stream_id;
+    uint64_t        inorder_offset;
     wmem_tree_t    *multisegment_pdus;
+    wmem_list_t    *ooo_segments;
+    wmem_map_t     *retrans_offsets;
     void           *subdissector_private;
 } quic_stream_state;
 
@@ -411,7 +419,9 @@ struct quic_info_data {
     uint32_t        version;
     wmem_list_t     *server_endpoints; /**< List of server endpoints, primarily used with 0 length DCIDs */
     bool            skip_decryption : 1; /**< Set to 1 if no keys are available. */
-    bool            client_dcid_set : 1; /**< Set to 1 if client_dcid_initial is set. */
+    bool            client_dcid_set : 1; /**< Set to 1 if client_dcid_initial is set. Set to 0 if a Retry packet has been received and the DCID might need to be cleared. */
+    bool            client_retry_processed : 1; /**< Set to 1 if the client has responded to a Retry packet. */
+    bool            server_initial_seen : 1; /**< Set to 1 if the server has responded to a client Initial with its own Initial. */
     bool            client_loss_bits_recv : 1; /**< The client is able to read loss bits info */
     bool            client_loss_bits_send : 1; /**< The client wants to send loss bits info */
     bool            server_loss_bits_recv : 1; /**< The server is able to read loss bits info */
@@ -437,8 +447,10 @@ struct quic_info_data {
     quic_cid_item_t client_cids;    /**< SCID of client from first Initial Packet. */
     quic_cid_item_t server_cids;    /**< SCID of server from first Retry/Handshake. */
     quic_cid_t      client_dcid_initial;    /**< DCID from Initial Packet. */
+    quic_cid_t      client_odcid;   /**< Original DCID, if there has been a Retry seen. */
     dissector_handle_t app_handle;  /**< Application protocol handle (NULL if unknown). */
     dissector_handle_t zrtt_app_handle;  /**< Application protocol handle (NULL if unknown) for 0-RTT data. */
+    dissector_handle_t app_datagram_handle;  /**< Application protocol handle for datagrams (NULL if unknown). */
     wmem_map_t     *client_streams; /**< Map from Stream ID -> STREAM info (uint64_t -> quic_stream_state), sent by the client. */
     wmem_map_t     *server_streams; /**< Map from Stream ID -> STREAM info (uint64_t -> quic_stream_state), sent by the server. */
     wmem_list_t    *streams_list;   /**< Ordered list of QUIC Stream ID in this connection (both directions). Used by "Follow QUIC Stream" functionality */
@@ -511,8 +523,20 @@ static inline uint8_t quic_draft_version(uint32_t version) {
         return 22;
     }
     /* Facebook mvfst, based on draft -27. */
-    if (version == 0xfaceb002 || version == 0xfaceb00e) {
+    if (version == 0xfaceb002 ||
+        version == 0xfaceb00e ||
+        version == 0xfaceb00f ||
+        version == 0xfaceb011 ||
+        version == 0xfaceb013) {
         return 27;
+    }
+    /* Facebook mvfst, experimental version with different salt. */
+    if (version == 0xfaceb014 || version == 0xfaceb015) {
+        return 27;
+    }
+    /* Facebook mvfst, "v1 alias" versions. */
+    if (version == 0xfaceb003 || version == 0xfaceb004) {
+        return 34;
     }
     /* GQUIC Q050, T050 and T051: they are not really based on any drafts,
      * but we must return a sensible value */
@@ -579,6 +603,8 @@ const range_string quic_version_vals[] = {
     { 0xfaceb003, 0xfaceb00d, "Facebook mvfst" },
     { 0xfaceb00e, 0xfaceb00e, "Facebook mvfst (Experimental)" },
     { 0xfaceb00f, 0xfaceb00f, "Facebook mvfst" },
+    { 0xfaceb010, 0xfaceb010, "Facebook mvfst" },
+    { 0xfaceb011, 0xfaceb015, "Facebook mvfst (Experimental)" },
     { 0xff000004, 0xff000004, "draft-04" },
     { 0xff000005, 0xff000005, "draft-05" },
     { 0xff000006, 0xff000006, "draft-06" },
@@ -688,12 +714,14 @@ static const value_string quic_v2_long_packet_type_vals[] = {
 #define FT_DATAGRAM_LENGTH          0x31
 #define FT_IMMEDIATE_ACK_DRAFT05    0xac /* ack-frequency-draft-05 */
 #define FT_ACK_FREQUENCY            0xaf
+#define FT_OBSERVED_ADDRESS_IPV4    0x9f81a6
+#define FT_OBSERVED_ADDRESS_IPV6    0x9f81a7
 #define FT_PATH_ACK                 0x15228c00
 #define FT_PATH_ACK_ECN             0x15228c01
 #define FT_PATH_ABANDON             0x15228c05
 #define FT_PATH_STATUS              0x15228c06 /* multipath-draft-05 */
-#define FT_PATH_BACKUP              0x15228c07 /* multipath-draft-06 */
-#define FT_PATH_AVAILABLE           0x15228c08 /* multipath-draft-06 */
+#define FT_PATH_BACKUP_AVAILABLE    0x15228c07 /* multipath-draft-06 rename with draft-15 */
+#define FT_PATH_STATUS_AVAILABLE    0x15228c08 /* multipath-draft-06 rename with draft-15 */
 #define FT_PATH_NEW_CONNECTION_ID   0x15228c09 /* multipath-draft-07 */
 #define FT_PATH_RETIRE_CONNECTION_ID 0x15228c0a /* multipath-draft-07 */
 #define FT_MAX_PATHS                0x15228c0b /* multipath-draft-07 */
@@ -701,6 +729,8 @@ static const value_string quic_v2_long_packet_type_vals[] = {
 #define FT_PATHS_BLOCKED            0x15228c0d /* multipath-draft-11 */
 #define FT_PATH_CIDS_BLOCKED        0x15228c0e /* multipath-draft-12 */
 #define FT_TIME_STAMP               0x02F5
+
+
 
 static const range_string quic_frame_type_vals[] = {
     { 0x00, 0x00,   "PADDING" },
@@ -734,11 +764,13 @@ static const range_string quic_frame_type_vals[] = {
     { 0xbaba00, 0xbaba01, "ACK_MP" }, /* multipath-draft-04 */
     { 0xbaba05, 0xbaba05, "PATH_ABANDON" }, /* multipath-draft-04 */
     { 0xbaba06, 0xbaba06, "PATH_STATUS" }, /* multipath-draft-04 */
+    { 0x9f81a6, 0x9f81a6, "OBSERVED_ADDRESS (IPv4)" }, /* address-discovery-draft-04 */
+    { 0x9f81a7, 0x9f81a7, "OBSERVED_ADDRESS (IPv6)" }, /* address-discovery-draft-04 */
     { 0x15228c00, 0x15228c01, "PATH_ACK" }, /* >= multipath-draft-05 */
     { 0x15228c05, 0x15228c05, "PATH_ABANDON" }, /* >= multipath-draft-05 */
     { 0x15228c06, 0x15228c06, "PATH_STATUS" }, /* = multipath-draft-05 */
-    { 0x15228c07, 0x15228c07, "PATH_BACKUP" }, /* >= multipath-draft-06 */
-    { 0x15228c08, 0x15228c08, "PATH_AVAILABLE" }, /* >= multipath-draft-06 */
+    { 0x15228c07, 0x15228c07, "PATH_BACKUP_AVAILABLE" }, /* >= multipath-draft-06 */
+    { 0x15228c08, 0x15228c08, "PATH_STATUS_AVAILABLE" }, /* >= multipath-draft-06 */
     { 0x15228c09, 0x15228c09, "PATH_NEW_CONNECTION_ID" }, /* >= multipath-draft-07 */
     { 0x15228c0a, 0x15228c0a, "PATH_RETIRE_CONNECTION_ID" }, /* >= multipath-draft-07 */
     { 0x15228c0b, 0x15228c0b, "MAX_PATHS" }, /* >= multipath-draft-07 */
@@ -1075,6 +1107,9 @@ quic_cids_has_match(const quic_cid_item_t *items, quic_cid_t *raw_cid)
         // actual CID, so accept any prefix match against "cid".
         // Note that this explicitly matches an empty CID.
         if (raw_cid->len >= cid->len && !memcmp(raw_cid->cid, cid->cid, cid->len)) {
+            // For multipath, set the sequence number and path id
+            // XXX - It might be better to return the match so that
+            // raw_cid could be a const pointer?
             raw_cid->seq_num = cid->seq_num;
             raw_cid->path_id = cid->path_id;
             return true;
@@ -1151,7 +1186,11 @@ quic_connection_add_server_endpoint(packet_info *pinfo, quic_info_data_t *conn)
 static quic_info_data_t *
 quic_connection_from_conv(packet_info *pinfo)
 {
-    conversation_t *conv = find_conversation_pinfo(pinfo, 0);
+    /* Explicitly look for the most recent UDP conversation with the
+     * current 5-tuple. (Not a CONVERSATION_QUIC set by connection
+     * number in the case of multiple UDP datagrams in one frame.)
+     */
+    conversation_t *conv = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype), pinfo->srcport, pinfo->destport, 0);
     if (conv) {
         return (quic_info_data_t *)conversation_get_proto_data(conv, proto_quic);
     }
@@ -1289,9 +1328,9 @@ quic_connection_find(packet_info *pinfo, uint8_t long_packet_type,
             // ensures that debug prints clearly show that DCID is invalid).
             dcid->len = 0;
         } else if (quic_connection_from_conv(pinfo) == NULL) {
-            // Connection information might not be attached to the conversation,
-            // because of connection migration.
-            conversation_t *conv = find_conversation_pinfo(pinfo, 0);
+            // Connection information might not be attached to the 5-tuple
+            // conversation, because of connection migration.
+            conversation_t *conv = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype), pinfo->srcport, pinfo->destport, 0);
             if (conv) {
                 // attach the connection information to the conversation.
                 conversation_add_proto_data(conv, proto_quic, conn);
@@ -1405,7 +1444,7 @@ quic_connection_add_cid(quic_info_data_t *conn, quic_cid_t *new_cid, bool from_s
 static void
 quic_connection_create_or_update(quic_info_data_t **conn_p,
                                  packet_info *pinfo, uint32_t long_packet_type,
-                                 uint32_t version, const quic_cid_t *scid,
+                                 uint32_t version, quic_cid_t *scid,
                                  const quic_cid_t *dcid, bool from_server)
 {
     quic_info_data_t *conn = *conn_p;
@@ -1423,32 +1462,101 @@ quic_connection_create_or_update(quic_info_data_t **conn_p,
                 // new Initial cipher and clear the first server CID such that
                 // the next server Initial Packet can link the connection with
                 // that new SCID.
+                // XXX - If it's responding to a Retry Packet, it should have
+                // a DCID and Retry token provided in a Retry Packet that
+                // caused client_dcid_set to be set to false. If not, then
+                // the Client may be ignoring the Retry Packet (whether as
+                // a duplicate for the Server, or injected by an attacker.)
+                // XXX - Can the server provided connection ID (and hence the
+                // new DCID here) be zero-length?
+                wmem_map_remove(quic_initial_connections, &conn->client_dcid_initial);
                 quic_connection_update_initial(conn, scid, dcid);
                 wmem_map_remove(quic_server_connections, &conn->server_cids.data);
                 memset(&conn->server_cids, 0, sizeof(quic_cid_t));
+                // The client is only allowed to respond to a Retry packet
+                // once; subsequent ones MUST be ignored.
+                conn->client_retry_processed = true;
             }
             break;
         }
         /* fallthrough */
-    case QUIC_LPT_RETRY:
     case QUIC_LPT_HANDSHAKE:
-        // Remember CID from first server Retry/Handshake packet
+        // Remember CID from first server Handshake packet
         // (or from the first server Initial packet, since draft -13).
-        if (from_server && conn) {
-            if (long_packet_type == QUIC_LPT_RETRY) {
-                // Retry Packet: the next Initial Packet from the
-                // client should start a new cryptographic handshake. Erase the
-                // current "Initial DCID" such that the next client Initial
-                // packet populates the new value.
-                wmem_map_remove(quic_initial_connections, &conn->client_dcid_initial);
-                memset(&conn->client_dcid_initial, 0, sizeof(quic_cid_t));
-                conn->client_dcid_set = false;
-            }
-            if (conn->server_cids.data.len == 0 && scid->len) {
+        if (from_server && conn && !conn->server_initial_seen) {
+            conn->server_initial_seen = true;
+            if (scid->len) {
                 memcpy(&conn->server_cids.data, scid, sizeof(quic_cid_t));
                 quic_cids_insert(&conn->server_cids.data, conn, true);
+                // If the server sends an Initial packet, it must have
+                // received and accepted a client Initial packet. That
+                // means that we shouldn't erase the client DCID (i.e.,
+                // any Retry packets after the client Initial were duplicates
+                // or possibly injected by an attacker.)
+                conn->client_dcid_set = true;
             }
         }
+        break;
+    case QUIC_LPT_RETRY:
+        // If the client has already responded to one Retry packet with an
+        // Initial packet, it MUST discard any subsequent Retry packets that
+        // it receives.
+        // https://datatracker.ietf.org/doc/html/rfc9000#section-17.2.5.2-1
+        // It MUST not change its Destination Connection ID in response to
+        // a Retry packet after having already processed another Retry packet.
+        // https://datatracker.ietf.org/doc/html/rfc9000#section-7.2-7
+        // So we shouldn't do any of the handling below if a Retry packet
+        // has already been processed.
+        // (XXX - What if we've already seen a Server Initial packet? Also
+        // skip things below & warn that either packets are out of order or
+        // there's a collision/MitM?)
+        if (from_server && conn && !conn->client_retry_processed) {
+            // The next Initial Packet from the client should start a new
+            // cryptographic handshake. Indicate that the next client Initial
+            // Packet should replace the current "Initial DCID".
+            //
+            // However, save it for verification of the Retry Integrity Tag.
+            // Save it with the connection, because there could be multiple
+            // Retry packets, up to one per UDP datagram (e.g., if the
+            // TLS Client Hello is large enough to require more than one
+            // QUIC Client Initial packet.) Those will all use the same
+            // ODCID, because a server is not allowed to send another Retry
+            // after the client responds with a Retry token.
+            // https://datatracker.ietf.org/doc/html/rfc9000#section-8.1.2-2
+            if (conn->client_dcid_set) {
+                memcpy(&conn->client_odcid, &conn->client_dcid_initial, sizeof(quic_cid_t));
+                // We don't know for certain that the client won't ignore this
+                // Retry packet, so don't actually remove and erase the initial
+                // connection yet.
+                //wmem_map_remove(quic_initial_connections, &conn->client_dcid_initial);
+                //memset(&conn->client_dcid_initial, 0, sizeof(quic_cid_t));
+                conn->client_dcid_set = false;
+            }
+            if (scid->len) {
+                // A client MUST change the DCID it uses only in response
+                // to the first received Initial or Retry packet.
+                // https://datatracker.ietf.org/doc/html/rfc9000#section-7.2-8
+                // However, if the server sends more than one RETRY in rapid
+                // succession (e.g., in response to a fragmented Client Hello),
+                // the client might receive the second one first. It doesn't
+                // hurt much to save both SCIDs for connection tracking.
+                if (conn->server_cids.data.len == 0) {
+                    memcpy(&conn->server_cids.data, scid, sizeof(quic_cid_t));
+                    quic_cids_insert(&conn->server_cids.data, conn, true);
+                } else {
+                    quic_connection_add_cid(conn, scid, true);
+                }
+            }
+        }
+        // XXX - else if there's no connection (we missed the original
+        // Client Initial), should we remember the SCID or create a connection
+        // somehow so that we know if future Initial packets are responding
+        // to this? If we're missing the earlier packets, we can't tell if a
+        // the token with a Client Initial packet is a Retry token or a token
+        // provided in a NEW_TOKEN frame in a previous connections.
+        // https://datatracker.ietf.org/doc/html/rfc9000#section-8.1.1-1
+        // We don't have a function to create a connection from anything
+        // other than a Client Initial.
         break;
     }
 }
@@ -1476,6 +1584,8 @@ quic_connection_destroy(void *data, void *user_data _U_)
 
 /* QUIC Streams tracking and reassembly. {{{ */
 static reassembly_table quic_reassembly_table;
+
+static bool quic_stream_out_of_order = true;
 
 typedef struct _quic_stream_key {
     uint64_t stream_id;
@@ -1540,6 +1650,39 @@ quic_reassembly_table_functions = {
     quic_stream_free_persistent_key
 };
 
+typedef struct _quic_retrans_key {
+    uint64_t pkt_number; /* QUIC packet number */
+    int offset;
+    uint32_t num;        /* Frame number in the capture file, pinfo->num */
+} quic_retrans_key;
+
+static unsigned
+quic_retrans_hash(const void *k)
+{
+    const quic_retrans_key* key = (const quic_retrans_key*) k;
+
+#if 0
+    return wmem_strong_hash((const uint8_t *)key, sizeof(quic_retrans_key));
+#endif
+    unsigned hash_val;
+
+    /* Most of the time the packet number in the capture file suffices. */
+    hash_val = key->num;
+
+    return hash_val;
+}
+
+static int
+quic_retrans_equal(const void *k1, const void *k2)
+{
+    const quic_retrans_key* key1 = (const quic_retrans_key*) k1;
+    const quic_retrans_key* key2 = (const quic_retrans_key*) k2;
+
+    return (key1->num == key2->num) &&
+           (key1->pkt_number == key2->pkt_number) &&
+           (key1->offset == key2->offset);
+}
+
 /** Perform sequence analysis for STREAM frames. */
 static quic_stream_state *
 quic_get_stream_state(packet_info *pinfo, quic_info_data_t *quic_info, bool from_server, uint64_t stream_id)
@@ -1566,6 +1709,9 @@ quic_get_stream_state(packet_info *pinfo, quic_info_data_t *quic_info, bool from
         stream = wmem_new0(wmem_file_scope(), quic_stream_state);
         stream->stream_id = stream_id;
         stream->multisegment_pdus = wmem_tree_new(wmem_file_scope());
+        stream->ooo_segments = wmem_list_new(wmem_file_scope());
+        stream->retrans_offsets = wmem_map_new(wmem_file_scope(),
+                quic_retrans_hash, quic_retrans_equal);
         wmem_map_insert(streams, &stream->stream_id, stream);
     }
     return stream;
@@ -1592,6 +1738,250 @@ process_quic_stream(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *t
     }
 }
 
+/* Returns the maximum contiguous sequence number of the reassembly associated
+ * with the msp *if* a new fragment were added ending in the given maxnextseq.
+ * The new fragment is from the current frame and may not have been added yet.
+ */
+static uint64_t
+find_maxnextseq(packet_info *pinfo, struct tcp_multisegment_pdu *msp, quic_stream_info *stream_info, uint64_t maxnextseq)
+{
+    fragment_head *fd_head;
+
+    DISSECTOR_ASSERT(msp);
+
+    fd_head = fragment_get(&quic_reassembly_table, pinfo, msp->first_frame, stream_info);
+    /* msp implies existence of fragments, this should never be NULL. */
+    DISSECTOR_ASSERT(fd_head);
+
+    /* Find length of contiguous fragments.
+     * Start with the first gap, but the new fragment is allowed to
+     * fill that gap. */
+    uint64_t max_len = maxnextseq - msp->seq;
+    fragment_item* frag = (fd_head->first_gap) ? fd_head->first_gap : fd_head->next;
+    for (; frag && frag->offset <= max_len; frag = frag->next) {
+        max_len = MAX(max_len, frag->offset + frag->len);
+    }
+
+    return max_len + msp->seq;
+}
+
+#if 0
+// For later implementation
+
+static struct tcp_multisegment_pdu*
+split_msp(packet_info *pinfo, struct tcp_multisegment_pdu *msp, quic_stream_info *stream_info, quic_stream_state *stream)
+{
+    fragment_head *fd_head;
+    uint32_t first_frame = 0;
+    uint32_t last_frame = 0;
+    const uint32_t split_offset = pinfo->desegment_offset;
+
+    fd_head = fragment_get(&quic_reassembly_table, pinfo, msp->first_frame, stream_info);
+    /* This is for splitting defragmented MSPs, so fd_head should exist
+     * and be defragmented. This also ensures that fd_i->tvb_data exists.
+     */
+    DISSECTOR_ASSERT(fd_head && fd_head->flags & FD_DEFRAGMENTED);
+
+    fragment_item *fd_i, *first_frag = NULL;
+
+    /* The fragment list is sorted in offset order, but not nec. frame order
+     * or end offset order due to out of order reassembly and possible overlap.
+     * fd_i->offset < split_offset - some bytes are before the split
+     * fd_i->offset + fd_i->len > split_offset - some bytes are after split
+     * Look through all the fragments that have some data before the split point.
+     */
+    for (fd_i = fd_head->next; fd_i && (fd_i->offset < split_offset); fd_i = fd_i->next) {
+        if (last_frame < fd_i->frame) {
+            last_frame = fd_i->frame;
+        }
+        if (fd_i->offset + fd_i->len > split_offset) {
+            if (first_frag == NULL) {
+                first_frag = fd_i;
+                first_frame = fd_i->frame;
+            } else if (fd_i->frame < first_frame) {
+                first_frame = fd_i->frame;
+            }
+        }
+    };
+
+    /* Now look through all the remaining fragments that only have bytes after
+     * the split.
+     */
+    for (; fd_i; fd_i = fd_i->next) {
+        uint32_t frag_end = fd_i->offset + fd_i->len;
+        if (split_offset <= frag_end) {
+            if (first_frag == NULL) {
+                first_frag = fd_i;
+                first_frame = fd_i->frame;
+            } else if (fd_i->frame < first_frame) {
+                first_frame = fd_i->frame;
+            }
+        }
+    }
+
+    /* We only call this when the frame the fragments were reassembled in
+     * (which is the current frame) includes some data before the split
+     * point, so that it won't change and we can be consistent dissecting
+     * between passes. There's a few cases where there's no data after the
+     * split, e.g. HTTP with no Content-Length and REASSEMBLE_UNTIL_FIN.
+     */
+    DISSECTOR_ASSERT(fd_head->reassembled_in == last_frame);
+
+    uint32_t new_seq = msp->seq + pinfo->desegment_offset;
+    struct tcp_multisegment_pdu *newmsp;
+    newmsp = pdu_store_sequencenumber_of_next_pdu(pinfo, new_seq,
+        new_seq+1, stream->multisegment_pdus);
+    if (first_frame == 0) {
+        newmsp->flags |= MSP_FLAGS_MISSING_FIRST_SEGMENT;
+    }
+    newmsp->first_frame = first_frame;
+    newmsp->nxtpdu = msp->nxtpdu;
+
+    /* XXX: Could do the adding the new fragments in fragment_truncate */
+    for (fd_i = first_frag; fd_i; fd_i = fd_i->next) {
+        uint32_t frag_offset = fd_i->offset;
+        uint32_t frag_len = fd_i->len;
+        /* Check for some unusual out of order overlapping segment situations. */
+        if (split_offset < frag_offset + frag_len) {
+            if (fd_i->offset < split_offset) {
+                frag_offset = split_offset;
+                frag_len -= (split_offset - fd_i->offset);
+            }
+            fragment_add_out_of_order(&quic_reassembly_table, fd_head->tvb_data,
+                         frag_offset, pinfo, first_frame, stream_info,
+                         frag_offset - split_offset, frag_len, true, fd_i->frame);
+        }
+    }
+
+    fragment_truncate(&quic_reassembly_table, pinfo, msp->first_frame, stream_info, split_offset);
+    msp->nxtpdu = msp->seq + split_offset;
+
+    /* The newmsp nxtpdu will be adjusted after leaving this function. */
+    return newmsp;
+}
+#endif
+
+typedef struct _ooo_segment_item {
+    uint32_t frame;
+    uint32_t seq;
+    uint32_t len;
+    uint8_t *data;
+} ooo_segment_item;
+
+static int
+compare_ooo_segment_item(const void *a, const void *b)
+{
+    const ooo_segment_item *fd_a = a;
+    const ooo_segment_item *fd_b = b;
+
+    if (fd_a->seq < fd_b->seq)
+        return -1;
+
+    if (fd_a->seq > fd_b->seq)
+        return 1;
+
+    if (fd_a->frame < fd_b->frame)
+        return -1;
+
+    if (fd_a->frame > fd_b->frame)
+        return 1;
+
+    return 0;
+}
+
+/* Search through our list of out of order segments and add the ones that are
+ * now contiguous onto a MSP until we use them all or reach another gap.
+ *
+ * If the MSP parameter is a incomplete, returns it with any OOO segments added.
+ * If the MSP parameter is NULL or complete, returns a newly created MSP with
+ * OOO segments added, or NULL if there were no segments to add.
+ */
+static struct tcp_multisegment_pdu *
+msp_add_out_of_order(packet_info *pinfo, struct tcp_multisegment_pdu *msp, quic_stream_info *stream_info, quic_stream_state *stream, uint32_t seq)
+{
+
+    /* Whether a previous MSP exists with missing segments. */
+    bool has_unfinished_msp = msp && !(msp->flags & MSP_FLAGS_GOT_ALL_SEGMENTS);
+    bool updated_maxnextseq = false;
+
+    if (msp) {
+        uint64_t maxnextseq = find_maxnextseq(pinfo, msp, stream_info, stream->inorder_offset);
+        stream->inorder_offset = MAX(stream->inorder_offset, maxnextseq);
+        updated_maxnextseq = true;
+    }
+    wmem_list_frame_t *curr_entry;
+    curr_entry = wmem_list_head(stream->ooo_segments);
+    ooo_segment_item *fd;
+    tvbuff_t         *tvb_data;
+    while (curr_entry) {
+        fd = (ooo_segment_item *)wmem_list_frame_data(curr_entry);
+        if (stream->inorder_offset < fd->seq) {
+            /* There might be segments already added to the msp that now extend
+             * the maximum contiguous sequence number. Check for them. */
+            if (msp && !updated_maxnextseq) {
+                stream->inorder_offset = find_maxnextseq(pinfo, msp, stream_info, stream->inorder_offset);
+                updated_maxnextseq = true;
+            }
+            if (stream->inorder_offset < fd->seq) {
+                break;
+            }
+        }
+        /* We have filled in the gap, so this out of order
+         * segment is now contiguous and can be processed along
+         * with the segment we just received.
+         */
+        stream->inorder_offset = fd->seq + fd->len;
+        tvb_data = tvb_new_real_data(fd->data, fd->len, fd->len);
+        if (has_unfinished_msp) {
+
+            /* Increase the expected MSP size if necessary. Yes, the
+             * subdissector may have told us that a PDU ended here, but we
+             * might have enough newly contiguous data to dissect another
+             * PDU past that, and we should send that to the subdissector
+             * too. */
+            if (msp->nxtpdu < fd->seq + fd->len) {
+                msp->nxtpdu = fd->seq + fd->len;
+            }
+            /* Add this OOO segment to the unfinished MSP */
+            fragment_add_out_of_order(&quic_reassembly_table,
+                tvb_data, 0,
+                pinfo, msp->first_frame, stream_info,
+                fd->seq - msp->seq, fd->len,
+                msp->nxtpdu, fd->frame);
+        } else {
+            /* No MSP in progress, so create one starting
+             * at the sequence number of segment received
+             * in this frame. Note that we will be adding
+             * the first segment below, and this is the frame
+             * of the first segment, so first_frame_with_seq
+             * is already correct (and unnecessary) and
+             * we don't need MSP_FLAGS_MISSING_FIRST_SEGMENT. */
+            /* Also note that this makes "msp->first_frame" be this frame,
+             * not any earlier OOO frame that we're adding on. That's what
+             * we want, even if it is a bit of misnomer. */
+            msp = pdu_store_sequencenumber_of_next_pdu(pinfo,
+                seq, fd->seq + fd->len,
+                stream->multisegment_pdus);
+            fragment_add_out_of_order(&quic_reassembly_table,
+                        tvb_data, 0, pinfo, msp->first_frame,
+                        stream_info, fd->seq - msp->seq, fd->len,
+                        msp->nxtpdu, fd->frame);
+            has_unfinished_msp = true;
+        }
+        updated_maxnextseq = false;
+        tvb_free(tvb_data);
+        wmem_list_remove_frame(stream->ooo_segments, curr_entry);
+        curr_entry = wmem_list_head(stream->ooo_segments);
+
+    }
+    /* There might be segments already added to the msp that now extend
+     * the maximum contiguous sequence number. Check for them. */
+    if (msp && !updated_maxnextseq) {
+        stream->inorder_offset = find_maxnextseq(pinfo, msp, stream_info, stream->inorder_offset);
+    }
+    return msp;
+}
+
 /**
  * Reassemble stream data within a STREAM frame.
  */
@@ -1609,9 +1999,12 @@ desegment_quic_stream(tvbuff_t *tvb, int offset, int length, packet_info *pinfo,
     int another_pdu_follows;
     int deseg_offset;
     struct tcp_multisegment_pdu *msp;
+    /* XXX - Things probably go wrong if the stream offset doesn't fit in
+     * a uint32_t. Should we just DISSECTOR_ASSERT until that's handled? */
     uint32_t seq = (uint32_t)stream_info->stream_offset;
     const uint32_t nxtseq = seq + (uint32_t)length;
     uint32_t reassembly_id = 0;
+    bool first_pdu = true;
 
     // XXX fix the tvb accessors below such that no new tvb is needed.
     tvb = tvb_new_subset_length(tvb, 0, offset + length);
@@ -1644,15 +2037,22 @@ again:
      * segment PDU)?
      */
     if ((msp = (struct tcp_multisegment_pdu *)wmem_tree_lookup32(stream->multisegment_pdus, seq)) &&
-            nxtseq <= msp->nxtpdu) {
-        // XXX: This also happens the second time through the data for an MSP normally
-        // TODO show expert info for retransmission? Additional checks may be
-        // necessary here to tell a retransmission apart from other (normal?)
-        // conditions. See also similar code in packet-tcp.c.
-#if 0
-        proto_tree_add_debug_text(tree, "TODO retransmission expert info frame %d stream_id=%" PRIu64 " offset=%d visited=%d reassembly_id=0x%08x",
-                pinfo->num, stream->stream_id, offset, PINFO_FD_VISITED(pinfo), reassembly_id);
-#endif
+            nxtseq <= msp->nxtpdu && msp->last_frame != pinfo->num) {
+
+        if (msp->first_frame != pinfo->num) {
+            proto_tree_add_expert_remaining(tree, pinfo, &ei_quic_retransmission, tvb, offset);
+        } else {
+            fh = fragment_get(&quic_reassembly_table, pinfo, msp->first_frame, stream_info);
+            if (fh != NULL && fh->reassembled_in != 0 && fh->reassembled_in != pinfo->num) {
+                proto_item *item = proto_tree_add_uint(tree, hf_quic_reassembled_in, tvb, 0,
+                                                       0, fh->reassembled_in);
+                proto_item_set_generated(item);
+                if (first_pdu) {
+                    col_append_sep_fstr(pinfo->cinfo, COL_INFO, " ", "[QUIC PDU reassembled in %u]",
+                        fh->reassembled_in);
+                }
+            }
+        }
         return;
     }
     /* Else, find the most previous PDU starting before this sequence number */
@@ -1678,6 +2078,89 @@ again:
         reassembly_id = msp ? msp->first_frame : pinfo->num;
     }
 
+    bool has_gap = false;
+    quic_retrans_key *tmp_key = wmem_new(pinfo->pool, quic_retrans_key);
+    tmp_key->num = pinfo->num;
+    tmp_key->offset = offset;
+    tmp_key->pkt_number = stream_info->stream_offset;
+
+    /* if (! REASSEMBLE_UNTIL_FIN ) */ {
+        if (!PINFO_FD_VISITED(pinfo)) {
+            if (stream->inorder_offset < seq) {
+                /* A gap. */
+                has_gap = true;
+            } else if (nxtseq <= stream->inorder_offset) {
+                /* No new data. Remember this. */
+                proto_tree_add_expert(tree, pinfo, &ei_quic_retransmission, tvb, offset, length);
+                uint64_t* contiguous_offset = wmem_new(wmem_file_scope(), uint64_t);
+                *contiguous_offset = stream->inorder_offset;
+                quic_retrans_key *fkey = wmem_new(wmem_file_scope(), quic_retrans_key);
+                *fkey = *tmp_key;
+                wmem_map_insert(stream->retrans_offsets, fkey, contiguous_offset);
+                return;
+            } else {
+                /* No gap, but new data that increases the inorder offset.
+                 * Check for overlap. */
+                if (seq < stream->inorder_offset) {
+                    /* XXX: Retrieve the previous data and compare for conflicts? */
+                    proto_tree_add_expert(tree, pinfo, &ei_quic_overlap, tvb, offset, length);
+                    uint64_t overlap = stream->inorder_offset - seq;
+                    length -= (int)overlap;
+                    seq = (uint32_t)(stream->inorder_offset);
+                    offset += (uint32_t)(overlap);
+                    /* Store this offset */
+                    uint64_t* contiguous_offset = wmem_new(wmem_file_scope(), uint64_t);
+                    *contiguous_offset = stream->inorder_offset;
+                    quic_retrans_key *fkey = wmem_new(wmem_file_scope(), quic_retrans_key);
+                    *fkey = *tmp_key;
+                    wmem_map_insert(stream->retrans_offsets, fkey, contiguous_offset);
+                }
+
+                stream->inorder_offset = nxtseq;
+
+                if (quic_stream_out_of_order) {
+                    /* Look for any OOO packets that are now contiguous. */
+                    msp = msp_add_out_of_order(pinfo, msp, stream_info, stream, seq);
+                }
+            }
+        } else {
+            /* Retrieve any per-frame state about retransmitted and overlapping
+             * data.
+             */
+            uint64_t *contiguous_offset = (uint64_t *)wmem_map_lookup(stream->retrans_offsets, tmp_key);
+            if (contiguous_offset != NULL) {
+                if (stream_info->stream_offset + length <= *contiguous_offset) {
+                    proto_tree_add_expert(tree, pinfo, &ei_quic_retransmission, tvb, offset, length);
+                    return;
+                } else if (stream_info->stream_offset < *contiguous_offset) {
+                    /* XXX: Retrieve the previous data and compare for conflicts? */
+                    proto_tree_add_expert(tree, pinfo, &ei_quic_overlap, tvb, offset, length);
+                    uint64_t overlap = *contiguous_offset - stream_info->stream_offset;
+                    length -= (int)overlap;
+                    seq = (uint32_t)(*contiguous_offset);
+                    offset += (uint32_t)(overlap);
+                } else {
+                    DISSECTOR_ASSERT_NOT_REACHED();
+                }
+            }
+
+            if (quic_stream_out_of_order) {
+                /* If we have visited this frame before, look for the frame in the
+                 * list of unused out of order segments. Since we know the gap will
+                 * never be filled, we could pass it to the subdissector, but
+                 * we want to be consistent between passes.  */
+                ooo_segment_item *fd;
+                fd = wmem_new0(pinfo->pool, ooo_segment_item);
+                fd->frame = pinfo->num;
+                fd->seq = seq;
+                fd->len = nxtseq - seq;
+                if (wmem_list_find_custom(stream->ooo_segments, fd, compare_ooo_segment_item)) {
+                    has_gap = true;
+                }
+            }
+        }
+    }
+
     if (msp && msp->seq <= seq && msp->nxtpdu > seq) {
         int len;
 
@@ -1696,6 +2179,26 @@ again:
             len = MIN(nxtseq, msp->nxtpdu) - seq;
         }
         last_fragment_len = len;
+
+        if (quic_stream_out_of_order /* && ! REASSEMBLE_UNTIL_FIN */ ) {
+            /*
+             * If the previous segment requested more data (setting
+             * FD_PARTIAL_REASSEMBLY as the next segment length is unknown), but
+             * subsequently an OoO segment was received (for an earlier hole),
+             * then "fragment_add" would truncate the reassembled PDU to the end
+             * of this OoO segment. To prevent that, explicitly specify the MSP
+             * length before calling "fragment_add".
+             *
+             * When a subdissector requests reassembly at the end of the
+             * connection (DESEGMENT_UNTIL_FIN), then it is not
+             * possible for an earlier segment to complete reassembly
+             * (more_frags for fragment_add is always true). Thus we do not
+             * have to worry about increasing the fragment length here.
+             */
+            fragment_reset_tot_len(&quic_reassembly_table, pinfo,
+                                   msp->first_frame, stream_info,
+                                   MAX(seq + len, msp->nxtpdu) - msp->seq);
+        }
 
         fh = fragment_add(&quic_reassembly_table, tvb, offset,
                           pinfo, reassembly_id, stream_info,
@@ -1724,6 +2227,30 @@ again:
         &&  (len > 0)) {
             another_pdu_follows=msp->nxtpdu - seq;
         }
+    } else if (has_gap && quic_stream_out_of_order) {
+        /* This is an OOO segment with a gap and past the known end of
+         * the current MSP, if any. We don't know for certain which MSP
+         * it belongs to, and the reassembly functions don't let us remove
+         * fragment items added by mistake. Keep it around in a separate
+         * structure, and add it later.
+         *
+         * On the second and later passes, we know that this gap will
+         * never be filled in, so we could hand the segment to the
+         * subdissector anyway. However, we want dissection to be
+         * consistent between passes.
+         */
+        if (!PINFO_FD_VISITED(pinfo)) {
+            ooo_segment_item *fd;
+            fd = wmem_new0(wmem_file_scope(), ooo_segment_item);
+            fd->frame = pinfo->num;
+            fd->seq = seq;
+            fd->len = nxtseq - seq;
+            /* We only enter here if dissect_tcp set can_desegment,
+             * which means that these bytes exist. */
+            fd->data = tvb_memdup(wmem_file_scope(), tvb, offset, fd->len);
+            wmem_list_append_sorted(stream->ooo_segments, fd, compare_ooo_segment_item);
+        }
+        fh = NULL;
     } else {
         /* This segment was not found in our table, so it doesn't
          * contain a continuation of a higher-level PDU.
@@ -1795,6 +2322,9 @@ again:
                  * being a new higher-level PDU that also
                  * needs desegmentation).
                  */
+                if (quic_stream_out_of_order && !PINFO_FD_VISITED(pinfo)) {
+                    msp->flags &= ~MSP_FLAGS_GOT_ALL_SEGMENTS;
+                }
                 fragment_set_partial_reassembly(&quic_reassembly_table,
                                                 pinfo, reassembly_id, stream_info);
 
@@ -1838,8 +2368,10 @@ again:
                 another_pdu_follows = 0;
                 offset += last_fragment_len;
                 seq += last_fragment_len;
-                if (tvb_captured_length_remaining(tvb, offset) > 0)
+                if (tvb_captured_length_remaining(tvb, offset) > 0) {
+                    first_pdu = false;
                     goto again;
+                }
             } else {
                 proto_item *frag_tree_item;
                 proto_tree *parent_tree = proto_tree_get_parent(tree);
@@ -1883,9 +2415,10 @@ again:
                         deseg_seq, nxtseq+pinfo->desegment_len, stream->multisegment_pdus);
                 }
 
-                /* add this segment as the first one for this new pdu */
+                /* Add this segment as the first one for this new pdu.
+                 * Use the the new MSP's reassembly ID (its first frame). */
                 fragment_add(&quic_reassembly_table, tvb, deseg_offset,
-                             pinfo, reassembly_id, stream_info,
+                             pinfo, msp->first_frame, stream_info,
                              0, nxtseq - deseg_seq,
                              nxtseq < msp->nxtpdu);
             }
@@ -1894,8 +2427,8 @@ again:
              * the MSP should already be created. Retrieve it to see if we
              * know what later frame the PDU is reassembled in.
              */
-            if (((struct tcp_multisegment_pdu *)wmem_tree_lookup32(stream->multisegment_pdus, deseg_seq))) {
-                fh = fragment_get(&quic_reassembly_table, pinfo, reassembly_id, stream_info);
+            if ((msp = (struct tcp_multisegment_pdu *)wmem_tree_lookup32(stream->multisegment_pdus, deseg_seq))) {
+                fh = fragment_get(&quic_reassembly_table, pinfo, msp->first_frame, stream_info);
             }
         }
     }
@@ -1910,6 +2443,10 @@ again:
             proto_item *item = proto_tree_add_uint(tree, hf_quic_reassembled_in, tvb, 0,
                                                    0, fh->reassembled_in);
             proto_item_set_generated(item);
+            if (first_pdu) {
+                col_append_sep_fstr(pinfo->cinfo, COL_INFO, " ", "[QUIC PDU reassembled in %u]",
+                    fh->reassembled_in);
+            }
         }
 
         /* TODO: Show what's left in the packet as a raw QUIC "segment", like
@@ -1925,6 +2462,7 @@ again:
         pinfo->can_desegment = 2;
         offset += another_pdu_follows;
         seq += another_pdu_follows;
+        first_pdu = false;
         goto again;
     }
 }
@@ -1958,38 +2496,6 @@ static bool quic_crypto_out_of_order = true;
 
 static reassembly_table quic_crypto_reassembly_table;
 
-typedef struct _quic_crypto_retrans_key {
-    uint64_t pkt_number; /* QUIC packet number */
-    int offset;
-    uint32_t num;        /* Frame number in the capture file, pinfo->num */
-} quic_crypto_retrans_key;
-
-static unsigned
-quic_crypto_retrans_hash(const void *k)
-{
-    const quic_crypto_retrans_key* key = (const quic_crypto_retrans_key*) k;
-
-#if 0
-    return wmem_strong_hash((const uint8_t *)key, sizeof(quic_crypto_retrans_key));
-#endif
-    unsigned hash_val;
-
-    /* Most of the time the packet number in the capture file suffices. */
-    hash_val = key->num;
-
-    return hash_val;
-}
-
-static int
-quic_crypto_retrans_equal(const void *k1, const void *k2)
-{
-    const quic_crypto_retrans_key* key1 = (const quic_crypto_retrans_key*) k1;
-    const quic_crypto_retrans_key* key2 = (const quic_crypto_retrans_key*) k2;
-
-    return (key1->num == key2->num) &&
-           (key1->pkt_number == key2->pkt_number) &&
-           (key1->offset == key2->offset);
-}
 
 static quic_crypto_state *
 quic_get_crypto_state(packet_info *pinfo, quic_info_data_t *quic_info, bool from_server, const uint8_t encryption_level)
@@ -2016,7 +2522,7 @@ quic_get_crypto_state(packet_info *pinfo, quic_info_data_t *quic_info, bool from
         crypto = wmem_new0(wmem_file_scope(), quic_crypto_state);
         crypto->multisegment_pdus = wmem_tree_new(wmem_file_scope());
         crypto->retrans_offsets = wmem_map_new(wmem_file_scope(),
-                quic_crypto_retrans_hash, quic_crypto_retrans_equal);
+                quic_retrans_hash, quic_retrans_equal);
         crypto->encryption_level = encryption_level;
         wmem_map_insert(cryptos, GUINT_TO_POINTER(encryption_level), crypto);
     }
@@ -2053,7 +2559,7 @@ process_quic_crypto(tvbuff_t *tvb, int offset, int length, packet_info *pinfo,
  * QUIC is responsible for buffering handshake bytes that arrive out of order or
  * for encryption levels that are not yet ready."
  *
- * XXX: We are only buffering bytes that arive out of order within an encryption
+ * XXX: We are only buffering bytes that arrive out of order within an encryption
  * level. Buffering for encryption levels that are not yet ready requires
  * determining that they are not ready (and they may never be ready from our
  * perspective if we don't have the keys.)
@@ -2101,7 +2607,7 @@ desegment_quic_crypto(tvbuff_t *tvb, int offset, int length, packet_info *pinfo,
      * file frame, but we can't easily get that since the tvb is the
      * result of decryption.
      */
-    quic_crypto_retrans_key *tmp_key = wmem_new(pinfo->pool, quic_crypto_retrans_key);
+    quic_retrans_key *tmp_key = wmem_new(pinfo->pool, quic_retrans_key);
     tmp_key->num = pinfo->num;
     tmp_key->offset = offset;
     tmp_key->pkt_number = crypto_info->packet_number;
@@ -2112,7 +2618,7 @@ desegment_quic_crypto(tvbuff_t *tvb, int offset, int length, packet_info *pinfo,
             proto_tree_add_expert(tree, pinfo, &ei_quic_retransmission, tvb, offset, length);
             uint64_t* contiguous_offset = wmem_new(wmem_file_scope(), uint64_t);
             *contiguous_offset = crypto->max_contiguous_offset;
-            quic_crypto_retrans_key *fkey = wmem_new(wmem_file_scope(), quic_crypto_retrans_key);
+            quic_retrans_key *fkey = wmem_new(wmem_file_scope(), quic_retrans_key);
             *fkey = *tmp_key;
             wmem_map_insert(crypto->retrans_offsets, fkey, contiguous_offset);
             return;
@@ -2126,7 +2632,7 @@ desegment_quic_crypto(tvbuff_t *tvb, int offset, int length, packet_info *pinfo,
             /* Store this offset */
             uint64_t* contiguous_offset = wmem_new(wmem_file_scope(), uint64_t);
             *contiguous_offset = crypto->max_contiguous_offset;
-            quic_crypto_retrans_key *fkey = wmem_new(wmem_file_scope(), quic_crypto_retrans_key);
+            quic_retrans_key *fkey = wmem_new(wmem_file_scope(), quic_retrans_key);
             *fkey = *tmp_key;
             wmem_map_insert(crypto->retrans_offsets, fkey, contiguous_offset);
         }
@@ -2676,7 +3182,7 @@ dissect_quic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *quic_tree
             int32_t len_sequence;
             int32_t len_retire_prior_to;
             uint64_t seq_num = 0, path_id = 0;
-            int32_t nci_length;
+            uint32_t nci_length;
             int32_t lenvar = 0;
             bool valid_cid = false;
 
@@ -2809,7 +3315,7 @@ dissect_quic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *quic_tree
 
             // Transport Error codes higher than 0x3fff are for Private Use.
             if (frame_type == FT_CONNECTION_CLOSE_TPT && error_code <= 0x3fff) {
-                proto_item_append_text(ti_ft, " Error code: %s", rval_to_str((uint32_t)error_code, quic_transport_error_code_vals, "Unknown (%d)"));
+                proto_item_append_text(ti_ft, " Error code: %s", rval_to_str_wmem(pinfo->pool, (uint32_t)error_code, quic_transport_error_code_vals, "Unknown (%d)"));
             } else {
                 proto_item_append_text(ti_ft, " Error code: %#" PRIx64, error_code);
             }
@@ -2834,6 +3340,15 @@ dissect_quic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *quic_tree
                 length = (uint32_t) tvb_reported_length_remaining(tvb, offset);
             }
             proto_tree_add_item(ft_tree, hf_quic_dg, tvb, offset, (uint32_t)length, ENC_NA);
+            if (quic_info->app_datagram_handle) {
+                tvbuff_t *next_tvb = tvb_new_subset_remaining(tvb, offset);
+                proto_tree *top_tree = proto_tree_get_parent_tree(quic_tree);
+                quic_datagram_info datagram_info = {
+                    .quic_info = quic_info,
+                    .from_server = from_server,
+                };
+                call_dissector_with_data(quic_info->app_datagram_handle, next_tvb, pinfo, top_tree, &datagram_info);
+            }
             offset += (uint32_t)length;
         }
         break;
@@ -2867,9 +3382,31 @@ dissect_quic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *quic_tree
 
         }
         break;
+        case FT_OBSERVED_ADDRESS_IPV4:
+        case FT_OBSERVED_ADDRESS_IPV6:{
+            int32_t length;
+
+            col_append_str(pinfo->cinfo, COL_INFO, ", OA");
+            proto_tree_add_item_ret_varint(ft_tree, hf_quic_oa_seq_num, tvb, offset, -1, ENC_VARINT_QUIC, NULL, &length);
+            offset += (uint32_t)length;
+
+            if (frame_type == FT_OBSERVED_ADDRESS_IPV4 ) {
+                proto_tree_add_item(ft_tree, hf_quic_oa_ipv4, tvb, offset, 4, ENC_BIG_ENDIAN);
+                proto_item_append_text(ti_ft, " IPv4=%s", tvb_ip_to_str(pinfo->pool, tvb, offset));
+                offset += 4;
+            } else {
+                proto_tree_add_item(ft_tree, hf_quic_oa_ipv6, tvb, offset, 16, ENC_NA);
+                proto_item_append_text(ti_ft, " IPv6=%s", tvb_ip6_to_str(pinfo->pool, tvb, offset));
+                offset += 16;
+            }
+            proto_tree_add_item(ft_tree, hf_quic_oa_port, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_item_append_text(ti_ft, " PORT=%u", tvb_get_ntohs(tvb, offset));
+            offset += 2;
+        }
+        break;
         case FT_PATH_STATUS:
-        case FT_PATH_BACKUP:
-        case FT_PATH_AVAILABLE:{
+        case FT_PATH_BACKUP_AVAILABLE:
+        case FT_PATH_STATUS_AVAILABLE:{
             int32_t length;
 
             col_append_str(pinfo->cinfo, COL_INFO, ", PS");
@@ -2962,10 +3499,10 @@ quic_decrypt_message(quic_pp_cipher *pp_cipher, tvbuff_t *head, unsigned header_
     uint8_t        *buffer;
     uint8_t         atag[16];
     unsigned        buffer_length;
-    const unsigned char  **error = &result->error;
+    const char    **error = &result->error;
     quic_datagram *dgram_info;
 
-    dgram_info = (quic_datagram *)p_get_proto_data(wmem_file_scope(), pinfo, proto_quic, 0);
+    dgram_info = (quic_datagram *)p_get_proto_data(wmem_file_scope(), pinfo, proto_quic, pinfo->curr_proto_layer_num);
 
     DISSECTOR_ASSERT(pp_cipher != NULL);
     DISSECTOR_ASSERT(pp_cipher->pp_cipher != NULL);
@@ -2989,14 +3526,14 @@ quic_decrypt_message(quic_pp_cipher *pp_cipher, tvbuff_t *head, unsigned header_
 
     memcpy(nonce, pp_cipher->pp_iv, TLS13_AEAD_NONCE_LENGTH);
     /* Packet number is left-padded with zeroes and XORed with write_iv */
-    phton64(nonce + sizeof(nonce) - 8, pntoh64(nonce + sizeof(nonce) - 8) ^ packet_number);
+    phtonu64(nonce + sizeof(nonce) - 8, pntohu64(nonce + sizeof(nonce) - 8) ^ packet_number);
     /* QUIC Multipath draft-07 also uses the lower 32 bits of the Path ID
      * (CID sequence number prior to draft-07), which MUST NOT go over 2^32
      * when multipath is used; also, the nonce must be at least 12 bytes.
      */
     if (dgram_info && dgram_info->conn && quic_multipath_negotiated(dgram_info->conn)) {
         DISSECTOR_ASSERT_CMPINT(TLS13_AEAD_NONCE_LENGTH, >=, 12);
-        phton32(nonce + sizeof(nonce) - 12, pntoh32(nonce + sizeof(nonce) - 12) ^ (UINT32_MAX & dgram_info->path_id));
+        phtonu32(nonce + sizeof(nonce) - 12, pntohu32(nonce + sizeof(nonce) - 12) ^ (UINT32_MAX & dgram_info->path_id));
     }
 
     gcry_cipher_reset(pp_cipher->pp_cipher);
@@ -3051,7 +3588,7 @@ quic_hkdf_expand_label(int hash_algo, uint8_t *secret, unsigned secret_len, cons
  * false is returned on error (see "error" parameter for the reason).
  */
 static bool
-quic_derive_initial_secrets(const quic_cid_t *cid,
+quic_derive_initial_secrets(wmem_allocator_t* allocator, const quic_cid_t *cid,
                             uint8_t client_initial_secret[HASH_SHA2_256_LENGTH],
                             uint8_t server_initial_secret[HASH_SHA2_256_LENGTH],
                             uint32_t version,
@@ -3094,13 +3631,17 @@ quic_derive_initial_secrets(const quic_cid_t *cid,
         0x7f, 0xf5, 0x79, 0xe5, 0xac, 0xd0, 0x72, 0x91, 0x55, 0x80,
         0x30, 0x4c, 0x43, 0xa2, 0x36, 0x7c, 0x60, 0x48, 0x83, 0x10
     };
-    static const int8_t hanshake_salt_draft_t51[20] = {
+    static const uint8_t hanshake_salt_draft_t51[20] = {
         0x7a, 0x4e, 0xde, 0xf4, 0xe7, 0xcc, 0xee, 0x5f, 0xa4, 0x50,
         0x6c, 0x19, 0x12, 0x4f, 0xc8, 0xcc, 0xda, 0x6e, 0x03, 0x3d
     };
     static const uint8_t handshake_salt_v2[20] = {
         0x0d, 0xed, 0xe3, 0xde, 0xf7, 0x00, 0xa6, 0xdb, 0x81, 0x93,
         0x81, 0xbe, 0x6e, 0x26, 0x9d, 0xcb, 0xf9, 0xbd, 0x2e, 0xd9
+    };
+    static const uint8_t handshake_salt_mvfst_experimental[20] = {
+        0xca, 0x6b, 0x74, 0xa5, 0xce, 0x82, 0xfc, 0x04, 0x43, 0x6b,
+        0xf2, 0xea, 0x75, 0xe7, 0x8c, 0x56, 0xc8, 0xc0, 0x8d, 0x24
     };
 
     gcry_error_t    err;
@@ -3114,6 +3655,9 @@ quic_derive_initial_secrets(const quic_cid_t *cid,
                            cid->cid, cid->len, secret);
     } else if (version == 0x54303531) {
         err = hkdf_extract(GCRY_MD_SHA256, hanshake_salt_draft_t51, sizeof(hanshake_salt_draft_t51),
+                           cid->cid, cid->len, secret);
+    } else if (version == 0xfaceb014 || version == 0xfaceb015) {
+        err = hkdf_extract(GCRY_MD_SHA256, handshake_salt_mvfst_experimental, sizeof(handshake_salt_mvfst_experimental),
                            cid->cid, cid->len, secret);
     } else if (is_quic_draft_max(version, 22)) {
         err = hkdf_extract(GCRY_MD_SHA256, handshake_salt_draft_22, sizeof(handshake_salt_draft_22),
@@ -3132,7 +3676,7 @@ quic_derive_initial_secrets(const quic_cid_t *cid,
                            cid->cid, cid->len, secret);
     }
     if (err) {
-        *error = wmem_strdup_printf(wmem_packet_scope(), "Failed to extract secrets: %s", gcry_strerror(err));
+        *error = wmem_strdup_printf(allocator, "Failed to extract secrets: %s", gcry_strerror(err));
         return false;
     }
 
@@ -3244,12 +3788,12 @@ quic_ciphers_prepare(quic_ciphers *ciphers, int hash_algo, int cipher_algo, int 
 
 
 static bool
-quic_create_initial_decoders(const quic_cid_t *cid, const char **error, quic_info_data_t *quic_info)
+quic_create_initial_decoders(wmem_allocator_t* allocator, const quic_cid_t *cid, const char **error, quic_info_data_t *quic_info)
 {
     uint8_t         client_secret[HASH_SHA2_256_LENGTH];
     uint8_t         server_secret[HASH_SHA2_256_LENGTH];
 
-    if (!quic_derive_initial_secrets(cid, client_secret, server_secret, quic_info->version, error)) {
+    if (!quic_derive_initial_secrets(allocator, cid, client_secret, server_secret, quic_info->version, error)) {
         return false;
     }
 
@@ -3266,7 +3810,7 @@ quic_create_initial_decoders(const quic_cid_t *cid, const char **error, quic_inf
 }
 
 static bool
-quic_create_0rtt_decoder(unsigned i, char *early_data_secret, unsigned early_data_secret_len,
+quic_create_0rtt_decoder(unsigned i, uint8_t *early_data_secret, unsigned early_data_secret_len,
                          quic_ciphers *ciphers, int *cipher_algo, uint32_t version)
 {
     static const uint16_t tls13_ciphers[] = {
@@ -3305,7 +3849,7 @@ quic_create_decoders(packet_info *pinfo, quic_info_data_t *quic_info, quic_ciphe
     }
 
     unsigned hash_len = gcry_md_get_algo_dlen(quic_info->hash_algo);
-    char *secret = (char *)wmem_alloc0(pinfo->pool, hash_len);
+    uint8_t *secret = (uint8_t *)wmem_alloc0(pinfo->pool, hash_len);
 
     if (!tls13_get_quic_secret(pinfo, from_server, type, hash_len, hash_len, secret)) {
         *error = "Secrets are not available";
@@ -3327,7 +3871,7 @@ static bool
 quic_get_traffic_secret(packet_info *pinfo, int hash_algo, quic_pp_state_t *pp_state, bool from_client)
 {
     unsigned hash_len = gcry_md_get_algo_dlen(hash_algo);
-    char *secret = (char *)wmem_alloc0(pinfo->pool, hash_len);
+    uint8_t *secret = (uint8_t *)wmem_alloc0(pinfo->pool, hash_len);
     if (!tls13_get_quic_secret(pinfo, !from_client, TLS_SECRET_APP, hash_len, hash_len, secret)) {
         return false;
     }
@@ -3419,7 +3963,7 @@ quic_get_1rtt_hp_cipher(packet_info *pinfo, quic_info_data_t *quic_info, bool fr
                connection where the handshake is not present.
                Note that even if we have a basic logic to detect unencrypted padding (via
                check_dcid_on_coalesced_packet()), there is not a proper way to detect it
-               other than checking if the decryption successed
+               other than checking if the decryption succeeded
             */
             *error = "Missing TLS handshake, unsupported ciphers or padding";
             return NULL;
@@ -3463,10 +4007,12 @@ quic_get_1rtt_hp_cipher(packet_info *pinfo, quic_info_data_t *quic_info, bool fr
         const char *proto_name = tls_get_alpn(pinfo);
         if (proto_name) {
             quic_info->app_handle = dissector_get_string_handle(quic_proto_dissector_table, proto_name);
+            quic_info->app_datagram_handle = dissector_get_string_handle(quic_datagram_proto_dissector_table, proto_name);
             // If no specific handle is found, alias "h3-*" to "h3" and "doq-*" to "doq"
             if (!quic_info->app_handle) {
                 if (g_str_has_prefix(proto_name, "h3-")) {
                     quic_info->app_handle = dissector_get_string_handle(quic_proto_dissector_table, "h3");
+                    quic_info->app_datagram_handle = dissector_get_string_handle(quic_datagram_proto_dissector_table, "h3");
                 } else if (g_str_has_prefix(proto_name, "doq-")) {
                     quic_info->app_handle = dissector_get_string_handle(quic_proto_dissector_table, "doq");
                 }
@@ -3698,7 +4244,7 @@ quic_add_connection(packet_info *pinfo, quic_cid_t *cid)
 {
     quic_datagram *dgram_info;
 
-    dgram_info = (quic_datagram *)p_get_proto_data(wmem_file_scope(), pinfo, proto_quic, 0);
+    dgram_info = (quic_datagram *)p_get_proto_data(wmem_file_scope(), pinfo, proto_quic, proto_get_layer_num(pinfo, proto_quic));
     if (dgram_info && dgram_info->conn) {
         quic_connection_add_cid(dgram_info->conn, cid, dgram_info->from_server);
     }
@@ -3710,7 +4256,7 @@ quic_add_loss_bits(packet_info *pinfo, uint64_t value)
     quic_datagram *dgram_info;
     quic_info_data_t *conn;
 
-    dgram_info = (quic_datagram *)p_get_proto_data(wmem_file_scope(), pinfo, proto_quic, 0);
+    dgram_info = (quic_datagram *)p_get_proto_data(wmem_file_scope(), pinfo, proto_quic, proto_get_layer_num(pinfo, proto_quic));
     if (dgram_info && dgram_info->conn) {
         conn = dgram_info->conn;
         if (dgram_info->from_server) {
@@ -3743,7 +4289,7 @@ quic_add_multipath(packet_info *pinfo, unsigned version)
     quic_datagram *dgram_info;
     quic_info_data_t *conn;
 
-    dgram_info = (quic_datagram *)p_get_proto_data(wmem_file_scope(), pinfo, proto_quic, 0);
+    dgram_info = (quic_datagram *)p_get_proto_data(wmem_file_scope(), pinfo, proto_quic, proto_get_layer_num(pinfo, proto_quic));
     if (dgram_info && dgram_info->conn) {
         conn = dgram_info->conn;
         if (dgram_info->from_server) {
@@ -3760,7 +4306,7 @@ quic_add_grease_quic_bit(packet_info *pinfo)
     quic_datagram *dgram_info;
     quic_info_data_t *conn;
 
-    dgram_info = (quic_datagram *)p_get_proto_data(wmem_file_scope(), pinfo, proto_quic, 0);
+    dgram_info = (quic_datagram *)p_get_proto_data(wmem_file_scope(), pinfo, proto_quic, proto_get_layer_num(pinfo, proto_quic));
     if (dgram_info && dgram_info->conn) {
         conn = dgram_info->conn;
         if (dgram_info->from_server) {
@@ -3782,6 +4328,12 @@ quic_find_stateless_reset_token(packet_info *pinfo, tvbuff_t *tvb, bool *from_se
      * connections on the 5-tuple (as when a nonzero Connection ID is
      * used there can be more than one.)
      */
+
+    /* Make sure there is a last 16 bytes present to check. */
+    int reported_len = (int)tvb_reported_length(tvb);
+    if (reported_len < 16 || (reported_len != (int)tvb_captured_length(tvb))) {
+        return NULL;
+    }
     quic_info_data_t* conn = quic_connection_from_conv(pinfo);
     const quic_cid_item_t *cids;
 
@@ -3796,7 +4348,7 @@ quic_find_stateless_reset_token(packet_info *pinfo, tvbuff_t *tvb, bool *from_se
              * so we ideally should track when they are retired.
              */
             if (cid->reset_token_set &&
-                    !tvb_memeql(tvb, -16, cid->reset_token, 16) ) {
+                    !tvb_memeql(tvb, reported_len - 16, cid->reset_token, 16) ) {
                 *from_server = conn_from_server;
                 return conn;
             }
@@ -3814,7 +4366,7 @@ quic_add_stateless_reset_token(packet_info *pinfo, tvbuff_t *tvb, int offset, co
     quic_info_data_t *conn;
     quic_cid_item_t *cids;
 
-    dgram_info = (quic_datagram *)p_get_proto_data(wmem_file_scope(), pinfo, proto_quic, 0);
+    dgram_info = (quic_datagram *)p_get_proto_data(wmem_file_scope(), pinfo, proto_quic, proto_get_layer_num(pinfo, proto_quic));
     if (dgram_info && dgram_info->conn) {
         conn = dgram_info->conn;
         if (dgram_info->from_server) {
@@ -3889,9 +4441,7 @@ dissect_quic_long_header_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *q
     uint32_t    dcil, scil;
     proto_item  *ti;
 
-    version = tvb_get_ntohl(tvb, offset);
-
-    ti = proto_tree_add_item(quic_tree, hf_quic_version, tvb, offset, 4, ENC_BIG_ENDIAN);
+    ti = proto_tree_add_item_ret_uint(quic_tree, hf_quic_version, tvb, offset, 4, ENC_BIG_ENDIAN, &version);
     if ((version & 0x0F0F0F0F) == 0x0a0a0a0a) {
         proto_item_append_text(ti, " (Forcing Version Negotiation)");
     }
@@ -4026,23 +4576,23 @@ dissect_quic_long_header(tvbuff_t *tvb, packet_info *pinfo, proto_tree *quic_tre
 #define DIGEST_MIN_SIZE 32  /* SHA256 */
 #define DIGEST_MAX_SIZE 48  /* SHA384 */
         const char *error = NULL;
-        char early_data_secret[DIGEST_MAX_SIZE];
+        uint8_t early_data_secret[DIGEST_MAX_SIZE];
         unsigned early_data_secret_len = 0;
         if (long_packet_type == QUIC_LPT_INITIAL && !from_server &&
             quic_connection_equal(&dcid, &conn->client_dcid_initial)) {
             /* Create new decryption context based on the Client Connection
              * ID from the *very first* Client Initial packet. */
-            quic_create_initial_decoders(&dcid, &error, conn);
+            quic_create_initial_decoders(pinfo->pool, &dcid, &error, conn);
         } else if (long_packet_type == QUIC_LPT_INITIAL && from_server &&
                    version != conn->version) {
-            /* Compatibile Version Negotiation: the server (probably) updated the connection version.
+            /* Compatible Version Negotiation: the server (probably) updated the connection version.
                We need to restart the ciphers since HP depends on version.
                If/when updating the ciphers is a bit tricky during Compatible Version Negotiation.
                TODO: do we really need to restart all the initial ciphers?
              */
             conn->version = version;
             quic_ciphers_reset(ciphers);
-            quic_create_initial_decoders(&conn->client_dcid_initial, &error, conn);
+            quic_create_initial_decoders(pinfo->pool, &conn->client_dcid_initial, &error, conn);
         } else if (long_packet_type == QUIC_LPT_0RTT) {
             early_data_secret_len = tls13_get_quic_secret(pinfo, false, TLS_SECRET_0RTT_APP, DIGEST_MIN_SIZE, DIGEST_MAX_SIZE, early_data_secret);
             if (early_data_secret_len == 0) {
@@ -4402,10 +4952,10 @@ quic_get_message_tvb(tvbuff_t *tvb, const unsigned offset, const quic_cid_t *dci
         }
     } else {
         if (quic_gso_heur_dcid_len && (dcid->len >= quic_gso_heur_dcid_len)) {
+            unsigned needle_pos;
             unsigned dcid_offset = offset + 1;
             tvbuff_t *needle_tvb = tvb_new_subset_length(tvb, dcid_offset, dcid->len);
-            int needle_pos = tvb_find_tvb(tvb, needle_tvb, dcid_offset + dcid->len);
-            if (needle_pos != -1) {
+            if (tvb_find_tvb_remaining(tvb, needle_tvb, dcid_offset + dcid->len, &needle_pos)) {
                 return tvb_new_subset_length(tvb, offset, needle_pos - offset - 1);
             }
         }
@@ -4623,17 +5173,15 @@ dissect_quic(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     unsigned    offset = 0;
     quic_datagram *dgram_info = NULL;
     quic_packet_info_t *quic_packet = NULL;
-    quic_cid_t  real_retry_odcid = {.len=0}, *retry_odcid = NULL;
+    quic_cid_t *retry_odcid = NULL;
     quic_cid_t  first_packet_dcid = {.len=0}; /* DCID of the first packet of the datagram */
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "QUIC");
 
-    if (PINFO_FD_VISITED(pinfo)) {
-        dgram_info = (quic_datagram *)p_get_proto_data(wmem_file_scope(), pinfo, proto_quic, 0);
-    }
+    dgram_info = (quic_datagram *)p_get_proto_data(wmem_file_scope(), pinfo, proto_quic, pinfo->curr_proto_layer_num);
     if (!dgram_info) {
         dgram_info = wmem_new0(wmem_file_scope(), quic_datagram);
-        p_add_proto_data(wmem_file_scope(), pinfo, proto_quic, 0, dgram_info);
+        p_add_proto_data(wmem_file_scope(), pinfo, proto_quic, pinfo->curr_proto_layer_num, dgram_info);
     }
 
     quic_ti = proto_tree_add_item(tree, proto_quic, tvb, 0, -1, ENC_NA);
@@ -4648,15 +5196,14 @@ dissect_quic(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
         quic_extract_header(tvb, &long_packet_type, &version, &dcid, &scid);
         conn = quic_connection_find(pinfo, long_packet_type, &dcid, &from_server);
-        if (conn && long_packet_type == QUIC_LPT_RETRY && conn->client_dcid_set) {
-            // Save the original client DCID before erasure.
-            real_retry_odcid = conn->client_dcid_initial;
-            retry_odcid = &real_retry_odcid;
-        }
-        if (!conn && tvb_bytes_exist(tvb, -16, 16) && (conn = quic_find_stateless_reset_token(pinfo, tvb, &from_server))) {
+        if (!conn && (conn = quic_find_stateless_reset_token(pinfo, tvb, &from_server))) {
             dgram_info->stateless_reset = true;
         } else {
             quic_connection_create_or_update(&conn, pinfo, long_packet_type, version, &scid, &dcid, from_server);
+        }
+        if (conn && long_packet_type == QUIC_LPT_RETRY && conn->client_odcid.len) {
+            // We have the original client DCID.
+            retry_odcid = &conn->client_odcid;
         }
         dgram_info->conn = conn;
         dgram_info->from_server = from_server;
@@ -4691,8 +5238,7 @@ dissect_quic(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         if (!check_dcid_on_coalesced_packet(tvb, dgram_info, offset, &first_packet_dcid)) {
             /* Coalesced packet with unexpected CID; it probably is some kind
                of unencrypted padding data added after the valid QUIC payload */
-            expert_add_info_format(pinfo, quic_tree, &ei_quic_coalesced_padding_data,
-                                   "(Random) padding data appended to the datagram");
+            expert_add_info(pinfo, quic_tree, &ei_quic_coalesced_padding_data);
             break;
         }
 
@@ -4980,7 +5526,7 @@ quic_get_sub_stream_id(unsigned streamid, unsigned sub_stream_id, bool le, unsig
 static char *
 quic_follow_conv_filter(epan_dissect_t *edt _U_, packet_info *pinfo, unsigned *stream, unsigned *sub_stream)
 {
-    quic_datagram *dgram_info = (quic_datagram *)p_get_proto_data(wmem_file_scope(), pinfo, proto_quic, 0);
+    quic_datagram *dgram_info = (quic_datagram *)p_get_proto_data(wmem_file_scope(), pinfo, proto_quic, proto_get_layer_num(pinfo, proto_quic));
 
     if (!dgram_info || !dgram_info->conn) {
         return NULL;
@@ -5025,8 +5571,9 @@ follow_quic_tap_listener(void *tapdata, packet_info *pinfo, epan_dissect_t *edt 
     // XXX: Ideally, we should also deal with stream retransmission
     // and out of order packets in a similar manner to the TCP dissector,
     // using the offset, plus ACKs and other information.
-    follow_record->data = g_byte_array_sized_new(tvb_captured_length(follow_data->tvb));
-    follow_record->data = g_byte_array_append(follow_record->data, tvb_get_ptr(follow_data->tvb, 0, -1), tvb_captured_length(follow_data->tvb));
+    unsigned length = tvb_captured_length(follow_data->tvb);
+    follow_record->data = g_byte_array_sized_new(length);
+    follow_record->data = g_byte_array_append(follow_record->data, tvb_get_ptr(follow_data->tvb, 0, length), length);
     follow_record->packet_num = pinfo->fd->num;
     follow_record->abs_ts = pinfo->fd->abs_ts;
 
@@ -5638,6 +6185,28 @@ proto_register_quic(void)
               NULL, HFILL }
         },
 
+        /* OBSERVED_ADDRESS */
+        { &hf_quic_oa_seq_num,
+            { "Sequence Number", "quic.oa.seq_num",
+              FT_UINT64, BASE_DEC, NULL, 0x0,
+              NULL, HFILL }
+        },
+        { &hf_quic_oa_ipv4,
+            { "IPv4", "quic.oa.ipv4",
+              FT_IPv4, BASE_NONE, NULL, 0x0,
+              NULL, HFILL }
+        },
+        { &hf_quic_oa_ipv6,
+            { "IPv6", "quic.oa.ipv6",
+              FT_IPv6, BASE_NONE, NULL, 0x0,
+              NULL, HFILL }
+        },
+        { &hf_quic_oa_port,
+            { "Port", "quic.oa.port",
+              FT_UINT16, BASE_DEC, NULL, 0x0,
+              NULL, HFILL }
+        },
+
         /* STATELESS RESET */
         { &hf_quic_unpredictable_bits,
             { "Unpredictable Bits", "quic.unpredictable_bits",
@@ -5766,7 +6335,7 @@ proto_register_quic(void)
         },
         { &ei_quic_coalesced_padding_data,
           { "quic.coalesced_padding_data", PI_PROTOCOL, PI_NOTE,
-            "Coalesced Padding Data", EXPFILL }
+            "(Random) padding data appended to the datagram", EXPFILL }
         },
         { &ei_quic_retransmission,
           { "quic.retransmission", PI_SEQUENCE, PI_NOTE,
@@ -5796,6 +6365,12 @@ proto_register_quic(void)
         "Whether out-of-order CRYPTO frames should be buffered and reordered before "
         "passing them to the TLS handshake dissector.",
         &quic_crypto_out_of_order);
+
+    prefs_register_bool_preference(quic_module, "reassemble_stream_out_of_order",
+        "Reassemble out-of-order STREAM frames",
+        "Whether out-of-order STREAM frames should be buffered and reordered before "
+        "passing them to the payload dissector.",
+        &quic_stream_out_of_order);
 
     prefs_register_uint_preference(quic_module, "gso_heur_min_dcid_len",
         "Search for coalesced short header packets at DCID length",
@@ -5829,6 +6404,7 @@ proto_register_quic(void)
      * bytes, but in practice these do not exist yet.
      */
     quic_proto_dissector_table = register_dissector_table("quic.proto", "QUIC Protocol", proto_quic, FT_STRING, STRING_CASE_SENSITIVE);
+    quic_datagram_proto_dissector_table = register_dissector_table("quic.proto.datagram", "QUIC Protocol for DATAGRAM frames", proto_quic, FT_STRING, STRING_CASE_SENSITIVE);
 
     quic_follow_tap = register_tap("quic_follow");
 }

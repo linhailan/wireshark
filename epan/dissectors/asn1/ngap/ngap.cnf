@@ -116,7 +116,7 @@ UE-NGAP-IDs/aMF-UE-NGAP-ID ABBREV=AMF_UE_NGAP_ID
 #.FN_FTR ProtocolIE-ID
   if (tree) {
     proto_item_append_text(proto_item_get_parent_nth(actx->created_item, 2), ": %s",
-                           val_to_str_ext(ngap_data->protocol_ie_id, &ngap_ProtocolIE_ID_vals_ext, "unknown (%d)"));
+                           val_to_str_ext(actx->pinfo->pool, ngap_data->protocol_ie_id, &ngap_ProtocolIE_ID_vals_ext, "unknown (%d)"));
   }
 #.END
 
@@ -270,7 +270,7 @@ UE-NGAP-IDs/aMF-UE-NGAP-ID ABBREV=AMF_UE_NGAP_ID
     } else {
       if (nas_5gs_handle) {
         proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_ngap_NAS_PDU);
-        volatile int saved_offset = offset;
+        volatile uint32_t saved_offset = offset;
         TRY {
           call_dissector(nas_5gs_handle, parameter_tvb, actx->pinfo, subtree);
         }
@@ -837,6 +837,7 @@ RecommendedCellItem/timeStayedInCell DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=U
   if (parameter_tvb) {
     proto_tree *subtree;
     volatile dissector_handle_t handle;
+    volatile uint32_t saved_offset = offset;
     subtree = proto_item_add_subtree(actx->created_item, ett_ngap_UERadioCapability);
     if (ngap_data->procedure_code == id_UERadioCapability_EUTRA_Format) {
       handle = lte_rrc_ue_radio_access_cap_info_handle;
@@ -855,6 +856,7 @@ RecommendedCellItem/timeStayedInCell DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=U
       }
       ENDTRY;
     }
+    offset = saved_offset;
   }
 
 #.FN_BODY TimeStamp VAL_PTR = &timestamp_tvb
@@ -863,7 +865,7 @@ RecommendedCellItem/timeStayedInCell DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=U
 
 #.FN_FTR TimeStamp
   if (timestamp_tvb) {
-    proto_item_append_text(actx->created_item, " (%s)", tvb_ntp_fmt_ts_sec(timestamp_tvb, 0));
+    proto_item_append_text(actx->created_item, " (%s)", tvb_ntp_fmt_ts_sec(actx->pinfo->pool, timestamp_tvb, 0));
   }
 
 #.TYPE_ATTR
@@ -985,7 +987,7 @@ ExpectedIdlePeriod DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=UNS(&units_seconds)
 TimeUEStayedInCell DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=UNS(&units_seconds)
 
 #.TYPE_ATTR
-TimeUEStayedInCellEnhancedGranularity DISPLAY=BASE_CUSTOM STRINGS=CF_FUNC(ngap_TimeUEStayedInCellEnhancedGranularity_fmt)
+TimeUEStayedInCellEnhancedGranularity DISPLAY=BASE_CUSTOM STRINGS=CF_FUNC(ngap_tenth_seconds_fmt)
 
 #.TYPE_ATTR
 TrafficLoadReductionIndication DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=UNS(&units_percent)
@@ -1027,7 +1029,7 @@ PeriodicRegistrationUpdateTimer TYPE=FT_UINT8 DISPLAY=BASE_CUSTOM STRINGS=CF_FUN
 
 #.FN_FTR VolumeTimedReport-Item/startTimeStamp
   if (timestamp_tvb) {
-    proto_item_append_text(actx->created_item, " (%s)", tvb_ntp_fmt_ts_sec(timestamp_tvb, 0));
+    proto_item_append_text(actx->created_item, " (%s)", tvb_ntp_fmt_ts_sec(actx->pinfo->pool, timestamp_tvb, 0));
   }
 
 #.FN_BODY VolumeTimedReport-Item/endTimeStamp VAL_PTR = &timestamp_tvb
@@ -1036,7 +1038,7 @@ PeriodicRegistrationUpdateTimer TYPE=FT_UINT8 DISPLAY=BASE_CUSTOM STRINGS=CF_FUN
 
 #.FN_FTR VolumeTimedReport-Item/endTimeStamp
   if (timestamp_tvb) {
-    proto_item_append_text(actx->created_item, " (%s)", tvb_ntp_fmt_ts_sec(timestamp_tvb, 0));
+    proto_item_append_text(actx->created_item, " (%s)", tvb_ntp_fmt_ts_sec(actx->pinfo->pool, timestamp_tvb, 0));
   }
 
 #.FN_BODY NRPPa-PDU VAL_PTR = &parameter_tvb
@@ -1076,7 +1078,7 @@ BluetoothName TYPE=FT_STRING DISPLAY = BASE_NONE
 %(DEFAULT_BODY)s
   if (cov_enh_level_tvb && ngap_dissect_container) {
     subtree = proto_item_add_subtree(actx->created_item, ett_ngap_CoverageEnhancementLevel);
-    volatile int saved_offset = offset;
+    volatile uint32_t saved_offset = offset;
     if ((ngap_is_nbiot_ue(actx->pinfo) && (ngap_dissect_lte_container_as == NGAP_LTE_CONTAINER_AUTOMATIC)) ||
         (ngap_dissect_lte_container_as == NGAP_LTE_CONTAINER_NBIOT)) {
       TRY {
@@ -1226,6 +1228,23 @@ LAC TYPE = FT_UINT16 DISPLAY = BASE_DEC_HEX
     dissect_nr_rrc_nr_RLF_Report_r16_PDU(nr_ue_rlc_report_tvb, actx->pinfo, subtree, NULL);
   }
 
+#.FN_BODY GTP-TEID VAL_PTR = &parameter_tvb LEN_PTR = &len
+  tvbuff_t *parameter_tvb = NULL;
+  uint32_t teid = 0;
+  const char *imsi = NULL;
+
+%(DEFAULT_BODY)s
+  if (!parameter_tvb)
+    return offset;
+
+  if (proto_is_frame_protocol(actx->pinfo->layers, "http2")) {
+    imsi = http2_get_stream_imsi(actx->pinfo);
+    if(imsi) {
+      teid = tvb_get_uint32(parameter_tvb, 0, ENC_BIG_ENDIAN);
+      gtp_add_teid_imsi(teid, imsi);
+    }
+  }
+
 #.TYPE_ATTR
 Periodicity DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=UNS(&units_microseconds)
 
@@ -1263,7 +1282,7 @@ FiveG-TMSI TYPE = FT_UINT32 DISPLAY = BASE_DEC_HEX
 %(DEFAULT_BODY)s
   if (parameter_tvb) {
     proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_ngap_GlobalCable_ID);
-    proto_tree_add_item(subtree, hf_ngap_GlobalCable_ID_str, parameter_tvb, 0, -1, ENC_UTF_8 | ENC_NA);
+    proto_tree_add_item(subtree, hf_ngap_GlobalCable_ID_str, parameter_tvb, 0, -1, ENC_UTF_8);
   }
 
 #.TYPE_ATTR
@@ -1336,6 +1355,51 @@ TSCFeedbackInformation/burstArrivalburstArrivalTimeOffsetTimeWindowEnd DISPLAY=B
     proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_ngap_successfulPSCellChangeReportContainer);
     dissect_nr_rrc_SuccessPSCell_Report_r18_PDU(parameter_tvb, actx->pinfo, subtree, NULL);
   }
+
+#.TYPE_ATTR
+AIoT-CommandAssistanceInformation/estimateofExpectedD2RMsgSize DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=UNS(&units_byte_bytes)
+
+#.TYPE_ATTR
+AIoT-InventoryAssistanceInformation/estimateofexpectedD2RMsgSizeExpectedD2RMsgSize DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=UNS(&units_byte_bytes)
+
+#.TYPE_ATTR
+AIoT-InventoryAssistanceInformation/timeInterval DISPLAY=BASE_CUSTOM STRINGS=CF_FUNC(ngap_AIoT_timeInterval_fmt)
+
+#.FN_BODY IntendedServiceAreaCoordinates VAL_PTR = &param_tvb
+  tvbuff_t *param_tvb = NULL;
+%(DEFAULT_BODY)s
+  if (param_tvb) {
+    proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_ngap_IntendedServiceAreaCoordinates);
+    dissect_nr_rrc_IntendedServiceAreaInfo_areaCoordinates_r19_PDU(param_tvb, actx->pinfo, subtree, NULL);
+  }
+
+#.FN_BODY MDT-circle/reference-location VAL_PTR = &param_tvb
+  tvbuff_t *param_tvb = NULL;
+%(DEFAULT_BODY)s
+  if (param_tvb) {
+    proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_ngap_MDT_circle_reference_location);
+    dissect_lpp_Ellipsoid_Point_PDU(param_tvb, actx->pinfo, subtree, NULL);
+  }
+
+#.TYPE_ATTR
+MDT-circle/distance-radius DISPLAY=BASE_CUSTOM STRINGS=CF_FUNC(ngap_50m_r19_fmt)
+
+#.FN_BODY MDT-polygon VAL_PTR = &param_tvb
+  tvbuff_t *param_tvb = NULL;
+%(DEFAULT_BODY)s
+  if (param_tvb) {
+    proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_ngap_MDT_polygon);
+    dissect_lpp_Polygon_PDU(param_tvb, actx->pinfo, subtree, NULL);
+  }
+
+#.TYPE_ATTR
+ReportingThreshold DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=UNS(&units_kbps)
+
+#.TYPE_ATTR
+SCGActivationTime DISPLAY=BASE_CUSTOM STRINGS=CF_FUNC(ngap_tenth_seconds_fmt)
+
+#.TYPE_ATTR
+Altitude DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=UNS(&units_meters)
 
 #.ASSIGN_VALUE_TO_TYPE  # NGAP does not have constants assigned to types, they are pure INTEGER
 # ProcedureCode
@@ -1421,6 +1485,12 @@ id-TimingSynchronisationStatusReport     ProcedureCode
 id-MTCommunicationHandling               ProcedureCode
 id-RANPagingRequest                      ProcedureCode
 id-BroadcastSessionTransport             ProcedureCode
+id-NGRemoval                             ProcedureCode
+id-InventoryRequest                      ProcedureCode
+id-InventoryReport                       ProcedureCode
+id-CommandRequest                        ProcedureCode
+id-AIOTSessionRelease                    ProcedureCode
+id-AIOTSessionReleaseRequest             ProcedureCode
 
 # ProtocolIE-ID
 id-AllowedNSSAI                                        ProtocolIE-ID
@@ -1858,6 +1928,62 @@ id-SourceSN-to-TargetSN-QMCInfo                        ProtocolIE-ID
 id-QoERVQoEReportingPaths                              ProtocolIE-ID
 id-UserLocationInformationN3IWF-without-PortNumber     ProtocolIE-ID
 id-AUN3DeviceAccessInfo                                ProtocolIE-ID
+id-TAIMBSSupportList                                   ProtocolIE-ID
+id-ExtendedBackupAMFName                               ProtocolIE-ID
+id-ExtendedOldAMF                                      ProtocolIE-ID
+id-MBS-UP-FailureIndication                            ProtocolIE-ID
+id-RequestedTNLInfo                                    ProtocolIE-ID
+id-Aerial-UE-FlightInformationOngoingReporting-failed  ProtocolIE-ID
+id-NetworkSliceAreaScopeofMDT                          ProtocolIE-ID
+id-GeographyBasedMDT                                   ProtocolIE-ID
+id-MBS-IntendedServiceAreaList                         ProtocolIE-ID
+id-AMF-UE-NGAP-ID2                                     ProtocolIE-ID
+id-GUAMIList                                           ProtocolIE-ID
+id-GW-Context-Release-Indication                       ProtocolIE-ID
+id-SourceAMF-GUAMI                                     ProtocolIE-ID
+id-RequestedNSSAI                                      ProtocolIE-ID
+id-Target-RAN-Node-ID                                  ProtocolIE-ID
+id-InventoryRequestTransfer                            ProtocolIE-ID
+id-InventoryResponseTransfer                           ProtocolIE-ID
+id-InventoryFailureTransfer                            ProtocolIE-ID
+id-InventoryReportTransfer                             ProtocolIE-ID
+id-CommandRequestTransfer                              ProtocolIE-ID
+id-CommandResponseTransfer                             ProtocolIE-ID
+id-CommandFailureTransfer                              ProtocolIE-ID
+id-AIOTSessionReleaseCommandTransfer                   ProtocolIE-ID
+id-AIOTSessionReleaseCompleteTransfer                  ProtocolIE-ID
+id-AIOTSessionReleaseRequestTransfer                   ProtocolIE-ID
+id-AIoT-CorrelationIdentifier                          ProtocolIE-ID
+id-AIOTFIdentifier                                     ProtocolIE-ID
+id-AIoT-DeviceIdentificationRequested                  ProtocolIE-ID
+id-AIoT-RequestedServiceAreaInformation                ProtocolIE-ID
+id-AIoT-InventoryAssistanceInformation                 ProtocolIE-ID
+id-AIoT-FollowonCommandIndication                      ProtocolIE-ID
+id-RAN-AIOT-Device-NGAP-ID                             ProtocolIE-ID
+id-AIoT-CommandAssistanceInformation                   ProtocolIE-ID
+id-AIoT-NASPDU                                         ProtocolIE-ID
+id-AIoT-Support                                        ProtocolIE-ID
+id-AIOTFName                                           ProtocolIE-ID
+id-LPWUSPSAssistanceInformation                        ProtocolIE-ID
+id-FurtherExtendedUEIdentityIndexValue                 ProtocolIE-ID
+id-FiveGProSeLayer2MHUEtoNetworkRelay                  ProtocolIE-ID
+id-FiveGProSeLayer2MHIntermediateUEtoNetworkRelay      ProtocolIE-ID
+id-FiveGProSeLayer2MHRemote                            ProtocolIE-ID
+id-FiveGProSeLayer3MHUEtoNetworkRelay                  ProtocolIE-ID
+id-AdditionalULI                                       ProtocolIE-ID
+id-PduSetDelayBudgetDownlink                           ProtocolIE-ID
+id-PduSetDelayBudgetUplink                             ProtocolIE-ID
+id-PduSetErrorRateDownlink                             ProtocolIE-ID
+id-PduSetErrorRateUplink                               ProtocolIE-ID
+id-DLPDUSetInformationMarkingSupportIndication         ProtocolIE-ID
+id-MonitoringRequestonAvailableBitrate                 ProtocolIE-ID
+id-MMSID                                               ProtocolIE-ID
+id-Indication-of-Bitrate-Adaptation                    ProtocolIE-ID
+id-SCGActivationTime                                   ProtocolIE-ID
+id-Aerial-UE-FlightInformationReporting                ProtocolIE-ID
+id-Aerial-UE-FlightInformationReportingControl         ProtocolIE-ID
+id-LPWUSDisableIndication                              ProtocolIE-ID
+
 
 #.END
 
@@ -2175,6 +2301,40 @@ MBS-NGUFailureIndication                                 N ngap.ies id-MBS-NGUFa
 UserPlaneFailureIndication                               N ngap.ies id-UserPlaneFailureIndication
 UserLocationInformationN3IWF-without-PortNumber          N ngap.ies id-UserLocationInformationN3IWF-without-PortNumber
 AUN3DeviceAccessInfo                                     N ngap.ies id-AUN3DeviceAccessInfo
+Extended-AMFName                                         N ngap.ies id-ExtendedOldAMF
+MBS-UP-FailureIndication                                 N ngap.ies id-MBS-UP-FailureIndication
+Aerial-UE-FlightInformationOngoingReporting-failed       N ngap.ies id-Aerial-UE-FlightInformationOngoingReporting-failed
+GeographyBasedMDT                                        N ngap.ies id-GeographyBasedMDT
+AMF-UE-NGAP-ID                                           N ngap.ies id-AMF-UE-NGAP-ID2
+GUAMIList                                                N ngap.ies id-GUAMIList
+GW-Context-Release-Indication                            N ngap.ies id-GW-Context-Release-Indication
+GUAMI                                                    N ngap.ies id-SourceAMF-GUAMI
+RequestedNSSAI                                           N ngap.ies id-RequestedNSSAI
+GlobalRANNodeID                                          N ngap.ies id-Target-RAN-Node-ID
+InventoryRequestTransfer-OCTET-STRING                    N ngap.ies id-InventoryRequestTransfer
+InventoryResponseTransfer-OCTET-STRING                   N ngap.ies id-InventoryResponseTransfer
+InventoryFailureTransfer-OCTET-STRING                    N ngap.ies id-InventoryFailureTransfer
+InventoryReportTransfer-OCTET-STRING                     N ngap.ies id-InventoryReportTransfer
+CommandRequestTransfer-OCTET-STRING                      N ngap.ies id-CommandRequestTransfer
+CommandResponseTransfer-OCTET-STRING                     N ngap.ies id-CommandResponseTransfer
+CommandFailureTransfer-OCTET-STRING                      N ngap.ies id-CommandFailureTransfer
+AIOTSessionReleaseCommandTransfer-OCTET-STRING           N ngap.ies id-AIOTSessionReleaseCommandTransfer
+AIOTSessionReleaseCompleteTransfer-OCTET-STRING          N ngap.ies id-AIOTSessionReleaseCompleteTransfer
+AIOTSessionReleaseRequestTransfer-OCTET-STRING           N ngap.ies id-AIOTSessionReleaseRequestTransfer
+AIoT-CorrelationIdentifier                               N ngap.ies id-AIoT-CorrelationIdentifier
+AIOTFIdentifier                                          N ngap.ies id-AIOTFIdentifier
+AIoT-DeviceIdentificationRequested                       N ngap.ies id-AIoT-DeviceIdentificationRequested
+AIoT-RequestedServiceAreaInformation                     N ngap.ies id-AIoT-RequestedServiceAreaInformation
+AIoT-InventoryAssistanceInformation                      N ngap.ies id-AIoT-InventoryAssistanceInformation
+AIoT-FollowonCommandIndication                           N ngap.ies id-AIoT-FollowonCommandIndication
+RAN-AIOT-Device-NGAP-ID                                  N ngap.ies id-RAN-AIOT-Device-NGAP-ID
+AIoT-CommandAssistanceInformation                        N ngap.ies id-AIoT-CommandAssistanceInformation
+AIoT-NASPDU                                              N ngap.ies id-AIoT-NASPDU
+AIoT-Support                                             N ngap.ies id-AIoT-Support
+AIOTFName                                                N ngap.ies id-AIOTFName
+LPWUSPSAssistanceInformation                             N ngap.ies id-LPWUSPSAssistanceInformation
+AdditionalULI                                            N ngap.ies id-AdditionalULI
+LPWUSDisableIndication                                   N ngap.ies id-LPWUSDisableIndication
 
 #NGAP-PROTOCOL-EXTENSION
 
@@ -2313,6 +2473,30 @@ MN-only-MDT-collection                                 N ngap.extension id-MN-on
 UserPlaneFailureIndicationReport                       N ngap.extension id-UserPlaneFailureIndicationReport
 QMCConfigInfo                                          N ngap.extension id-SourceSN-to-TargetSN-QMCInfo
 QoERVQoEReportingPaths                                 N ngap.extension id-QoERVQoEReportingPaths
+TAIMBSSupportList                                      N ngap.extension id-TAIMBSSupportList
+Extended-AMFName                                       N ngap.extension id-ExtendedBackupAMFName
+RequestedTNLInfo                                       N ngap.extension id-RequestedTNLInfo
+NetworkSliceAreaScopeofMDT                             N ngap.extension id-NetworkSliceAreaScopeofMDT
+MBS-IntendedServiceAreaList                            N ngap.extension id-MBS-IntendedServiceAreaList
+LPWUSPSAssistanceInformation                           N ngap.extension id-LPWUSPSAssistanceInformation
+FurtherExtendedUEIdentityIndexValue                    N ngap.extension id-FurtherExtendedUEIdentityIndexValue
+FiveGProSeLayer2MHUEtoNetworkRelay                     N ngap.extension id-FiveGProSeLayer2MHUEtoNetworkRelay
+FiveGProSeLayer2MHIntermediateUEtoNetworkRelay         N ngap.extension id-FiveGProSeLayer2MHIntermediateUEtoNetworkRelay
+FiveGProSeLayer2MHRemote                               N ngap.extension id-FiveGProSeLayer2MHRemote
+FiveGProSeLayer3MHUEtoNetworkRelay                     N ngap.extension id-FiveGProSeLayer3MHUEtoNetworkRelay
+AdditionalULI                                          N ngap.extension id-AdditionalULI
+ExtendedPacketDelayBudget                              N ngap.extension id-PduSetDelayBudgetDownlink
+ExtendedPacketDelayBudget                              N ngap.extension id-PduSetDelayBudgetUplink
+PacketErrorRate                                        N ngap.extension id-PduSetErrorRateDownlink
+PacketErrorRate                                        N ngap.extension id-PduSetErrorRateUplink
+DLPDUSetInformationMarkingSupportIndication            N ngap.extension id-DLPDUSetInformationMarkingSupportIndication
+MonitoringRequestonAvailableBitrate                    N ngap.extension id-MonitoringRequestonAvailableBitrate
+MMSID                                                  N ngap.extension id-MMSID
+Indication-of-Bitrate-Adaptation                       N ngap.extension id-Indication-of-Bitrate-Adaptation
+SCGActivationTime                                      N ngap.extension id-SCGActivationTime
+Aerial-UE-FlightInformationReporting                   N ngap.extension id-Aerial-UE-FlightInformationReporting
+Aerial-UE-FlightInformationReportingControl            N ngap.extension id-Aerial-UE-FlightInformationReportingControl
+LPWUSDisableIndication                                 N ngap.extension id-LPWUSDisableIndication
 
 #NGAP-ELEMENTARY-PROCEDURE
 
@@ -2421,6 +2605,10 @@ NGSetupRequest                          N ngap.proc.imsg id-NGSetup
 NGSetupResponse                         N ngap.proc.sout id-NGSetup
 NGSetupFailure                          N ngap.proc.uout id-NGSetup
 
+NGRemovalRequest                        N ngap.proc.imsg id-NGRemoval
+NGRemovalResponse                       N ngap.proc.sout id-NGRemoval
+NGRemovalFailure                        N ngap.proc.uout id-NGRemoval
+
 OverloadStart                           N ngap.proc.imsg id-OverloadStart
 
 OverloadStop                            N ngap.proc.imsg id-OverloadStop
@@ -2528,6 +2716,21 @@ UplinkRIMInformationTransfer            N ngap.proc.imsg id-UplinkRIMInformation
 
 DownlinkRIMInformationTransfer          N ngap.proc.imsg id-DownlinkRIMInformationTransfer
 
+InventoryRequest                        N ngap.proc.imsg id-InventoryRequest
+InventoryResponse                       N ngap.proc.sout id-InventoryRequest
+InventoryFailure                        N ngap.proc.uout id-InventoryRequest
+
+InventoryReport                         N ngap.proc.imsg id-InventoryReport
+
+CommandRequest                          N ngap.proc.imsg id-CommandRequest
+CommandResponse                         N ngap.proc.sout id-CommandRequest
+CommandFailure                          N ngap.proc.uout id-CommandRequest
+
+AIOTSessionReleaseCommand               N ngap.proc.imsg id-AIOTSessionRelease
+AIOTSessionReleaseComplete              N ngap.proc.sout id-AIOTSessionRelease
+
+AIOTSessionReleaseRequest               N ngap.proc.imsg id-AIOTSessionReleaseRequest
+
 PDUSessionResourceSetupRequestTransfer         S ngap.n2_ie_type "PDU_RES_SETUP_REQ"
 PDUSessionResourceSetupResponseTransfer        S ngap.n2_ie_type "PDU_RES_SETUP_RSP"
 PDUSessionResourceSetupUnsuccessfulTransfer    S ngap.n2_ie_type "PDU_RES_SETUP_FAIL"
@@ -2556,14 +2759,25 @@ UEContextResumeResponseTransfer                S ngap.n2_ie_type "UE_CONTEXT_RES
 UEContextSuspendRequestTransfer                S ngap.n2_ie_type "UE_CONTEXT_SUSPEND_REQ"
 SourceToTarget-TransparentContainer            S ngap.n2_ie_type "SRC_TO_TAR_CONTAINER"
 TargetToSource-TransparentContainer            S ngap.n2_ie_type "TAR_TO_SRC_CONTAINER"
+TargettoSource-Failure-TransparentContainer    S ngap.n2_ie_type "TAR_TO_SRC_FAIL_CONTAINER"
 RANStatusTransfer-TransparentContainer         S ngap.n2_ie_type "RAN_STATUS_TRANS_CONTAINER"
 SONConfigurationTransfer                       S ngap.n2_ie_type "SON_CONFIG_TRANSFER"
 NRPPa-PDU                                      S ngap.n2_ie_type "NRPPA_PDU"
 UERadioCapability                              S ngap.n2_ie_type "UE_RADIO_CAPABILITY"
+RIMInformationTransfer                         S ngap.n2_ie_type "RIM_INFO_TRANSFER"
+PC5QoSParameters                               S ngap.n2_ie_type "PC5_QOS_PARA"
+EarlyStatusTransfer-TransparentContainer       S ngap.n2_ie_type "EARLY_STATUS_TRANS_CONTAINER"
+UERadioCapabilityForPaging                     S ngap.n2_ie_type "UE_RADIO_CAPABILITY_FOR_PAGING"
 MBSSessionSetupOrModRequestTransfer            S ngap.n2_ie_type "MBS_SES_REQ"
 MBSSessionSetupOrModResponseTransfer           S ngap.n2_ie_type "MBS_SES_RSP"
 MBSSessionSetupOrModFailureTransfer            S ngap.n2_ie_type "MBS_SES_FAIL"
 MBSSessionReleaseResponseTransfer              S ngap.n2_ie_type "MBS_SES_REL_RSP"
+BroadcastTransportRequestTransfer              S ngap.n2_ie_type "BC_TRA_REQ"
+BroadcastTransportResponseTransfer             S ngap.n2_ie_type "BC_TRA_RSP"
+BroadcastTransportFailureTransfer              S ngap.n2_ie_type "BC_TRA_FAIL"
+MulticastSessionActivationRequestTransfer      S ngap.n2_ie_type "MBS_SES_ACT_REQ"
+MulticastSessionDeactivationRequestTransfer    S ngap.n2_ie_type "MBS_SES_DEACT_REQ"
+MulticastSessionUpdateRequestTransfer          S ngap.n2_ie_type "MBS_SES_UPD_REQ"
 
 #.FN_HDR AMFConfigurationUpdate
   set_message_label(actx, MTYPE_AMF_CONFIGURATION_UPDATE);
@@ -2833,6 +3047,18 @@ MBSSessionReleaseResponseTransfer              S ngap.n2_ie_type "MBS_SES_REL_RS
   set_message_label(actx, MTYPE_NG_SETUP_FAILURE);
   set_stats_message_type(actx->pinfo, MTYPE_NG_SETUP_FAILURE);
 
+#.FN_HDR NGRemovalRequest
+  set_message_label(actx, MTYPE_NG_REMOVAL_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_NG_REMOVAL_REQUEST);
+
+#.FN_HDR NGRemovalResponse
+  set_message_label(actx, MTYPE_NG_REMOVAL_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_NG_REMOVAL_RESPONSE);
+
+#.FN_HDR NGRemovalFailure
+  set_message_label(actx, MTYPE_NG_REMOVAL_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_NG_REMOVAL_FAILURE);
+
 #.FN_HDR OverloadStart
   set_message_label(actx, MTYPE_OVERLOAD_START);
   set_stats_message_type(actx->pinfo, MTYPE_OVERLOAD_START);
@@ -3089,6 +3315,46 @@ MBSSessionReleaseResponseTransfer              S ngap.n2_ie_type "MBS_SES_REL_RS
   set_message_label(actx, MTYPE_DOWNLINK_RIM_INFORMATION_TRANSFER);
   set_stats_message_type(actx->pinfo, MTYPE_DOWNLINK_RIM_INFORMATION_TRANSFER);
 
+#.FN_HDR InventoryRequest
+  set_message_label(actx, MTYPE_INVENTORY_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_INVENTORY_REQUEST);
+
+#.FN_HDR InventoryResponse
+  set_message_label(actx, MTYPE_INVENTORY_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_INVENTORY_RESPONSE);
+
+#.FN_HDR InventoryFailure
+  set_message_label(actx, MTYPE_INVENTORY_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_INVENTORY_FAILURE);
+
+#.FN_HDR InventoryReport
+  set_message_label(actx, MTYPE_INVENTORY_REPORT);
+  set_stats_message_type(actx->pinfo, MTYPE_INVENTORY_REPORT);
+
+#.FN_HDR CommandRequest
+  set_message_label(actx, MTYPE_COMMAND_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_COMMAND_REQUEST);
+
+#.FN_HDR CommandResponse
+  set_message_label(actx, MTYPE_COMMAND_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_COMMAND_RESPONSE);
+
+#.FN_HDR CommandFailure
+  set_message_label(actx, MTYPE_COMMAND_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_COMMAND_FAILURE);
+
+#.FN_HDR AIOTSessionReleaseCommand
+  set_message_label(actx, MTYPE_AIOT_SESSION_RELEASE_COMMAND);
+  set_stats_message_type(actx->pinfo, MTYPE_AIOT_SESSION_RELEASE_COMMAND);
+
+#.FN_HDR AIOTSessionReleaseComplete
+  set_message_label(actx, MTYPE_AIOT_SESSION_RELEASE_COMPLETE);
+  set_stats_message_type(actx->pinfo, MTYPE_AIOT_SESSION_RELEASE_COMPLETE);
+
+#.FN_HDR AIOTSessionReleaseRequest
+  set_message_label(actx, MTYPE_AIOT_SESSION_RELEASE_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_AIOT_SESSION_RELEASE_REQUEST);
+
 # SMF related IEs when encapsulated in http2/mime/json
 #.FN_HDR PDUSessionResourceSetupRequestTransfer
   tvbuff_t* json_tvb = (tvbuff_t*)p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_json, 0);
@@ -3230,6 +3496,11 @@ MBSSessionReleaseResponseTransfer              S ngap.n2_ie_type "MBS_SES_REL_RS
   if (json_tvb)
     col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "TargetToSource-TransparentContainer");
 
+#.FN_HDR TargettoSource-Failure-TransparentContainer
+  tvbuff_t* json_tvb = (tvbuff_t*)p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_json, 0);
+  if (json_tvb)
+    col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "TargettoSource-Failure-TransparentContainer");
+
 #.FN_HDR RANStatusTransfer-TransparentContainer
   tvbuff_t* json_tvb = (tvbuff_t*)p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_json, 0);
   if (json_tvb)
@@ -3250,6 +3521,26 @@ MBSSessionReleaseResponseTransfer              S ngap.n2_ie_type "MBS_SES_REL_RS
   if (json_tvb)
     col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "UERadioCapability");
 
+#.FN_HDR RIMInformationTransfer
+  tvbuff_t* json_tvb = (tvbuff_t*)p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_json, 0);
+  if (json_tvb)
+    col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RIMInformationTransfer");
+
+#.FN_HDR PC5QoSParameters
+  tvbuff_t* json_tvb = (tvbuff_t*)p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_json, 0);
+  if (json_tvb)
+    col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "PC5QoSParameters");
+
+#.FN_HDR EarlyStatusTransfer-TransparentContainer
+  tvbuff_t* json_tvb = (tvbuff_t*)p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_json, 0);
+  if (json_tvb)
+    col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "EarlyStatusTransfer-TransparentContainer");
+
+#.FN_HDR UERadioCapabilityForPaging
+  tvbuff_t* json_tvb = (tvbuff_t*)p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_json, 0);
+  if (json_tvb)
+    col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "UERadioCapabilityForPaging");
+
 #.FN_HDR MBSSessionSetupOrModRequestTransfer
   tvbuff_t* json_tvb = (tvbuff_t*)p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_json, 0);
   if (json_tvb)
@@ -3269,6 +3560,36 @@ MBSSessionReleaseResponseTransfer              S ngap.n2_ie_type "MBS_SES_REL_RS
   tvbuff_t* json_tvb = (tvbuff_t*)p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_json, 0);
   if (json_tvb)
     col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "MBSSessionReleaseResponseTransfer");
+
+#.FN_HDR BroadcastTransportRequestTransfer
+  tvbuff_t* json_tvb = (tvbuff_t*)p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_json, 0);
+  if (json_tvb)
+    col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "BroadcastTransportRequestTransfer");
+
+#.FN_HDR BroadcastTransportResponseTransfer
+  tvbuff_t* json_tvb = (tvbuff_t*)p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_json, 0);
+  if (json_tvb)
+    col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "BroadcastTransportResponseTransfer");
+
+#.FN_HDR BroadcastTransportFailureTransfer
+  tvbuff_t* json_tvb = (tvbuff_t*)p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_json, 0);
+  if (json_tvb)
+    col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "BroadcastTransportFailureTransfer");
+
+#.FN_HDR MulticastSessionActivationRequestTransfer
+  tvbuff_t* json_tvb = (tvbuff_t*)p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_json, 0);
+  if (json_tvb)
+    col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "MulticastSessionActivationRequestTransfer");
+
+#.FN_HDR MulticastSessionDeactivationRequestTransfer
+  tvbuff_t* json_tvb = (tvbuff_t*)p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_json, 0);
+  if (json_tvb)
+    col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "MulticastSessionDeactivationRequestTransfer");
+
+#.FN_HDR MulticastSessionUpdateRequestTransfer
+  tvbuff_t* json_tvb = (tvbuff_t*)p_get_proto_data(actx->pinfo->pool, actx->pinfo, proto_json, 0);
+  if (json_tvb)
+    col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "MulticastSessionUpdateRequestTransfer");
 
 #
 # Editor modelines  -  https://www.wireshark.org/tools/modelines.html

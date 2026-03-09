@@ -689,24 +689,23 @@ dissect_sapms_adm_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, ui
 		switch (adm_opcode){
 			case 0x01: 		/* AD_PROFILE */
 			case 0x2e:{		/* AD_SHARED_PARAMETER */
-				proto_tree_add_item(record_tree, hf_sapms_adm_parameter, tvb, offset, 100, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(record_tree, hf_sapms_adm_parameter, tvb, offset, 100, ENC_ASCII);
 				offset+=100;
 				length-=100;
 				break;
 			}
 			case 0x15:{ 	/* AD_RZL_STRG */
 				uint8_t strg_type = 0;
-				strg_type = tvb_get_uint8(tvb, offset);
-				proto_tree_add_item(record_tree, hf_sapms_adm_rzl_strg_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+				proto_tree_add_item_ret_uint8(record_tree, hf_sapms_adm_rzl_strg_type, tvb, offset, 1, ENC_BIG_ENDIAN, &strg_type);
 				offset+=1;
 				length-=1;
 				offset+=3;  /* Skip 3 bytes */
 				length-=3;
-				proto_tree_add_item(record_tree, hf_sapms_adm_rzl_strg_name, tvb, offset, 20, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(record_tree, hf_sapms_adm_rzl_strg_name, tvb, offset, 20, ENC_ASCII);
 				offset+=20;
 				length-=20;
 
-				value = proto_tree_add_item(record_tree, hf_sapms_adm_rzl_strg_value, tvb, offset, 40, ENC_ASCII|ENC_NA);
+				value = proto_tree_add_item(record_tree, hf_sapms_adm_rzl_strg_value, tvb, offset, 40, ENC_ASCII);
 				value_tree = proto_item_add_subtree(value, ett_sapms);
 				switch (strg_type){
 					case 11:		/* STRG_TYPE_READALL_I */
@@ -813,26 +812,26 @@ dissect_sapms_client(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32
 
 	/* Client name field */
 	if (opcode_version==0x01){
-		proto_tree_add_item(client_tree, hf_sapms_server_lst_name, tvb, offset, 20, ENC_ASCII|ENC_NA);
+		proto_tree_add_item(client_tree, hf_sapms_server_lst_name, tvb, offset, 20, ENC_ASCII);
 		offset+=20;
 	} else {
-		proto_tree_add_item(client_tree, hf_sapms_server_lst_name, tvb, offset, 40, ENC_ASCII|ENC_NA);
+		proto_tree_add_item(client_tree, hf_sapms_server_lst_name, tvb, offset, 40, ENC_ASCII);
 		offset+=40;
 	}
 
 	/* Host field (version 1 is 20 bytes, 2 is 32 bytes and version 3/4 is 64 bytes) */
 	if (opcode_version==0x01){
-		proto_tree_add_item(client_tree, hf_sapms_server_lst_host, tvb, offset, 20, ENC_ASCII|ENC_NA);
+		proto_tree_add_item(client_tree, hf_sapms_server_lst_host, tvb, offset, 20, ENC_ASCII);
 		offset+=20;
 	} else if (opcode_version==0x02){
-		proto_tree_add_item(client_tree, hf_sapms_server_lst_host, tvb, offset, 32, ENC_ASCII|ENC_NA);
+		proto_tree_add_item(client_tree, hf_sapms_server_lst_host, tvb, offset, 32, ENC_ASCII);
 		offset+=32;
 	} else {
-		proto_tree_add_item(client_tree, hf_sapms_server_lst_host, tvb, offset, 64, ENC_ASCII|ENC_NA);
+		proto_tree_add_item(client_tree, hf_sapms_server_lst_host, tvb, offset, 64, ENC_ASCII);
 		offset+=64;
 	}
 	/* Service field */
-	proto_tree_add_item(client_tree, hf_sapms_server_lst_service, tvb, offset, 20, ENC_ASCII|ENC_NA);
+	proto_tree_add_item(client_tree, hf_sapms_server_lst_service, tvb, offset, 20, ENC_ASCII);
 	offset+=20;
 
 	/* Message type flags */
@@ -884,7 +883,7 @@ dissect_sapms_client(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32
 
 static void
 dissect_sapms_counter(tvbuff_t *tvb, proto_tree *tree, uint32_t offset){
-	proto_tree_add_item(tree, hf_sapms_counter_uuid, tvb, offset, 40, ENC_ASCII|ENC_NA);
+	proto_tree_add_item(tree, hf_sapms_counter_uuid, tvb, offset, 40, ENC_ASCII);
 	offset+=40;
 	proto_tree_add_item(tree, hf_sapms_counter_count, tvb, offset, 4, ENC_BIG_ENDIAN);
 	offset+=4;
@@ -897,7 +896,7 @@ dissect_sapms_property(tvbuff_t *tvb, proto_tree *tree, uint32_t offset){
 	proto_item *value = NULL;
 	proto_tree *value_tree = NULL;
 
-	proto_tree_add_item(tree, hf_sapms_property_client, tvb, offset, 40, ENC_ASCII|ENC_NA);
+	proto_tree_add_item(tree, hf_sapms_property_client, tvb, offset, 40, ENC_ASCII);
 	offset+=40;
 
 	property_id = tvb_get_uint32(tvb, offset, ENC_BIG_ENDIAN);
@@ -922,12 +921,11 @@ dissect_sapms_property(tvbuff_t *tvb, proto_tree *tree, uint32_t offset){
 
 			offset += 12;  /* Padding */
 
-			vhost_length = tvb_get_uint16(tvb, offset, ENC_BIG_ENDIAN);
-			proto_tree_add_item(value_tree, hf_sapms_property_vhost_length, tvb, offset, 2, ENC_BIG_ENDIAN);
+			proto_tree_add_item_ret_uint16(value_tree, hf_sapms_property_vhost_length, tvb, offset, 2, ENC_BIG_ENDIAN, &vhost_length);
 			offset+=2;
 
 			if (vhost_length > 0) {
-				proto_tree_add_item(value_tree, hf_sapms_property_vhost_value, tvb, offset, vhost_length, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(value_tree, hf_sapms_property_vhost_value, tvb, offset, vhost_length, ENC_ASCII);
 			}
 			break;
 		}
@@ -941,21 +939,19 @@ dissect_sapms_property(tvbuff_t *tvb, proto_tree *tree, uint32_t offset){
 			uint32_t param_length = 0;
 			uint16_t value_length = 0;
 
-			param_length = tvb_get_uint32(tvb, offset, ENC_BIG_ENDIAN);
-			proto_tree_add_item(value_tree, hf_sapms_property_param_name_length, tvb, offset, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item_ret_uint(value_tree, hf_sapms_property_param_name_length, tvb, offset, 4, ENC_BIG_ENDIAN, &param_length);
 			offset+=4;
 			if (param_length > 0){
-				proto_tree_add_item(value_tree, hf_sapms_property_param_name_value, tvb, offset, param_length, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(value_tree, hf_sapms_property_param_name_value, tvb, offset, param_length, ENC_ASCII);
 				offset+=param_length;
 			}
 			offset += 100 - param_length;  /* Padding */
 			offset += 2;  /* Padding */
 
-			value_length = tvb_get_uint16(tvb, offset, ENC_BIG_ENDIAN);
-			proto_tree_add_item(value_tree, hf_sapms_property_param_value_length, tvb, offset, 2, ENC_BIG_ENDIAN);
+			proto_tree_add_item_ret_uint16(value_tree, hf_sapms_property_param_value_length, tvb, offset, 2, ENC_BIG_ENDIAN, &value_length);
 			offset+=2;
 			if (param_length > 0){
-				proto_tree_add_item(value_tree, hf_sapms_property_param_value_value, tvb, offset, value_length, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(value_tree, hf_sapms_property_param_value_value, tvb, offset, value_length, ENC_ASCII);
 			}
 			break;
 		}
@@ -966,7 +962,7 @@ dissect_sapms_property(tvbuff_t *tvb, proto_tree *tree, uint32_t offset){
 			break;
 		}
 		case 0x07:{			/* Release Information */
-			proto_tree_add_item(value_tree, hf_sapms_property_release, tvb, offset, 10, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(value_tree, hf_sapms_property_release, tvb, offset, 10, ENC_ASCII);
 			offset+=10;
 			proto_tree_add_item(value_tree, hf_sapms_property_release_patchno, tvb, offset, 4, ENC_BIG_ENDIAN);
 			offset+=4;
@@ -1014,9 +1010,9 @@ dissect_sapms_opcode(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32
 		}
 		case 0x07:			/* MS_SET_SECURITY_KEY */
 		case 0x08:{			/* MS_GET_SECURITY_KEY */
-			proto_tree_add_item(tree, hf_sapms_security_name, tvb, offset, 40, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tree, hf_sapms_security_name, tvb, offset, 40, ENC_ASCII);
 			offset+=40;
-			proto_tree_add_item(tree, hf_sapms_security_key, tvb, offset, 256, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tree, hf_sapms_security_key, tvb, offset, 256, ENC_ASCII);
 			break;
 		}
 		case 0x09:{			/* MS_GET_SECURITY_KEY2 */
@@ -1028,7 +1024,7 @@ dissect_sapms_opcode(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32
 			offset+=4;
 			proto_tree_add_item(tree, hf_sapms_security_port, tvb, offset, 2, ENC_BIG_ENDIAN);
 			offset+=2;
-			proto_tree_add_item(tree, hf_sapms_security_key, tvb, offset, 256, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tree, hf_sapms_security_key, tvb, offset, 256, ENC_ASCII);
 			offset+=256;
 			tvb_get_ipv6(tvb, offset, &address_ipv6);
 			proto_tree_add_ipv6(tree, hf_sapms_security_address6, tvb, offset, 16, &address_ipv6);
@@ -1060,7 +1056,7 @@ dissect_sapms_opcode(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32
 				proto_tree_add_item(tree, hf_sapms_dump_command, tvb, offset, 2, ENC_BIG_ENDIAN);
 				offset+=2;
 				if (length>=48) {
-					proto_tree_add_item(tree, hf_sapms_dump_name, tvb, offset, 40, ENC_ASCII|ENC_NA);
+					proto_tree_add_item(tree, hf_sapms_dump_name, tvb, offset, 40, ENC_ASCII);
 				}
 
 			} else if (flag == 0x03) { /* If it's a reply (flag=MS_REPLY) */
@@ -1068,7 +1064,7 @@ dissect_sapms_opcode(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32
 				length = tvb_strsize(tvb, offset);
 				/* Add each string in a different item */
 				while (length>1) {
-					string_length = tvb_find_line_end(tvb, offset, -1, NULL, false);
+					tvb_find_line_end_remaining(tvb, offset, &string_length, NULL);
 					if (string_length>0) {
 						proto_tree_add_none_format(tree, hf_sapms_opcode_value, tvb, offset, string_length, "%s", tvb_get_string_enc(pinfo->pool, tvb, offset, string_length, ENC_ASCII));
 						offset+=string_length; length-=string_length;
@@ -1089,18 +1085,17 @@ dissect_sapms_opcode(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32
 		case 0x23:{			/* MS_GET_TXT */
 			uint32_t text_length = 0;
 
-			proto_tree_add_item(tree, hf_sapms_text_name, tvb, offset, 40, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tree, hf_sapms_text_name, tvb, offset, 40, ENC_ASCII);
 			offset+=40;
 			length-=40;
-			text_length = tvb_get_uint32(tvb, offset, ENC_BIG_ENDIAN);
-			proto_tree_add_item(tree, hf_sapms_text_length, tvb, offset, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item_ret_uint(tree, hf_sapms_text_length, tvb, offset, 4, ENC_BIG_ENDIAN, &text_length);
 			offset+=4;
 			length-=4;
 			/* Check length */
 			if (text_length != length ){
 				expert_add_info_format(pinfo, tree, &ei_sapms_text_invalid_length, "Invalid text length (expected=%d, actual=%d)", text_length, length);
 			}
-			proto_tree_add_item(tree, hf_sapms_text_value, tvb, offset, length, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tree, hf_sapms_text_value, tvb, offset, length, ENC_ASCII);
 			break;
 		}
 		case 0x24:			/* MS_COUNTER_CREATE */
@@ -1140,48 +1135,43 @@ dissect_sapms_opcode(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32
 			offset+=4;
 			length-=4;
 
-			name_length = tvb_get_uint16(tvb, offset, ENC_BIG_ENDIAN);
-			proto_tree_add_item(tree, hf_sapms_logon_name_length, tvb, offset, 2, ENC_BIG_ENDIAN);
+			proto_tree_add_item_ret_uint16(tree, hf_sapms_logon_name_length, tvb, offset, 2, ENC_BIG_ENDIAN, &name_length);
 			offset+=2;
 			length-=2;
 			if (name_length > 0 && length >= name_length){
-				proto_tree_add_item(tree, hf_sapms_logon_name, tvb, offset, name_length, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(tree, hf_sapms_logon_name, tvb, offset, name_length, ENC_ASCII);
 				offset+=name_length;
 				length-=name_length;
 			}
 
-			prot_length = tvb_get_uint16(tvb, offset, ENC_BIG_ENDIAN);
-			proto_tree_add_item(tree, hf_sapms_logon_prot_length, tvb, offset, 2, ENC_BIG_ENDIAN);
+			proto_tree_add_item_ret_uint16(tree, hf_sapms_logon_prot_length, tvb, offset, 2, ENC_BIG_ENDIAN, &prot_length);
 			offset+=2;
 			length-=2;
 			if (prot_length > 0 && length >= prot_length){
-				proto_tree_add_item(tree, hf_sapms_logon_prot, tvb, offset, prot_length, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(tree, hf_sapms_logon_prot, tvb, offset, prot_length, ENC_ASCII);
 				offset+=prot_length;
 				length-=prot_length;
 			}
 
-			host_length = tvb_get_uint16(tvb, offset, ENC_BIG_ENDIAN);
-			proto_tree_add_item(tree, hf_sapms_logon_host_length, tvb, offset, 2, ENC_BIG_ENDIAN);
+			proto_tree_add_item_ret_uint16(tree, hf_sapms_logon_host_length, tvb, offset, 2, ENC_BIG_ENDIAN, &host_length);
 			offset+=2;
 			length-=2;
 			if (host_length > 0 && length >= host_length){
-				proto_tree_add_item(tree, hf_sapms_logon_host, tvb, offset, host_length, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(tree, hf_sapms_logon_host, tvb, offset, host_length, ENC_ASCII);
 				offset+=host_length;
 				length-=host_length;
 			}
 
-			misc_length = tvb_get_uint16(tvb, offset, ENC_BIG_ENDIAN);
-			proto_tree_add_item(tree, hf_sapms_logon_misc_length, tvb, offset, 2, ENC_BIG_ENDIAN);
+			proto_tree_add_item_ret_uint16(tree, hf_sapms_logon_misc_length, tvb, offset, 2, ENC_BIG_ENDIAN, &misc_length);
 			offset+=2;
 			length-=2;
 			if (misc_length > 0 && length >= misc_length){
-				proto_tree_add_item(tree, hf_sapms_logon_misc, tvb, offset, misc_length, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(tree, hf_sapms_logon_misc, tvb, offset, misc_length, ENC_ASCII);
 				offset+=misc_length;
 				length-=misc_length;
 			}
 
-			address6_length = tvb_get_uint16(tvb, offset, ENC_BIG_ENDIAN);
-			proto_tree_add_item(tree, hf_sapms_logon_address6_length, tvb, offset, 2, ENC_BIG_ENDIAN);
+			proto_tree_add_item_ret_uint16(tree, hf_sapms_logon_address6_length, tvb, offset, 2, ENC_BIG_ENDIAN, &address6_length);
 			offset+=2;
 			length-=2;
 			if ((address6_length == 16) && (length >= (address6_length + (uint32_t)4))){
@@ -1205,14 +1195,13 @@ dissect_sapms_opcode(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32
 			client_length = dissect_sapms_client(tvb, pinfo, tree, offset, opcode_version);
 			offset += client_length;
 			length -= client_length;
-			reason_length = tvb_get_uint16(tvb, offset, ENC_BIG_ENDIAN);
-			proto_tree_add_item(tree, hf_sapms_shutdown_reason_length, tvb, offset, 2, ENC_BIG_ENDIAN);
+			proto_tree_add_item_ret_uint16(tree, hf_sapms_shutdown_reason_length, tvb, offset, 2, ENC_BIG_ENDIAN, &reason_length);
 			offset+=2;
 			length-=2;
 
 			if (reason_length > 0 && length > 0){
 				reason_length = length < reason_length? length : reason_length;
-				proto_tree_add_item(tree, hf_sapms_shutdown_reason, tvb, offset, reason_length, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(tree, hf_sapms_shutdown_reason, tvb, offset, reason_length, ENC_ASCII);
 			}
 			break;
 		}
@@ -1242,12 +1231,11 @@ dissect_sapms_opcode(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32
 			offset+=2;
 			length-=2;
 
-			name_length = tvb_get_uint32(tvb, offset, ENC_BIG_ENDIAN);
-			proto_tree_add_item(tree, hf_sapms_ip_to_name_length, tvb, offset, 4, ENC_BIG_ENDIAN);
+			proto_tree_add_item_ret_uint(tree, hf_sapms_ip_to_name_length, tvb, offset, 4, ENC_BIG_ENDIAN, &name_length);
 			offset+=4;
 			length-=4;
 			if (name_length > 0 && length >= name_length){
-				proto_tree_add_item(tree, hf_sapms_ip_to_name, tvb, offset, name_length, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(tree, hf_sapms_ip_to_name, tvb, offset, name_length, ENC_ASCII);
 			}
 
 			break;
@@ -1258,11 +1246,11 @@ dissect_sapms_opcode(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32
 			offset+=2;
 			length-=2;
 			string_length = tvb_strnlen(tvb, offset, length) + 1;
-			proto_tree_add_item(tree, hf_sapms_check_acl_acl, tvb, offset, string_length, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tree, hf_sapms_check_acl_acl, tvb, offset, string_length, ENC_ASCII);
 			offset+=string_length;
 			length-=string_length;
 			string_length = tvb_strnlen(tvb, offset, length) + 1;
-			proto_tree_add_item(tree, hf_sapms_check_acl_acl, tvb, offset, string_length, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tree, hf_sapms_check_acl_acl, tvb, offset, string_length, ENC_ASCII);
 			break;
 		}
 		default:{
@@ -1298,13 +1286,13 @@ dissect_sapms(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
 		int remaining_length = 0;
 		uint8_t flag=0, iflag = 0, opcode = 0, opcode_version = 0;
 
-		proto_tree_add_item(sapms_tree, hf_sapms_eyecatcher, tvb, offset, 12, ENC_ASCII|ENC_NA);
+		proto_tree_add_item(sapms_tree, hf_sapms_eyecatcher, tvb, offset, 12, ENC_ASCII);
 		offset+=12;
 		proto_tree_add_item(sapms_tree, hf_sapms_version, tvb, offset, 1, ENC_BIG_ENDIAN);
 		offset+=1;
 		proto_tree_add_item(sapms_tree, hf_sapms_errorno, tvb, offset, 1, ENC_BIG_ENDIAN);
 		offset+=1;
-		proto_tree_add_item(sapms_tree, hf_sapms_toname, tvb, offset, 40, ENC_ASCII|ENC_NA);
+		proto_tree_add_item(sapms_tree, hf_sapms_toname, tvb, offset, 40, ENC_ASCII);
 		offset+=40;
 		msg_types = proto_tree_add_item(sapms_tree, hf_sapms_msgtypes, tvb, offset, 1, ENC_BIG_ENDIAN);
 		msg_types_tree = proto_item_add_subtree(msg_types, ett_sapms);
@@ -1331,14 +1319,13 @@ dissect_sapms(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
 		offset+=1;
 		proto_item_append_text(sapms_tree, ", Flag=%s", val_to_str_const(flag, sapms_flag_vals, "Unknown"));
 
-		iflag = tvb_get_uint8(tvb, offset);
-		proto_tree_add_item(sapms_tree, hf_sapms_iflag, tvb, offset, 1, ENC_BIG_ENDIAN);
+		proto_tree_add_item_ret_uint8(sapms_tree, hf_sapms_iflag, tvb, offset, 1, ENC_BIG_ENDIAN, &iflag);
 		offset+=1;
 		proto_item_append_text(sapms_tree, ", IFlag=%s", val_to_str_const(iflag, sapms_iflag_vals, "Unknown"));
 
 		col_append_fstr(pinfo->cinfo, COL_INFO, "Flag=%s,IFlag=%s", val_to_str_const(flag, sapms_flag_vals, "Unknown"), val_to_str_const(iflag, sapms_iflag_vals, "Unknown"));
 
-		proto_tree_add_item(sapms_tree, hf_sapms_fromname, tvb, offset, 40, ENC_ASCII|ENC_NA);
+		proto_tree_add_item(sapms_tree, hf_sapms_fromname, tvb, offset, 40, ENC_ASCII);
 		offset+=40;
 
 		if (flag == 0x00 && iflag == 0x00){  /* For MS_REQUEST+MS_LOGIN_2 it's the diag port */
@@ -1360,13 +1347,11 @@ dissect_sapms(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
 			case 0x01:	    /* MS_SEND_NAME */
 			case 0x02:	 	/* MS_SEND_TYPE */
 			case 0x07:{     /* MS_SEND_TYPE_ONCE */
-				opcode = tvb_get_uint8(tvb, offset);
-				proto_tree_add_item(sapms_tree, hf_sapms_opcode, tvb, offset, 1, ENC_BIG_ENDIAN);
+				proto_tree_add_item_ret_uint8(sapms_tree, hf_sapms_opcode, tvb, offset, 1, ENC_BIG_ENDIAN, &opcode);
 				offset+=1;
 				proto_tree_add_item(sapms_tree, hf_sapms_opcode_error, tvb, offset, 1, ENC_BIG_ENDIAN);
 				offset+=1;
-				opcode_version = tvb_get_uint8(tvb, offset);
-				proto_tree_add_item(sapms_tree, hf_sapms_opcode_version, tvb, offset, 1, ENC_BIG_ENDIAN);
+				proto_tree_add_item_ret_uint8(sapms_tree, hf_sapms_opcode_version, tvb, offset, 1, ENC_BIG_ENDIAN, &opcode_version);
 				offset+=1;
 				proto_tree_add_item(sapms_tree, hf_sapms_opcode_charset, tvb, offset, 1, ENC_BIG_ENDIAN);
 				offset+=1;
@@ -1384,15 +1369,15 @@ dissect_sapms(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
 				break;
 
 			} case 0x05:{   /* MS_ADM_OPCODES */
-				proto_tree_add_item(sapms_tree, hf_sapms_adm_eyecatcher, tvb, offset, 12, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(sapms_tree, hf_sapms_adm_eyecatcher, tvb, offset, 12, ENC_ASCII);
 				offset+=12;
 				proto_tree_add_item(sapms_tree, hf_sapms_adm_version, tvb, offset, 1, ENC_BIG_ENDIAN);
 				offset+=1;
 				proto_tree_add_item(sapms_tree, hf_sapms_adm_msgtype, tvb, offset, 1, ENC_BIG_ENDIAN);
 				offset+=1;
-				proto_tree_add_item(sapms_tree, hf_sapms_adm_recsize, tvb, offset, 11, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(sapms_tree, hf_sapms_adm_recsize, tvb, offset, 11, ENC_ASCII);
 				offset+=11;
-				proto_tree_add_item(sapms_tree, hf_sapms_adm_recno, tvb, offset, 11, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(sapms_tree, hf_sapms_adm_recno, tvb, offset, 11, ENC_ASCII);
 				offset+=11;
 
 				/* Add the records subtree */
@@ -1679,7 +1664,7 @@ proto_register_sapms(void)
 		{ &hf_sapms_logon_misc,
 			{ "Logon Misc", "sapms.logon.misc", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
 		{ &hf_sapms_logon_address6_length,
-			{ "Logon Address IPv6 Length", "sapms.logon.addr6_length", FT_INT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+			{ "Logon Address IPv6 Length", "sapms.logon.addr6_length", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
 		{ &hf_sapms_logon_address6,
 			{ "Logon Address IPv6", "sapms.logon.address6", FT_IPv6, BASE_NONE, NULL, 0x0, NULL, HFILL }},
 		{ &hf_sapms_logon_end,

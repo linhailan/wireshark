@@ -18,7 +18,7 @@ ADD_CUSTOM_CMAKE_INCLUDE()
 set(WIRESHARK_WIDGET_HEADERS
 	widgets/additional_toolbar.h
 	widgets/apply_line_edit.h
-	widgets/byte_view_text.h
+	widgets/base_data_source_view.h
 	widgets/capture_filter_combo.h
 	widgets/capture_filter_edit.h
 	widgets/clickable_label.h
@@ -39,7 +39,9 @@ set(WIRESHARK_WIDGET_HEADERS
 	widgets/filter_expression_toolbar.h
 	widgets/find_line_edit.h
 	widgets/follow_stream_text.h
+	widgets/hex_data_source_view.h
 	widgets/interface_toolbar_lineedit.h
+	widgets/json_data_source_view.h
 	widgets/label_stack.h
 	widgets/overlay_scroll_bar.h
 	widgets/packet_list_header.h
@@ -48,6 +50,7 @@ set(WIRESHARK_WIDGET_HEADERS
 	widgets/profile_tree_view.h
 	widgets/qcp_axis_ticker_elided.h
 	widgets/qcp_axis_ticker_si.h
+	widgets/qcp_spacer_legend_item.h
 	widgets/qcp_string_legend_item.h
 	widgets/range_syntax_lineedit.h
 	widgets/resize_header_view.h
@@ -63,6 +66,7 @@ set(WIRESHARK_WIDGET_HEADERS
 	widgets/traffic_types_list.h
 	widgets/wireless_timeline.h
 	widgets/wireshark_file_dialog.h
+	widgets/customplot.h
 )
 
 set(WIRESHARK_3RD_PARTY_WIDGET_HEADERS
@@ -92,6 +96,7 @@ set(WIRESHARK_UTILS_HEADERS
 	utils/variant_pointer.h
 	utils/wireshark_mime_data.h
 	utils/wireshark_zip_helper.h
+	utils/workspace_state.h
 )
 
 set(WIRESHARK_MODEL_HEADERS
@@ -125,6 +130,7 @@ set(WIRESHARK_MODEL_HEADERS
 	models/pref_models.h
 	models/profile_model.h
 	models/proto_tree_model.h
+	models/recentcapturefiles_list_model.h
 	models/related_packet_delegate.h
 	models/resolved_addresses_models.h
 	models/sparkline_delegate.h
@@ -147,7 +153,6 @@ set(WIRESHARK_QT_HEADERS
 	bluetooth_device_dialog.h
 	bluetooth_devices_dialog.h
 	bluetooth_hci_summary_dialog.h
-	byte_view_tab.h
 	capture_comment_dialog.h
 	capture_file_dialog.h
 	capture_file_properties_dialog.h
@@ -163,6 +168,7 @@ set(WIRESHARK_QT_HEADERS
 	conversation_dialog.h
 	conversation_hash_tables_dialog.h
 	credentials_dialog.h
+	data_source_tab.h
 	decode_as_dialog.h
 	display_filter_expression_dialog.h
 	dissector_tables_dialog.h
@@ -190,13 +196,16 @@ set(WIRESHARK_QT_HEADERS
 	funnel_text_dialog.h
 	geometry_state_dialog.h
 	glib_mainloop_on_qeventloop.h
+	graph.h
 	gsm_map_summary_dialog.h
 	iax2_analysis_dialog.h
 	import_text_dialog.h
 	interface_frame.h
 	interface_toolbar_reader.h
 	interface_toolbar.h
+	keyboard_shortcuts_dialog.h
 	io_console_dialog.h
+	io_graph.h
 	io_graph_action.h
 	io_graph_dialog.h
 	layout_preferences_frame.h
@@ -222,6 +231,10 @@ set(WIRESHARK_QT_HEADERS
 	packet_format_stack.h
 	packet_list.h
 	packet_range_group_box.h
+	plot.h
+	plot_action.h
+	plot_dialog.h
+	marker_dialog.h
 	preference_editor_frame.h
 	preferences_dialog.h
 	print_dialog.h
@@ -230,7 +243,6 @@ set(WIRESHARK_QT_HEADERS
 	proto_tree.h
 	protocol_hierarchy_dialog.h
 	protocol_preferences_menu.h
-	recent_file_status.h
 	resolved_addresses_dialog.h
 	response_time_delay_dialog.h
 	rpc_service_response_time_dialog.h
@@ -288,7 +300,6 @@ endif()
 set(WIRESHARK_WIDGET_SRCS
 	widgets/additional_toolbar.cpp
 	widgets/apply_line_edit.cpp
-	widgets/byte_view_text.cpp
 	widgets/capture_filter_combo.cpp
 	widgets/capture_filter_edit.cpp
 	widgets/clickable_label.cpp
@@ -309,7 +320,9 @@ set(WIRESHARK_WIDGET_SRCS
 	widgets/filter_expression_toolbar.cpp
 	widgets/find_line_edit.cpp
 	widgets/follow_stream_text.cpp
+	widgets/hex_data_source_view.cpp
 	widgets/interface_toolbar_lineedit.cpp
+	widgets/json_data_source_view.cpp
 	widgets/label_stack.cpp
 	widgets/overlay_scroll_bar.cpp
 	widgets/packet_list_header.cpp
@@ -318,6 +331,7 @@ set(WIRESHARK_WIDGET_SRCS
 	widgets/profile_tree_view.cpp
 	widgets/qcp_axis_ticker_elided.cpp
 	widgets/qcp_axis_ticker_si.cpp
+	widgets/qcp_spacer_legend_item.cpp
 	widgets/qcp_string_legend_item.cpp
 	widgets/range_syntax_lineedit.cpp
 	widgets/resize_header_view.cpp
@@ -333,6 +347,7 @@ set(WIRESHARK_WIDGET_SRCS
 	widgets/traffic_types_list.cpp
 	widgets/wireless_timeline.cpp
 	widgets/wireshark_file_dialog.cpp
+	widgets/customplot.cpp
 )
 
 set(WIRESHARK_3RD_PARTY_WIDGET_SRCS
@@ -359,6 +374,7 @@ set(WIRESHARK_UTILS_SRCS
 	utils/stock_icon.cpp
 	utils/wireshark_mime_data.cpp
 	utils/wireshark_zip_helper.cpp
+	utils/workspace_state.cpp
 )
 
 set(WIRESHARK_MODEL_SRCS
@@ -392,6 +408,7 @@ set(WIRESHARK_MODEL_SRCS
 	models/pref_models.cpp
 	models/profile_model.cpp
 	models/proto_tree_model.cpp
+	models/recentcapturefiles_list_model.cpp
 	models/related_packet_delegate.cpp
 	models/resolved_addresses_models.cpp
 	models/sparkline_delegate.cpp
@@ -411,7 +428,6 @@ set(WIRESHARK_QT_SRC
 	bluetooth_device_dialog.cpp
 	bluetooth_devices_dialog.cpp
 	bluetooth_hci_summary_dialog.cpp
-	byte_view_tab.cpp
 	capture_comment_dialog.cpp
 	capture_file_dialog.cpp
 	capture_file_properties_dialog.cpp
@@ -427,6 +443,7 @@ set(WIRESHARK_QT_SRC
 	conversation_dialog.cpp
 	conversation_hash_tables_dialog.cpp
 	credentials_dialog.cpp
+	data_source_tab.cpp
 	decode_as_dialog.cpp
 	display_filter_expression_dialog.cpp
 	dissector_tables_dialog.cpp
@@ -457,6 +474,7 @@ set(WIRESHARK_QT_SRC
 	interface_frame.cpp
 	interface_toolbar_reader.cpp
 	interface_toolbar.cpp
+	keyboard_shortcuts_dialog.cpp
 	io_console_dialog.cpp
 	io_graph_action.cpp
 	layout_preferences_frame.cpp
@@ -482,6 +500,8 @@ set(WIRESHARK_QT_SRC
 	packet_format_stack.cpp
 	packet_list.cpp
 	packet_range_group_box.cpp
+	plot_action.cpp
+	marker_dialog.cpp
 	preference_editor_frame.cpp
 	preferences_dialog.cpp
 	print_dialog.cpp
@@ -490,7 +510,6 @@ set(WIRESHARK_QT_SRC
 	proto_tree.cpp
 	protocol_hierarchy_dialog.cpp
 	protocol_preferences_menu.cpp
-	recent_file_status.cpp
 	resolved_addresses_dialog.cpp
 	response_time_delay_dialog.cpp
 	rpc_service_response_time_dialog.cpp
@@ -548,12 +567,16 @@ endif()
 set(WIRESHARK_QT_TAP_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/expert_info_dialog.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/funnel_statistics.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/graph.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/gsm_map_summary_dialog.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/io_graph.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/io_graph_dialog.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/lte_mac_statistics_dialog.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/lte_rlc_statistics_dialog.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/mtp3_summary_dialog.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/multicast_statistics_dialog.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/plot.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/plot_dialog.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/rtp_stream_dialog.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/sctp_all_assocs_dialog.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/sctp_assoc_analyse_dialog.cpp
@@ -612,6 +635,7 @@ set(WIRESHARK_QT_UI
 	import_text_dialog.ui
 	interface_frame.ui
 	interface_toolbar.ui
+	keyboard_shortcuts_dialog.ui
 	io_console_dialog.ui
 	io_graph_dialog.ui
 	layout_preferences_frame.ui
@@ -629,6 +653,7 @@ set(WIRESHARK_QT_UI
 	packet_format_group_box.ui
 	packet_format_json_group_box.ui
 	packet_range_group_box.ui
+	plot_dialog.ui
 	preference_editor_frame.ui
 	preferences_dialog.ui
 	print_dialog.ui
@@ -673,15 +698,19 @@ if(HAVE_PCAP_REMOTE)
 endif()
 
 set(WIRESHARK_QT_TS
+	wireshark_ca.ts
 	wireshark_de.ts
 	wireshark_en.ts # lupdate -pluralonly
 	wireshark_es.ts
 	wireshark_fr.ts
+	wireshark_ga_IE.ts
 	wireshark_hu.ts
+	wireshark_id.ts
 	wireshark_it.ts
 	wireshark_ja_JP.ts
 	wireshark_ko.ts
 	wireshark_pl.ts
+	wireshark_pt_BR.ts
 	wireshark_ru.ts
 	wireshark_sv.ts
 	wireshark_tr_TR.ts
@@ -726,12 +755,16 @@ add_custom_command(
 set(CMAKE_AUTORCC_OPTIONS --format-version 1)
 list(APPEND CMAKE_AUTORCC_OPTIONS -compress-algo zlib)
 
+if(NOT APPLE)
+	set(WSICON_QRC ${CMAKE_SOURCE_DIR}/resources/wsicon.qrc)
+endif()
+
 qt_add_resources(WIRESHARK_QT_QRC
 	../../resources/about.qrc
 	../../resources/languages/languages.qrc
 	../../resources/layout.qrc
 	../../resources/stock_icons.qrc
-	../../resources/wsicon.qrc
+	${WSICON_QRC}
 	${CMAKE_CURRENT_BINARY_DIR}/i18n.qrc
 	${CMAKE_CURRENT_BINARY_DIR}/authors.qrc
 	OPTIONS ${CMAKE_AUTORCC_OPTIONS}

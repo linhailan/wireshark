@@ -17,20 +17,29 @@
 
 #include "epan/dfilter/dfilter-translator.h"
 
-#include <wsutil/application_flavor.h>
+#include <app/application_flavor.h>
 #include <wsutil/filesystem.h>
 #include <wsutil/version_info.h>
 
 #include <ui/commandline.h>
 
+#include <QAction>
 #include <QClipboard>
+#include <QFileInfo>
+#include <QMenu>
+#include <QTextCodec>
 
 #include "funnel_statistics.h"
 #include "main_application.h"
 #include "packet_list.h"
 #include "utils/profile_switcher.h"
 #include "utils/qt_ui_utils.h"
+#include "utils/workspace_state.h"
 #include "widgets/display_filter_combo.h"
+
+#ifdef Q_OS_MAC
+#include <ui/macosx/cocoa_bridge.h>
+#endif
 
 // Packet Menu actions
 static QList<QAction *> dynamic_packet_menu_actions;
@@ -42,19 +51,74 @@ MainWindow::MainWindow(QWidget *parent) :
     cur_layout_(QVector<unsigned>()),
     packet_list_(nullptr),
     proto_tree_(nullptr),
-    byte_view_tab_(nullptr),
+    data_source_tab_(nullptr),
     packet_diagram_(nullptr),
     df_combo_box_(nullptr),
     main_status_bar_(nullptr),
     profile_switcher_(new ProfileSwitcher(this)),
-    use_capturing_title_(false)
+    use_capturing_title_(false),
+    recent_captures_menu_(nullptr),
+    no_recent_files_action_(nullptr)
+#if defined(Q_OS_MAC)
+    , dock_menu_(nullptr)
+#endif
 {
-
+    findTextCodecs();
 }
 
 MainWindow::~MainWindow()
 {
     clearAddedPacketMenus();
+}
+
+void MainWindow::findTextCodecs() {
+    const QList<int> mibs = QTextCodec::availableMibs();
+    QRegularExpression ibmRegExp("^IBM([0-9]+).*$");
+    QRegularExpression iso8859RegExp("^ISO-8859-([0-9]+).*$");
+    QRegularExpression windowsRegExp("^WINDOWS-([0-9]+).*$");
+    QRegularExpressionMatch match;
+    for (int mib : mibs) {
+        QTextCodec *codec = QTextCodec::codecForMib(mib);
+        // QTextCodec::availableMibs() returns a list of hard-coded MIB
+        // numbers, it doesn't check if they are really available. ICU data may
+        // not have been compiled with support for all encodings.
+        if (!codec) {
+            continue;
+        }
+
+        QString key = codec->name().toUpper();
+        char rank;
+
+        if (key.localeAwareCompare("IBM") < 0) {
+            rank = 1;
+        } else if ((match = ibmRegExp.match(key)).hasMatch()) {
+            rank = match.captured(1).size(); // Up to 5
+        } else if (key.localeAwareCompare("ISO-8859-") < 0) {
+            rank = 6;
+        } else if ((match = iso8859RegExp.match(key)).hasMatch()) {
+            rank = 6 + match.captured(1).size(); // Up to 6 + 2
+        } else if (key.localeAwareCompare("WINDOWS-") < 0) {
+            rank = 9;
+        } else if ((match = windowsRegExp.match(key)).hasMatch()) {
+            rank = 9 + match.captured(1).size(); // Up to 9 + 4
+        } else {
+            rank = 14;
+        }
+        // This doesn't perfectly well order the IBM codecs because it's
+        // annoying to properly place IBM00858 and IBM00924 in the middle of
+        // code page numbers not zero padded to 5 digits.
+        // We could manipulate the key further to have more commonly used
+        // charsets earlier. IANA MIB ordering would be unexpected:
+        // https://www.iana.org/assignments/character-sets/character-sets.xml
+        // For data about use in HTTP (other protocols can be quite different):
+        // https://w3techs.com/technologies/overview/character_encoding
+
+        key.prepend(char('0' + rank));
+        // We use a map here because, due to backwards compatibility,
+        // the same QTextCodec may be returned for multiple MIBs, which
+        // happens for GBK/GB2312, EUC-KR/windows-949/UHC, and others.
+        text_codec_map_.insert(key, codec);
+    }
 }
 
 bool MainWindow::hasSelection()
@@ -242,7 +306,7 @@ void MainWindow::addDisplayFilterTranslationActions(QMenu *copy_menu) {
         if (idx == 0) {
             action_text = tr("Display filter as %1").arg(translator);
         } else {
-            action_text = tr(UTF8_HORIZONTAL_ELLIPSIS "as %1").arg(translator);
+            action_text = tr("…as %1").arg(translator);
         }
         QAction *xlate_action = copy_menu->addAction(action_text);
         xlate_action->setProperty(translator_, QVariant::fromValue(translator));
@@ -286,12 +350,13 @@ void MainWindow::copyDisplayFilterTranslation()
 QString MainWindow::replaceWindowTitleVariables(QString title)
 {
     title.replace("%P", get_profile_name());
-    title.replace("%V", get_ws_vcs_version_info());
+    title.replace("%V", application_get_vcs_version_info());
 
 #ifdef HAVE_LIBPCAP
-    if (global_commandline_info.capture_comments) {
+    char* capture_comment = commandline_get_first_capture_comment();
+    if (capture_comment) {
         // Use the first capture comment from command line.
-        title.replace("%C", (char *)g_ptr_array_index(global_commandline_info.capture_comments, 0));
+        title.replace("%C", capture_comment);
     } else {
         // No capture comment.
         title.remove("%C");
@@ -401,3 +466,106 @@ void MainWindow::updateTitlebar()
     }
 }
 
+void MainWindow::setIconForCaptureInProgress(bool capture_in_progress)
+{
+#ifdef Q_OS_MAC
+    CocoaBridge::setCaptureIcon(capture_in_progress);
+#else
+    const QIcon &icon = capture_in_progress ? mainApp->captureIcon() : mainApp->normalIcon();
+    mainApp->setWindowIcon(icon);
+    QMainWindow::setWindowIcon(icon);
+#endif
+}
+
+/**
+ * Populate the recent captures menu with files from WorkspaceState.
+ * Calls openRecentCaptureFile() (pure virtual) when user selects a file.
+ */
+void MainWindow::populateRecentCapturesMenu()
+{
+    if (!recent_captures_menu_) {
+        return;
+    }
+    recent_captures_menu_->clear();
+
+#if defined(Q_OS_MAC)
+    if (dock_menu_) {
+        dock_menu_->clear();
+    }
+#endif
+
+    const QList<RecentFileInfo>& recentFiles = WorkspaceState::instance()->recentCaptureFiles();
+
+#if defined(Q_OS_MAC)
+    int shortcut = Qt::Key_0;
+#endif
+
+    int rFSize = static_cast<int>(recentFiles.size());
+    for (int i = rFSize - 1; i >= 0; i--) {
+        const RecentFileInfo& rfi = recentFiles.at(i);
+        QString filename = rfi.filename;
+
+        // Add the new item
+        QAction *ra = new QAction(recent_captures_menu_);
+        ra->setText(filename);
+        ra->setEnabled(rfi.accessible);
+        recent_captures_menu_->insertAction(NULL, ra);
+
+#if defined(Q_OS_MAC)
+        if (shortcut <= Qt::Key_9) {
+            ra->setShortcut(Qt::META | (Qt::Key)shortcut);
+            shortcut++;
+        }
+#endif
+
+        if (rfi.accessible) {
+            connect(ra, &QAction::triggered, this, [this, filename]() {
+                openRecentCaptureFile(filename);
+            });
+        }
+
+#if defined(Q_OS_MAC)
+        if (dock_menu_) {
+            QAction *rda = new QAction(dock_menu_);
+            QFileInfo fi(filename);
+            rda->setText(fi.fileName());
+            dock_menu_->insertAction(NULL, rda);
+
+            connect(rda, &QAction::triggered, this, [this, filename]() {
+                openRecentCaptureFile(filename);
+            });
+        }
+#endif
+
+        if (recent_captures_menu_->actions().count() == static_cast<qsizetype>(prefs.gui_recent_files_count_max)) {
+            break;
+        }
+    }
+
+    if (recent_captures_menu_->actions().count() > 0) {
+        // Separator + "Clear"
+        recent_captures_menu_->insertSeparator(NULL);
+        QAction *ra = new QAction(recent_captures_menu_);
+        ra->setObjectName("clearRecentCapturesAction");
+        ra->setText(tr("Clear Menu"));
+        recent_captures_menu_->insertAction(NULL, ra);
+        connect(ra, &QAction::triggered, this, []() {
+            WorkspaceState::instance()->clearRecentCaptureFiles();
+        });
+    } else {
+        if (no_recent_files_action_) {
+            recent_captures_menu_->addAction(no_recent_files_action_);
+        }
+    }
+}
+
+void MainWindow::retranslateUiElements()
+{
+    if (recent_captures_menu_) {
+        const QList<RecentFileInfo>& recentFiles = WorkspaceState::instance()->recentCaptureFiles();
+        QAction *action = recent_captures_menu_->findChild<QAction*>("clearRecentCapturesAction");
+        if (recentFiles.size() > 0 && action) {
+            action->setText(tr("Clear Menu"));
+        }
+    }
+}

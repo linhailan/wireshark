@@ -1644,6 +1644,7 @@
 #define ZBEE_PROTOABBREV_ZCL_APPLEVTALT     "zbee_zcl_ha.applevtalt"
 #define ZBEE_PROTOABBREV_ZCL_APPLIDT        "zbee_zcl_ha.applident"
 #define ZBEE_PROTOABBREV_ZCL_APPLSTATS      "zbee_zcl_ha.applstats"
+#define ZBEE_PROTOABBREV_ZCL_DIAGNOSTICS    "zbee_zcl_ha.diagnostics"
 #define ZBEE_PROTOABBREV_ZCL_METIDT         "zbee_zcl_ha.metidt"
 #define ZBEE_PROTOABBREV_ZCL_IAS_ZONE       "zbee_zcl_ias.zone"
 #define ZBEE_PROTOABBREV_ZCL_IAS_ACE        "zbee_zcl_ias.ace"
@@ -1696,6 +1697,7 @@
 #define ZBEE_PROTOABBREV_ZCL_BALLAST_CONFIG    "zbee_zcl_lighting.ballast_ctrl"
 #define ZBEE_PROTOABBREV_ZCL_TOUCHLINK         "zbee_zcl_general.touchlink"
 #define ZBEE_PROTOABBREV_ZCL_GP                "zbee_zcl_general.gp"
+#define ZBEE_PROTOABBREV_ZCL_GENERIC_TUNNEL    "zbee_zcl_proto_iface.generic_tunnel"
 
 /* ZigBee Vendor Sub IE Fields */
 #define ZBEE_ZIGBEE_IE_ID_MASK                      0xFFC0

@@ -219,9 +219,9 @@ static void dissect_ice_string(packet_info *pinfo, proto_tree *tree, proto_item 
     if ( Size != 0 ) {
         proto_tree_add_item_ret_string(tree, hf_icep, tvb, offset, Size, ENC_ASCII, pinfo->pool, &s);
     } else {
-        s = wmem_strdup(pinfo->pool, "(empty)");
+        s = (const uint8_t*)wmem_strdup(pinfo->pool, "(empty)");
         /* display the 0x00 Size byte when click on a empty ice_string */
-        proto_tree_add_string(tree, hf_icep, tvb, offset - 1, 1, s);
+        proto_tree_add_string(tree, hf_icep, tvb, offset - 1, 1, (const char*)s);
     }
 
     if ( dest != NULL )
@@ -767,7 +767,7 @@ static void dissect_icep_batch_request(tvbuff_t *tvb, uint32_t offset,
 
     if ( num_reqs == 0 ) {
 
-        proto_tree_add_expert(icep_tree, pinfo, &ei_icep_empty_batch, tvb, offset, -1);
+        proto_tree_add_expert_remaining(icep_tree, pinfo, &ei_icep_empty_batch, tvb, offset);
         col_append_str(pinfo->cinfo, COL_INFO, " (empty batch requests sequence)");
 
         return;
@@ -918,7 +918,7 @@ static int dissect_icep_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "ICEP");
 
     col_add_str(pinfo->cinfo, COL_INFO,
-                 val_to_str(tvb_get_uint8(tvb, 8),
+                 val_to_str(pinfo->pool, tvb_get_uint8(tvb, 8),
                     icep_msgtype_vals,
                     "Unknown Message Type: 0x%02x"));
 

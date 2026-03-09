@@ -79,6 +79,7 @@ static int hf_can_err_ctrl_specific;
 static int hf_canxl_priority;
 static int hf_canxl_vcid;
 static int hf_canxl_secflag;
+static int hf_canxl_rrsflag;
 static int hf_canxl_xlflag;
 static int hf_canxl_sdu_type;
 static int hf_canxl_len;
@@ -167,22 +168,6 @@ static const value_string can_err_trx_canl_vals[] = {
     { 0x06, "short to VCC" },
     { 0x07, "short to GND" },
     { 0x08, "short to CANH" },
-    { 0, NULL }
-};
-
-static const value_string canxl_sdu_type_vals[] = {
-    { 0x00, "Reserved" },
-    { CANXL_SDU_TYPE_CONTENT_BASED_ADDRESSING, "Content-based Addressing" },
-    { 0x02, "Reserved for future use" },
-    { CANXL_SDU_TYPE_CAN_CC_CAN_FD, "CAN CC/CAN FD" },
-    { CANXL_SDU_TYPE_IEEE_802_3, "IEEE 802.3 (MAC frame)" },
-    { CANXL_SDU_TYPE_IEEE_802_3_EXTENDED, "IEEE 802.3 (MAC frame) extended" },
-    { CANXL_SDU_TYPE_CAN_CC, "CAN CC" },
-    { CANXL_SDU_TYPE_CAN_FD, "CAN FD" },
-    { CANXL_SDU_TYPE_CIA_611_2, "CiA 611-2 (Multi-PDU)" },
-    { CANXL_SDU_TYPE_AUTOSAR_MPDU, "AUTOSAR Multi-PDU" },
-    { CANXL_SDU_TYPE_CIA_613_2, "CiA 613-2 (CANsec key agreement protocol" },
-    { 0xFF, "Reserved" },
     { 0, NULL }
 };
 
@@ -562,6 +547,7 @@ dissect_socketcan_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, un
     };
     static int * const canxl_flag_fields[] = {
         &hf_canxl_secflag,
+        &hf_canxl_rrsflag,
         &hf_canxl_xlflag,
         NULL,
     };
@@ -794,7 +780,7 @@ dissect_socketcan_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, un
             tvbuff_t   *next_tvb;
 
             if (can_info.id & CAN_RTR_FLAG) {
-                col_append_str(pinfo->cinfo, COL_INFO, "(Remote Transmission Request)");
+                col_append_str(pinfo->cinfo, COL_INFO, " (Remote Transmission Request)");
             }
 
             next_tvb = tvb_new_subset_length(tvb, CAN_DATA_OFFSET, can_info.len);
@@ -941,7 +927,9 @@ proto_register_socketcan(void) {
         { &hf_canxl_vcid, {
             "VCID", "canxl.vcid", FT_UINT32, BASE_DEC, NULL, 0x00FF0000, NULL, HFILL } },
         { &hf_canxl_secflag, {
-            "Simple Extended Context", "canxl.flags.sec", FT_BOOLEAN, 8, NULL, CANXL_SEC, NULL, HFILL } },
+            "Simple Extended Content", "canxl.flags.sec", FT_BOOLEAN, 8, NULL, CANXL_SEC, NULL, HFILL } },
+        { &hf_canxl_rrsflag, {
+            "Remote Request Substitution", "canxl.flags.rrs", FT_BOOLEAN, 8, NULL, CANXL_RRS, NULL, HFILL } },
         { &hf_canxl_xlflag, {
             "XL Frame", "canxl.flags.xl", FT_BOOLEAN, 8, NULL, CANXL_XLF, NULL, HFILL } },
         { &hf_canxl_sdu_type, {

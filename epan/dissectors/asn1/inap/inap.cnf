@@ -90,7 +90,7 @@ static const value_string inap_err_code_string_vals[] = {
 # in file packet-inap-table2.c which is included in the template file
 #
 #.TABLE2_HDR
-static int dissect_invokeData(proto_tree *tree, tvbuff_t *tvb, int offset, asn1_ctx_t *actx) {
+static unsigned dissect_invokeData(proto_tree *tree, tvbuff_t *tvb, unsigned offset, asn1_ctx_t *actx) {
 
   switch(opcode){
 #.TABLE2_BODY OPERATION.&ArgumentType
@@ -99,8 +99,8 @@ static int dissect_invokeData(proto_tree *tree, tvbuff_t *tvb, int offset, asn1_
       break;
 #.TABLE2_FTR
     default:
-      proto_tree_add_expert_format(tree, actx->pinfo, &ei_inap_unknown_invokeData,
-                                   tvb, offset, -1, "Unknown invokeData %d", opcode);
+      proto_tree_add_expert_format_remaining(tree, actx->pinfo, &ei_inap_unknown_invokeData,
+                                   tvb, offset, "Unknown invokeData %d", opcode);
       /* todo call the asn.1 dissector */
       break;
   }
@@ -108,7 +108,7 @@ static int dissect_invokeData(proto_tree *tree, tvbuff_t *tvb, int offset, asn1_
 }
 #.END
 #.TABLE2_HDR
-static int dissect_returnResultData(proto_tree *tree, tvbuff_t *tvb, int offset,asn1_ctx_t *actx) {
+static unsigned dissect_returnResultData(proto_tree *tree, tvbuff_t *tvb, unsigned offset,asn1_ctx_t *actx) {
   switch(opcode){
 #.TABLE2_BODY OPERATION.&ResultType
     case %(&operationCode)s:  /* %(_ident)s */
@@ -116,14 +116,14 @@ static int dissect_returnResultData(proto_tree *tree, tvbuff_t *tvb, int offset,
       break;
 #.TABLE2_FTR
   default:
-    proto_tree_add_expert_format(tree, actx->pinfo, &ei_inap_unknown_returnResultData,
-                                 tvb, offset, -1, "Unknown returnResultData %d", opcode);
+    proto_tree_add_expert_format_remaining(tree, actx->pinfo, &ei_inap_unknown_returnResultData,
+                                 tvb, offset, "Unknown returnResultData %d", opcode);
   }
   return offset;
 }
 #.END
 #.TABLE2_HDR
-static int dissect_returnErrorData(proto_tree *tree, tvbuff_t *tvb, int offset,asn1_ctx_t *actx) {
+static unsigned dissect_returnErrorData(proto_tree *tree, tvbuff_t *tvb, unsigned offset,asn1_ctx_t *actx) {
   switch(errorCode) {
 #.TABLE2_BODY ERROR.&ParameterType
     case %(&errorCode)s:  /* %(_ident)s */
@@ -131,8 +131,8 @@ static int dissect_returnErrorData(proto_tree *tree, tvbuff_t *tvb, int offset,a
       break;
 #.TABLE2_FTR
   default:
-    proto_tree_add_expert_format(tree, actx->pinfo, &ei_inap_unknown_returnErrorData,
-                                 tvb, offset, -1, "Unknown returnErrorData %d", opcode);
+    proto_tree_add_expert_format_remaining(tree, actx->pinfo, &ei_inap_unknown_returnErrorData,
+                                 tvb, offset, "Unknown returnErrorData %d", opcode);
   }
   return offset;
 }
@@ -173,11 +173,11 @@ static const inap_err_t inap_err_tab[] = {
   if (is_ExtensionField == false){
     if (inap_opcode_type == INAP_OPCODE_RETURN_ERROR){
       errorCode = opcode;
-      col_append_str(actx->pinfo->cinfo, COL_INFO, val_to_str(errorCode, inap_err_code_string_vals, "Unknown INAP error (%%u)"));
+      col_append_str(actx->pinfo->cinfo, COL_INFO, val_to_str(actx->pinfo->pool, errorCode, inap_err_code_string_vals, "Unknown INAP error (%%u)"));
       col_append_str(actx->pinfo->cinfo, COL_INFO, " ");
       col_set_fence(actx->pinfo->cinfo, COL_INFO);
     }else{
-      col_append_str(actx->pinfo->cinfo, COL_INFO, val_to_str(opcode, inap_opr_code_strings, "Unknown INAP (%%u)"));
+      col_append_str(actx->pinfo->cinfo, COL_INFO, val_to_str(actx->pinfo->pool, opcode, inap_opr_code_strings, "Unknown INAP (%%u)"));
       col_append_str(actx->pinfo->cinfo, COL_INFO, " ");
       col_set_fence(actx->pinfo->cinfo, COL_INFO);
     }
@@ -343,7 +343,7 @@ dissect_isup_called_party_number_parameter(parameter_tvb, actx->pinfo, tree, NUL
     return offset;
   subtree = proto_item_add_subtree(actx->created_item, ett_inap_cause);
 
-  dissect_q931_cause_ie(parameter_tvb, 0, tvb_reported_length_remaining(parameter_tvb,0), subtree, hf_inap_cause_indicator, &Cause_value, isup_parameter_type_value);
+  dissect_q931_cause_ie(parameter_tvb, actx->pinfo, 0, tvb_reported_length_remaining(parameter_tvb,0), subtree, hf_inap_cause_indicator, &Cause_value, isup_parameter_type_value);
 
 #.FN_BODY Digits VAL_PTR = &parameter_tvb
   /*

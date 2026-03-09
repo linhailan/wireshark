@@ -595,7 +595,7 @@ dissect_cip_s_supervisor_data( proto_tree *item_tree,
    proto_tree_add_item( rrsc_tree, hf_cip_reqrsp, tvb, offset, 1, ENC_LITTLE_ENDIAN );
 
    proto_item_append_text( rrsc_item, "%s (%s)",
-               val_to_str( ( service & CIP_SC_MASK ), cip_sc_vals_ssupervisor , "Unknown Service (0x%02x)"),
+               val_to_str(pinfo->pool, ( service & CIP_SC_MASK ), cip_sc_vals_ssupervisor , "Unknown Service (0x%02x)"),
                val_to_str_const( ( service & CIP_SC_RESPONSE_MASK )>>7, cip_sc_rr, "") );
 
    /* Add Service code */
@@ -1061,11 +1061,10 @@ static int dissect_s_validator_network_time_multiplier(packet_info *pinfo, proto
 static int dissect_s_validator_timeout_multiplier(packet_info *pinfo, proto_tree *tree, proto_item *item, tvbuff_t *tvb,
                              int offset, int total_len)
 {
-   int i, size;
+   uint8_t i, size;
 
-   proto_tree_add_item(tree, hf_cip_svalidator_timeout_multiplier_size,
-                       tvb, offset, 1, ENC_LITTLE_ENDIAN );
-   size = tvb_get_uint8( tvb, offset );
+   proto_tree_add_item_ret_uint8(tree, hf_cip_svalidator_timeout_multiplier_size,
+                       tvb, offset, 1, ENC_LITTLE_ENDIAN, &size);
 
    if (total_len < size+1)
    {
@@ -1118,11 +1117,10 @@ static int dissect_s_validator_app_data_path(packet_info *pinfo, proto_tree *tre
 static int dissect_s_validator_prod_cons_fault_count(packet_info *pinfo, proto_tree *tree, proto_item *item,
                                                      tvbuff_t *tvb, int offset, int total_len)
 {
-   int i, size;
+   uint8_t i, size;
 
-   proto_tree_add_item(tree, hf_cip_svalidator_prod_cons_fault_count_size,
-                         tvb, offset, 1, ENC_LITTLE_ENDIAN );
-   size = tvb_get_uint8( tvb, offset );
+   proto_tree_add_item_ret_uint8(tree, hf_cip_svalidator_prod_cons_fault_count_size,
+                                 tvb, offset, 1, ENC_LITTLE_ENDIAN, &size);
 
    if (total_len < size+1)
    {
@@ -1159,7 +1157,7 @@ dissect_cip_s_validator_data( proto_tree *item_tree,
    proto_tree_add_item( rrsc_tree, hf_cip_reqrsp, tvb, offset, 1, ENC_LITTLE_ENDIAN );
 
    proto_item_append_text( rrsc_item, "%s (%s)",
-               val_to_str( ( service & CIP_SC_MASK ),
+               val_to_str(pinfo->pool, ( service & CIP_SC_MASK ),
                   cip_sc_vals_svalidator , "Unknown Service (0x%02x)"),
                val_to_str_const( ( service & CIP_SC_RESPONSE_MASK )>>7,
                   cip_sc_rr, "") );
@@ -1431,7 +1429,7 @@ static uint32_t compute_crc_s5_time(uint32_t pid_seed, uint8_t ack_mcast_byte, u
     return timestamp_crc;
 }
 
-static bool verify_compliment_data(tvbuff_t *tvb, int data_offset, int complement_data_offset, int data_size)
+static bool verify_complement_data(tvbuff_t *tvb, int data_offset, int complement_data_offset, int data_size)
 {
     const uint8_t *data = tvb_get_ptr(tvb, data_offset, data_size);
     const uint8_t *complement_data = tvb_get_ptr(tvb, complement_data_offset, data_size);
@@ -1488,10 +1486,8 @@ dissect_mode_byte( proto_tree *tree, tvbuff_t *tvb, int offset, packet_info *pin
    proto_tree *mode_tree;
    uint8_t     mode_byte;
 
-   mode_byte = tvb_get_uint8(tvb, offset);
-
    /* dissect Mode Byte bits */
-   mode_item = proto_tree_add_item(tree, hf_cipsafety_mode_byte, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+   mode_item = proto_tree_add_item_ret_uint8(tree, hf_cipsafety_mode_byte, tvb, offset, 1, ENC_LITTLE_ENDIAN, &mode_byte);
    mode_tree = proto_item_add_subtree( mode_item, ett_cipsafety_mode_byte);
 
    proto_tree_add_item(mode_tree, hf_cipsafety_mode_byte_ping_count,               tvb, offset, 1, ENC_LITTLE_ENDIAN);
@@ -1729,7 +1725,7 @@ static void dissect_base_format_3_to_250_byte_data(packet_info* pinfo, proto_tre
    }
 
    proto_item* complement_item = proto_tree_add_item(tree, hf_cipsafety_complement_data, tvb, io_data_size + 3, io_data_size, ENC_NA);
-   if (!verify_compliment_data(tvb, 0, io_data_size + 3, io_data_size))
+   if (!verify_complement_data(tvb, 0, io_data_size + 3, io_data_size))
       expert_add_info(pinfo, complement_item, &ei_cipsafety_not_complement_data);
 
    if (compute_crc)
@@ -1820,7 +1816,7 @@ static void dissect_extended_format_3_to_250_byte_data(packet_info* pinfo, proto
    }
 
    proto_item* complement_item = proto_tree_add_item(tree, hf_cipsafety_complement_data, tvb, io_data_size + 3, io_data_size, ENC_NA);
-   if (!verify_compliment_data(tvb, 0, io_data_size + 3, io_data_size))
+   if (!verify_complement_data(tvb, 0, io_data_size + 3, io_data_size))
       expert_add_info(pinfo, complement_item, &ei_cipsafety_not_complement_data);
 
    uint32_t crc_s5_0, crc_s5_1, crc_s5_2;
@@ -1924,7 +1920,7 @@ void add_safety_data_type_to_info_column(packet_info *pinfo, enum enip_connid_ty
 static void
 dissect_cip_safety_data( proto_tree *tree, proto_item *item, tvbuff_t *tvb, int item_length, packet_info *pinfo, cip_safety_info_t* safety_info)
 {
-   bool multicast = in4_addr_is_multicast(pntoh32(pinfo->dst.data));
+   bool multicast = in4_addr_is_multicast(pntohu32(pinfo->dst.data));
    bool server_dir = false;
    enum enip_connid_type conn_type = ECIDT_UNKNOWN;
    enum cip_safety_format_type format = CIP_SAFETY_BASE_FORMAT;

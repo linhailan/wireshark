@@ -17,12 +17,12 @@
 #include <epan/packet.h>
 #include <epan/exceptions.h>
 #include <epan/etypes.h>
-#include <epan/ppptypes.h>
 #include <epan/show_exception.h>
 #include <epan/decode_as.h>
 #include <epan/capture_dissectors.h>
 #include <epan/proto_data.h>
 #include "packet-eth.h"
+#include "packet-ppp.h"
 
 void proto_register_ethertype(void);
 
@@ -190,6 +190,7 @@ const value_string etype_vals[] = {
 	{ ETHERTYPE_ECPRI,                "eCPRI" },
 	{ ETHERTYPE_CABLELABS,            "CableLabs Layer-3 Protocol" },
 	{ ETHERTYPE_EXEH,                 "EXos internal Extra Header" },
+	{ ETHERTYPE_ATMF,                 "Allied Telesis Autonomous Management Framework" },
 	{ ETHERTYPE_ATRL,                 "Allied Telesis Resiliency Link" },
 	{ ETHERTYPE_ACIGLEAN,             "Cisco ACI ARP gleaning" },
 	{ ETHERTYPE_IEEE_802_1CB,         "802.1CB Frame Replication and Elimination for Reliability" },
@@ -254,13 +255,13 @@ dissect_ethertype(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
 			gleantype = (tvb_get_uint8(tvb, ethertype_data->payload_offset) & 0xF0) >> 4;
 			switch (gleantype) {
 			case 4: /* IPv4 */
-				payload_etype = 0x0800;
+				payload_etype = ETHERTYPE_IP;
 				break;
 			case 6: /* IPv6 */
-				payload_etype = 0x86BB;
+				payload_etype = ETHERTYPE_IPv6;
 				break;
 			default: /* ARP */
-				payload_etype = 0x0806;
+				payload_etype = ETHERTYPE_ARP;
 			}
 			ethertype_data->etype = payload_etype;
 		// FIXME: Add glean to protocol-stack in frame-header
@@ -413,7 +414,7 @@ proto_register_ethertype(void)
 	static build_valid_func eth_da_build_value[1] = {eth_value};
 	static decode_as_value_t eth_da_values = {eth_prompt, 1, eth_da_build_value};
 	static decode_as_t ethertype_da = {"ethertype", "ethertype", 1, 0, &eth_da_values, NULL, NULL,
-										decode_as_default_populate_list, decode_as_default_reset, decode_as_default_change, NULL};
+										decode_as_default_populate_list, decode_as_default_reset, decode_as_default_change, NULL, NULL, NULL };
 
 
 	proto_ethertype = proto_register_protocol("Ethertype", "Ethertype", "ethertype");

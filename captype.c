@@ -29,6 +29,7 @@
 #include <wsutil/cmdarg_err.h>
 #include <wsutil/file_util.h>
 #include <wsutil/filesystem.h>
+#include <app/application_flavor.h>
 #include <wsutil/privileges.h>
 #include <cli_main.h>
 #include <wsutil/version_info.h>
@@ -38,7 +39,10 @@
 #endif
 
 #include <wsutil/str_util.h>
+#include <ws_exit_codes.h>
+#include <wsutil/clopts_common.h>
 #include <wsutil/wslog.h>
+#include <wsutil/report_message.h>
 
 #include "ui/failure_message.h"
 
@@ -66,8 +70,13 @@ main(int argc, char *argv[])
     static const struct ws_option long_options[] = {
         {"help", ws_no_argument, NULL, 'h'},
         {"version", ws_no_argument, NULL, 'v'},
+        LONGOPT_WSLOG
         {0, 0, 0, 0 }
     };
+#define OPTSTRING "hv"
+    static const char optstring[] = OPTSTRING;
+    const struct file_extension_info* file_extensions;
+    unsigned num_extensions;
 
     /* Set the program name. */
     g_set_prgname("captype");
@@ -85,10 +94,10 @@ main(int argc, char *argv[])
     cmdarg_err_init(stderr_cmdarg_err, stderr_cmdarg_err_cont);
 
     /* Initialize log handler early so we can have proper logging during startup. */
-    ws_log_init(vcmdarg_err);
+    ws_log_init(vcmdarg_err, "Captype Debug Console");
 
     /* Early logging command-line initialization. */
-    ws_log_parse_args(&argc, argv, vcmdarg_err, 1);
+    ws_log_parse_args(&argc, argv, optstring, long_options, vcmdarg_err, WS_EXIT_INVALID_OPTION);
 
     ws_noisy("Finished log init and parsing command line log arguments");
 
@@ -105,7 +114,7 @@ main(int argc, char *argv[])
      * Attempt to get the pathname of the directory containing the
      * executable file.
      */
-    configuration_init_error = configuration_init(argv[0]);
+    configuration_init_error = configuration_init(argv[0], "wireshark");
     if (configuration_init_error != NULL) {
         fprintf(stderr,
                 "captype: Can't get pathname of directory containing the captype program: %s.\n",
@@ -114,32 +123,30 @@ main(int argc, char *argv[])
     }
 
     /* Initialize the version information. */
-    ws_init_version_info("Captype", NULL, NULL);
+    ws_init_version_info("Captype", NULL, application_get_vcs_version_info, NULL, NULL);
 
     init_report_failure_message("captype");
 
-    wtap_init(true);
+    application_file_extensions(&file_extensions, &num_extensions);
+    wtap_init(true, application_configuration_environment_prefix(), file_extensions, num_extensions);
 
     /* Process the options */
-    while ((opt = ws_getopt_long(argc, argv, "hv", long_options, NULL)) !=-1) {
+    while ((opt = ws_getopt_long(argc, argv, optstring, long_options, NULL)) !=-1) {
 
         switch (opt) {
 
             case 'h':
                 show_help_header("Print the file types of capture files.");
                 print_usage(stdout);
-                exit(0);
-                break;
+                return EXIT_SUCCESS;
 
             case 'v':
                 show_version();
-                exit(0);
-                break;
+                return EXIT_SUCCESS;
 
             case '?':              /* Bad flag - print usage message */
                 print_usage(stderr);
-                exit(1);
-                break;
+                return EXIT_FAILURE;
         }
     }
 
@@ -151,7 +158,7 @@ main(int argc, char *argv[])
     overall_error_status = 0;
 
     for (i = 1; i < argc; i++) {
-        wth = wtap_open_offline(argv[i], WTAP_TYPE_AUTO, &err, &err_info, false);
+        wth = wtap_open_offline(argv[i], WTAP_TYPE_AUTO, &err, &err_info, false, application_configuration_environment_prefix());
 
         if(wth) {
             printf("%s: %s\n", argv[i], wtap_file_type_subtype_name(wtap_file_type_subtype(wth)));
@@ -160,7 +167,7 @@ main(int argc, char *argv[])
             if (err == WTAP_ERR_FILE_UNKNOWN_FORMAT)
                 printf("%s: unknown\n", argv[i]);
             else {
-                cfile_open_failure_message(argv[i], err, err_info);
+                report_cfile_open_failure(argv[i], err, err_info);
                 overall_error_status = 2; /* remember that an error has occurred */
             }
         }

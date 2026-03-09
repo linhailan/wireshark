@@ -49,9 +49,10 @@ void proto_reg_handoff_mysql(void);
 
 #define MYSQL_HEADER_LENGTH 4
 
-/* MariaDB Server >= 10.0 sends a 5.5.5- prefix for the version, since
-	 replication doesn't support a two digit version number. Version 5.5.5
-   was never released in MySQL and MariaDB */
+/* MariaDB Server 10.x versions send a 5.5.5- prefix for the version, since
+   replication didn't support a two digit version number. Version 5.5.5
+   was never released in MySQL and MariaDB
+   https://jira.mariadb.org/browse/MDEV-28910 */
 #define MARIADB_RPL_VERSION_HACK "5.5.5-"
 
 /* client/server capabilities
@@ -67,13 +68,13 @@ void proto_reg_handoff_mysql(void);
 #define MYSQL_CAPS_OB 0x0040 /* CLIENT_ODBC */
 #define MYSQL_CAPS_LI 0x0080 /* CLIENT_LOCAL_FILES */
 #define MYSQL_CAPS_IS 0x0100 /* CLIENT_IGNORE_SPACE */
-#define MYSQL_CAPS_CU 0x0200 /* CLIENT_PROTOCOL_41 */
+#define MYSQL_CAPS_CU 0x0200 /* CLIENT_PROTOCOL_41 (was CLIENT_CHANGE_USER) */
 #define MYSQL_CAPS_IA 0x0400 /* CLIENT_INTERACTIVE */
 #define MYSQL_CAPS_SL 0x0800 /* CLIENT_SSL */
-#define MYSQL_CAPS_II 0x1000 /* CLIENT_IGNORE_SPACE */
+#define MYSQL_CAPS_II 0x1000 /* CLIENT_IGNORE_SIGPIPE */
 #define MYSQL_CAPS_TA 0x2000 /* CLIENT_TRANSACTIONS */
-#define MYSQL_CAPS_RS 0x4000 /* CLIENT_RESERVED */
-#define MYSQL_CAPS_SC 0x8000 /* CLIENT_SECURE_CONNECTION */
+#define MYSQL_CAPS_RS 0x4000 /* CLIENT_RESERVED (was CLIENT_PROTOCOL_41) */
+#define MYSQL_CAPS_SC 0x8000 /* CLIENT_RESERVED2 (was CLIENT_SECURE_CONNECTION) */
 
 
 /* field flags */
@@ -234,11 +235,14 @@ static const value_string mysql_clone_response_vals[] = {
 #define MARIADB_BULK_SEND_TYPES 128
 
 /* MariaDB extended capabilities */
+/* https://mariadb.com/docs/server/reference/clientserver-protocol/mariadb-protocol-differences-with-mysql
+ * https://mariadb.com/docs/server/reference/clientserver-protocol/1-connecting/connection#capabilities */
 #define MARIADB_CAPS_PR 0x00000001 /* MARIADB_CLIENT_PROGRESS */
 #define MARIADB_CAPS_CM 0x00000002 /* MARIADB_CLIENT_COM_MULTI */
 #define MARIADB_CAPS_BO 0x00000004 /* MARIADB_CLIENT_STMT_BULK_OPERATIONS */
-#define MARIADB_CAPS_EM 0x00000008 /* MARIADB_CLIENT_EXTENDED_METADATA */
-#define MARIADB_CAPS_ME 0x00000010 /* MARIADB_CLIENT_CACHE_METADATA */
+#define MARIADB_CAPS_EM 0x00000008 /* MARIADB_CLIENT_EXTENDED_METADATA (added 10.5.2) */
+#define MARIADB_CAPS_ME 0x00000010 /* MARIADB_CLIENT_CACHE_METADATA (added 10.6.0) */
+#define MARIADB_CAPS_BU 0x00000020 /* MARIADB_CLIENT_BULK_UNIT_RESULTS (added 11.5.2) */
 
 /* MariaDB bulk indicators */
 #define MARIADB_INDICATOR_NONE       0
@@ -1126,6 +1130,10 @@ static int proto_mysql;
 /* dissector configuration */
 static bool mysql_desegment = true;
 static bool mysql_showquery;
+static bool mysql_deprecate_eof = true;
+static bool mysql_query_attributes;
+static bool mariadb_extended_metadata;
+static bool mariadb_cache_metadata;
 
 /* expand-the-tree flags */
 static int ett_mysql;
@@ -1336,6 +1344,7 @@ static int hf_mysql_fld_unsigned;
 static int hf_mysql_fld_zero_fill;
 static int hf_mysql_exec_field_null;
 static int hf_mysql_null_buffer;
+static int hf_mysql_fld_binary;
 static int hf_mysql_fld_enum;
 static int hf_mysql_fld_auto_increment;
 static int hf_mysql_fld_timestamp;
@@ -1398,6 +1407,7 @@ static int hf_mariadb_cap_commulti;
 static int hf_mariadb_cap_bulk;
 static int hf_mariadb_cap_extmetadata;
 static int hf_mariadb_cap_cache_metadata;
+static int hf_mariadb_cap_bulk_unit_results;
 static int hf_mariadb_extcaps_server;
 static int hf_mariadb_extcaps_client;
 static int hf_mariadb_bulk_flag_autoid;
@@ -1406,6 +1416,10 @@ static int hf_mariadb_bulk_caps_flags;
 static int hf_mariadb_bulk_paramtypes;
 static int hf_mariadb_bulk_indicator;
 static int hf_mariadb_bulk_row_nr;
+static int hf_mariadb_progress_stage;
+static int hf_mariadb_progress_max_stage;
+static int hf_mariadb_progress_progress;
+static int hf_mariadb_progress_status;
 static int hf_mariadb_send_meta;
 static int hf_mariadb_extmeta;
 static int hf_mariadb_extmeta_data;
@@ -1417,6 +1431,7 @@ static int hf_mariadb_extmeta_format;
 static dissector_handle_t mysql_handle;
 static dissector_handle_t decompressed_handle;
 static dissector_handle_t tls_handle;
+static dissector_handle_t rfc7468_handle;
 
 static expert_field ei_mysql_dissector_incomplete;
 static expert_field ei_mysql_streamed_param;
@@ -1642,7 +1657,7 @@ typedef struct mysql_exec_dissector {
 } mysql_exec_dissector_t;
 
 /* function prototypes */
-static int mysql_dissect_error_packet(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree, const mysql_frame_data_t *my_frame_data);
+static int mysql_dissect_error_packet(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree, const mysql_frame_data_t *my_frame_data, mysql_conn_data_t *conn_data);
 static int mysql_dissect_ok_packet(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree, mysql_conn_data_t *conn_data);
 static int mysql_dissect_server_status(tvbuff_t *tvb, int offset, proto_tree *tree, uint16_t *server_status);
 static int mysql_dissect_caps(tvbuff_t *tvb, int offset, proto_tree *tree, int mysql_caps, uint16_t *caps);
@@ -1805,6 +1820,7 @@ static int * const mariadb_extcaps_flags[] = {
 	&hf_mariadb_cap_bulk,
 	&hf_mariadb_cap_extmetadata,
 	&hf_mariadb_cap_cache_metadata,
+	&hf_mariadb_cap_bulk_unit_results,
 	NULL
 };
 
@@ -1822,12 +1838,79 @@ static int * const mysql_fld_flags[] = {
 	&hf_mysql_fld_blob,
 	&hf_mysql_fld_unsigned,
 	&hf_mysql_fld_zero_fill,
+	&hf_mysql_fld_binary,
 	&hf_mysql_fld_enum,
 	&hf_mysql_fld_auto_increment,
 	&hf_mysql_fld_timestamp,
 	&hf_mysql_fld_set,
 	NULL
 };
+
+static mysql_conn_data_t*
+find_or_create_mysql_conn_data(conversation_t *conversation)
+{
+	mysql_conn_data_t *conn_data;
+
+	/* get associated state information, create if necessary */
+	conn_data = (mysql_conn_data_t *)conversation_get_proto_data(conversation, proto_mysql);
+	if (!conn_data) {
+		conn_data = wmem_new0(wmem_file_scope(), mysql_conn_data_t);
+		conn_data->stmts = wmem_tree_new(wmem_file_scope());
+		conn_data->encoding_client = ENC_UTF_8;
+		conn_data->encoding_results = ENC_UTF_8;
+
+		// Client and server capability flags
+		// Set in case the conversation doesn't start with greeting/login,
+		// as some of the capabilities alter dissection in ways that
+		// cannot be easily detected.
+		// It might be inconsistent whether clients set a flag even if
+		// the server denied capability by not setting the flag.
+		// TODO - Preferences to control the defaults. (#19856)
+		/* Always set the 4.1 protocol capabilities. (MySQL 4.1 was
+		 * released October 2004; there are probably very few clients
+		 * that use the older protocol, though another preference
+		 * could be added as necessary.) */
+		conn_data->clnt_caps = MYSQL_CAPS_CU     // CLIENT_PROTOCOL_41
+			^ MYSQL_CAPS_SC;		 // CLIENT_SECURE_CONNECTION / _RESERVED2
+		conn_data->srv_caps = MYSQL_CAPS_CU      // CLIENT_PROTOCOL_41
+			^ MYSQL_CAPS_SC;		 // CLIENT_SECURE_CONNECTION / _RESERVED2
+		/* These two extended capabilities go together. The EOF packet
+		 * was deprecated in order to enable session state tracking.
+		 * Not all clients/connectors support deprecating the EOF. */
+		if (mysql_deprecate_eof) {
+			conn_data->clnt_caps_ext |= MYSQL_CAPS_DE // CLIENT_DEPRECATE_EOF
+				^ MYSQL_CAPS_ST;                  // CLIENT_SESSION_TRACK
+			conn_data->srv_caps_ext |= MYSQL_CAPS_DE  // CLIENT_DEPRECATE_EOF
+				^ MYSQL_CAPS_ST;                  // CLIENT_SESSION_TRACK
+		}
+		/* QUERY_ATTRIBUTES was introduced in MySQL 8.0.23 and is not backwards
+		 * compatible. */
+		if (mysql_query_attributes) {
+			conn_data->clnt_caps_ext |= MYSQL_CAPS_QA; // CLIENT_QUERY_ATTRIBUTES
+			conn_data->srv_caps_ext |= MYSQL_CAPS_QA;  // CLIENT_QUERY_ATTRIBUTES
+		}
+		if (mariadb_extended_metadata) {
+			conn_data->mariadb_client_ext_caps |= MARIADB_CAPS_EM;
+			conn_data->mariadb_server_ext_caps |= MARIADB_CAPS_EM;
+		}
+		if (mariadb_cache_metadata) {
+			conn_data->mariadb_client_ext_caps |= MARIADB_CAPS_ME;
+			conn_data->mariadb_server_ext_caps |= MARIADB_CAPS_ME;
+		}
+
+		// Some extended capabilities add extra to Login packets, but
+		// also to MYSQL_CHANGE_USER commands (since the capabilities
+		// are not resent on a Change User.)
+		// Those include MYSQL_CAPS_PA (PLUGIN_AUTH), added MySQL 5.5.7,
+		// and MYSQL_CAPS_CA (CONNECT_ATTRS) and MYSQL_CAPS_AL
+		// (PLUGIN_AUTH_LENENC_CLIENT_DATA), both added in MySQL 5.6.7.
+		// We could also add preferences for Zlib and Zstandard compression,
+		// and for character sets.
+
+		conversation_add_proto_data(conversation, proto_mysql, conn_data);
+	}
+	return conn_data;
+}
 
 /* Helper function to only set state on first pass */
 static void mysql_set_conn_state(packet_info *pinfo, mysql_conn_data_t *conn_data, mysql_state_t state)
@@ -1915,7 +1998,7 @@ mysql_dissect_greeting(tvbuff_t *tvb, packet_info *pinfo, int offset,
 	protocol= tvb_get_uint8(tvb, offset);
 
 	if (protocol == 0xff) {
-		return mysql_dissect_error_packet(tvb, pinfo, offset+1, tree, my_frame_data);
+		return mysql_dissect_error_packet(tvb, pinfo, offset+1, tree, my_frame_data, conn_data);
 	}
 
 	mysql_set_conn_state(pinfo, conn_data, LOGIN);
@@ -2090,7 +2173,6 @@ mysql_dissect_login(tvbuff_t *tvb, packet_info *pinfo, int offset,
 
 	if (!(conn_data->frame_start_ssl) && conn_data->clnt_caps & MYSQL_CAPS_SL) /* Next packet will be use SSL */
 	{
-		col_set_str(pinfo->cinfo, COL_INFO, "Response: SSL Handshake");
 		conn_data->frame_start_ssl = pinfo->num;
 		ssl_starttls_ack(tls_handle, pinfo, mysql_handle);
 	}
@@ -2123,6 +2205,14 @@ mysql_dissect_login(tvbuff_t *tvb, packet_info *pinfo, int offset,
 		offset += 3;
 	}
 
+	// If client and server both set CLIENT_SSL then a lot of extra info is left out
+	// Protocol::SSLRequest: https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_connection_phase_packets_protocol_ssl_request.html
+	if ((conn_data->clnt_caps_ext & MYSQL_CAPS_SL)
+		&& (conn_data->srv_caps_ext & MYSQL_CAPS_SL)
+		&& !tvb_reported_length_remaining(tvb, offset)) {
+		return offset;
+	}
+
 	/* User name */
 	lenstr = my_tvb_strsize(tvb, offset);
 	col_append_fstr(pinfo->cinfo, COL_INFO, " user=%s ",
@@ -2137,7 +2227,17 @@ mysql_dissect_login(tvbuff_t *tvb, packet_info *pinfo, int offset,
 	}
 
 	/* password: asciiz or length+ascii */
-	if (conn_data->clnt_caps & MYSQL_CAPS_SC) {
+	if (conn_data->clnt_caps & MYSQL_CAPS_AL) {
+		/* Note the only difference between this case and the
+		 * next is when the authentication data is > 250 bytes. */
+		uint64_t lenstr64;
+		offset += tvb_get_fle(tvb, login_tree, offset, &lenstr64, NULL);
+		lenstr = (uint32_t)lenstr64;
+	} else if (conn_data->clnt_caps & MYSQL_CAPS_SC) {
+		/* Since MySQL 8.0, the documents say to always treat CAPS_SC as
+		 * set if PROTOCOL_41 is in use, and call the bit _RESERVED2.
+		 * At some point clients might stop setting the bit, in which
+		 * case we'd still want to do this if PROTOCOL_41 is in use. */
 		lenstr = tvb_get_uint8(tvb, offset);
 		offset += 1;
 	} else {
@@ -2210,7 +2310,7 @@ mysql_dissect_exec_string(tvbuff_t *tvb, packet_info *pinfo _U_, int *param_offs
 	uint64_t param_len;
 
 	lenfle = tvb_get_fle(tvb, field_tree, *param_offset, &param_len, NULL);
-	proto_tree_add_item(field_tree, hf_mysql_exec_field_string_length, tvb, *param_offset, lenfle, ENC_ASCII);
+	proto_tree_add_item(field_tree, hf_mysql_exec_field_string_length, tvb, *param_offset, lenfle, ENC_BIG_ENDIAN);
 	*param_offset += lenfle;
 
 	if (encoding == ENC_NA) {
@@ -2230,7 +2330,7 @@ mysql_dissect_exec_bit(tvbuff_t *tvb, packet_info *pinfo _U_, int *param_offset,
 	uint64_t param_len;
 
 	lenfle = tvb_get_fle(tvb, field_tree, *param_offset, &param_len, NULL);
-	proto_tree_add_item(field_tree, hf_mysql_exec_field_bit_length, tvb, *param_offset, lenfle, ENC_ASCII);
+	proto_tree_add_item(field_tree, hf_mysql_exec_field_bit_length, tvb, *param_offset, lenfle, ENC_BIG_ENDIAN);
 	*param_offset += lenfle;
 
 	proto_tree_add_item(field_tree, hf_mysql_exec_field_bit,
@@ -2245,7 +2345,7 @@ mysql_dissect_exec_blob(tvbuff_t *tvb, packet_info *pinfo _U_, int *param_offset
 	uint64_t param_len;
 
 	lenfle = tvb_get_fle(tvb, field_tree, *param_offset, &param_len, NULL);
-	proto_tree_add_item(field_tree, hf_mysql_exec_field_blob_length, tvb, *param_offset, lenfle, ENC_ASCII);
+	proto_tree_add_item(field_tree, hf_mysql_exec_field_blob_length, tvb, *param_offset, lenfle, ENC_BIG_ENDIAN);
 	*param_offset += lenfle;
 
 	proto_tree_add_item(field_tree, hf_mysql_exec_field_blob,
@@ -2260,7 +2360,7 @@ mysql_dissect_exec_geometry(tvbuff_t *tvb, packet_info *pinfo _U_, int *param_of
 	uint64_t param_len;
 
 	lenfle = tvb_get_fle(tvb, field_tree, *param_offset, &param_len, NULL);
-	proto_tree_add_item(field_tree, hf_mysql_exec_field_geometry_length, tvb, *param_offset, lenfle, ENC_ASCII);
+	proto_tree_add_item(field_tree, hf_mysql_exec_field_geometry_length, tvb, *param_offset, lenfle, ENC_BIG_ENDIAN);
 	*param_offset += lenfle;
 
 	proto_tree_add_item(field_tree, hf_mysql_exec_field_geometry,
@@ -2278,7 +2378,7 @@ mysql_dissect_exec_json(tvbuff_t *tvb, packet_info *pinfo, int *param_offset, pr
 
 	json_handle = find_dissector("json");
 	lenfle = tvb_get_fle(tvb, field_tree, *param_offset, &param_len, NULL);
-	proto_tree_add_item(field_tree, hf_mysql_exec_field_json_length, tvb, *param_offset, lenfle, ENC_ASCII);
+	proto_tree_add_item(field_tree, hf_mysql_exec_field_json_length, tvb, *param_offset, lenfle, ENC_BIG_ENDIAN);
 	*param_offset += lenfle;
 
 	next_tvb = tvb_new_subset_length(tvb, *param_offset, (int)param_len);
@@ -2530,10 +2630,10 @@ mysql_dissect_request(tvbuff_t *tvb,packet_info *pinfo, int offset, proto_tree *
 	req_tree = proto_item_add_subtree(request_item, ett_request);
 
 	opcode = tvb_get_uint8(tvb, offset);
-	col_append_fstr(pinfo->cinfo, COL_INFO, " %s", val_to_str_ext(opcode, &mysql_command_vals_ext, "Unknown (%u) "));
+	col_append_fstr(pinfo->cinfo, COL_INFO, " %s", val_to_str_ext(pinfo->pool, opcode, &mysql_command_vals_ext, "Unknown (%u) "));
 
 	proto_tree_add_item(req_tree, hf_mysql_command, tvb, offset, 1, ENC_NA);
-	proto_item_append_text(request_item, " %s", val_to_str_ext(opcode, &mysql_command_vals_ext, "Unknown (%u)"));
+	proto_item_append_text(request_item, " %s", val_to_str_ext(pinfo->pool, opcode, &mysql_command_vals_ext, "Unknown (%u)"));
 	offset += 1;
 
 
@@ -2573,15 +2673,15 @@ mysql_dissect_request(tvbuff_t *tvb,packet_info *pinfo, int offset, proto_tree *
 			// suggests n_params is length encoded. Use tvb_get_fle?
 			// (More than 250 parameters *does* seem unlikely.)
 			int n_params = tvb_get_uint8(tvb, offset);
-			proto_tree_add_item(req_tree, hf_mysql_num_params, tvb, offset, 1, ENC_ASCII);
+			proto_tree_add_item(req_tree, hf_mysql_num_params, tvb, offset, 1, ENC_BIG_ENDIAN);
 			offset += 2;
 
 			if ((n_params > 0) && (n_params <= 250)) {
 				int null_count = (n_params + 7) / 8;
-				proto_tree_add_item(req_tree, hf_mysql_unused, tvb, offset, null_count, ENC_ASCII);
+				proto_tree_add_item(req_tree, hf_mysql_unused, tvb, offset, null_count, ENC_NA);
 				offset += null_count;
 
-				proto_tree_add_item(req_tree, hf_mysql_new_parameter_bound_flag, tvb, offset, 1, ENC_ASCII);
+				proto_tree_add_item(req_tree, hf_mysql_new_parameter_bound_flag, tvb, offset, 1, ENC_BIG_ENDIAN);
 				offset += 1;
 
 				unsigned encoding = my_frame_data->encoding_client;
@@ -2673,7 +2773,17 @@ mysql_dissect_request(tvbuff_t *tvb,packet_info *pinfo, int offset, proto_tree *
 		proto_tree_add_item(req_tree, hf_mysql_user, tvb,  offset, lenstr, ENC_ASCII);
 		offset += lenstr;
 
-		if (conn_data->clnt_caps & MYSQL_CAPS_SC) {
+		if (conn_data->clnt_caps & MYSQL_CAPS_AL) {
+			/* Note the only difference between this case and the
+			 * next is when the authentication data is > 250 bytes. */
+			uint64_t lenstr64;
+			offset += tvb_get_fle(tvb, req_tree, offset, &lenstr64, NULL);
+			lenstr = (uint32_t)lenstr64;
+		} else if (conn_data->clnt_caps & MYSQL_CAPS_SC) {
+			/* Since MySQL 8.0, the documents say to always treat CAPS_SC as
+			 * set if PROTOCOL_41 is in use, and call the bit _RESERVED2.
+			 * At some point clients might stop setting the bit, in which
+			 * case we'd still want to do this if PROTOCOL_41 is in use. */
 			lenstr = tvb_get_uint8(tvb, offset);
 			offset += 1;
 		} else {
@@ -2758,8 +2868,7 @@ mysql_dissect_request(tvbuff_t *tvb,packet_info *pinfo, int offset, proto_tree *
 		break;
 
 	case MYSQL_STMT_SEND_LONG_DATA:
-		proto_tree_add_item(req_tree, hf_mysql_stmt_id, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-		stmt_id = tvb_get_letohl(tvb, offset);
+		proto_tree_add_item_ret_uint(req_tree, hf_mysql_stmt_id, tvb, offset, 4, ENC_LITTLE_ENDIAN, &stmt_id);
 		offset += 4;
 
 		stmt_data = (my_stmt_data_t *)wmem_tree_lookup32(conn_data->stmts, stmt_id);
@@ -2786,8 +2895,7 @@ mysql_dissect_request(tvbuff_t *tvb,packet_info *pinfo, int offset, proto_tree *
 		break;
 
 	case MARIADB_STMT_BULK_EXECUTE:
-		proto_tree_add_item(req_tree, hf_mysql_stmt_id, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-		stmt_id = tvb_get_letohl(tvb, offset);
+		proto_tree_add_item_ret_uint(req_tree, hf_mysql_stmt_id, tvb, offset, 4, ENC_LITTLE_ENDIAN, &stmt_id);
 		offset += 4;
 
 		// use last prepared statement
@@ -2854,8 +2962,7 @@ mysql_dissect_request(tvbuff_t *tvb,packet_info *pinfo, int offset, proto_tree *
 
 	case MYSQL_STMT_EXECUTE:
 		// https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_stmt_execute.html
-		proto_tree_add_item(req_tree, hf_mysql_stmt_id, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-		stmt_id = tvb_get_letohl(tvb, offset);
+		proto_tree_add_item_ret_uint(req_tree, hf_mysql_stmt_id, tvb, offset, 4, ENC_LITTLE_ENDIAN, &stmt_id);
 		offset += 4;
 
 		if (conn_data->major_version >= 5) {
@@ -2960,7 +3067,7 @@ mysql_dissect_request(tvbuff_t *tvb,packet_info *pinfo, int offset, proto_tree *
 		proto_tree_add_item(req_tree, hf_mysql_binlog_gtid_data_length, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 		offset += 4;
 
-		proto_tree_add_item(req_tree, hf_mysql_binlog_gtid_data, tvb, offset, lenstr, ENC_ASCII);
+		proto_tree_add_item(req_tree, hf_mysql_binlog_gtid_data, tvb, offset, lenstr, ENC_NA);
 		offset += lenstr;
 
 		mysql_set_conn_state(pinfo, conn_data, BINLOG_DUMP);
@@ -3067,8 +3174,8 @@ mysql_dissect_response(tvbuff_t *tvb, packet_info *pinfo, int offset,
 	switch (response_code) {
 	case 0xff:
 		proto_tree_add_item(tree, hf_mysql_response_code, tvb, offset, 1, ENC_NA);
-		proto_item_append_text(pi, " - %s", val_to_str(RESPONSE_ERROR, state_vals, "Unknown (%u)"));
-		offset = mysql_dissect_error_packet(tvb, pinfo, offset+1, tree, my_frame_data);
+		proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, RESPONSE_ERROR, state_vals, "Unknown (%u)"));
+		offset = mysql_dissect_error_packet(tvb, pinfo, offset+1, tree, my_frame_data, conn_data);
 		mysql_set_conn_state(pinfo, conn_data, REQUEST);
 		break;
 	case 0xfe:
@@ -3082,35 +3189,35 @@ mysql_dissect_response(tvbuff_t *tvb, packet_info *pinfo, int offset,
 
 			if (current_state == PREPARED_PARAMETERS) {
 				if (stmt_data != NULL && stmt_data->field_metas.count > 0) {
-					proto_item_append_text(pi, " - %s", val_to_str(INTERMEDIATE_EOF, state_vals, "Unknown (%u)"));
+					proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, INTERMEDIATE_EOF, state_vals, "Unknown (%u)"));
 					mysql_set_remaining_field_packet_count(pinfo, conn_data, stmt_data->field_metas.count);
 					mysql_set_conn_state(pinfo, conn_data, PREPARED_FIELDS);
 				} else {
-					proto_item_append_text(pi, " - %s", val_to_str(RESPONSE_EOF, state_vals, "Unknown (%u)"));
+					proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, RESPONSE_EOF, state_vals, "Unknown (%u)"));
 					mysql_set_conn_state(pinfo, conn_data, REQUEST);
 				}
 			} else if (current_state == FIELD_PACKET) {
 				// intermediate EOF packet
-				proto_item_append_text(pi, " - %s", val_to_str(INTERMEDIATE_EOF, state_vals, "Unknown (%u)"));
+				proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, INTERMEDIATE_EOF, state_vals, "Unknown (%u)"));
 				mysql_set_conn_state(pinfo, conn_data, ROW_PACKET);
 			} else {
 				// ending EOF packet
-				proto_item_append_text(pi, " - %s", val_to_str(RESPONSE_EOF, state_vals, "Unknown (%u)"));
+				proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, RESPONSE_EOF, state_vals, "Unknown (%u)"));
 				mysql_set_conn_state(pinfo, conn_data, REQUEST);
 			}
 		} else if (tvb_reported_length_remaining(tvb, offset) < 0xffffff) {
 			// not an EOF
 			if (current_state == AUTH_SWITCH_REQUEST) {
-				proto_item_append_text(pi, " - %s", val_to_str(AUTH_SWITCH_REQUEST, state_vals, "Unknown (%u)"));
+				proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, AUTH_SWITCH_REQUEST, state_vals, "Unknown (%u)"));
 				offset = mysql_dissect_auth_switch_request(tvb, pinfo, offset, tree, conn_data);
 			} else {
-				proto_item_append_text(pi, " - %s", val_to_str(RESPONSE_OK, state_vals, "Unknown (%u)"));
+				proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, RESPONSE_OK, state_vals, "Unknown (%u)"));
 				offset = mysql_dissect_ok_packet(tvb, pinfo, offset, tree, conn_data);
 				mysql_set_conn_state(pinfo, conn_data, REQUEST);
 			}
 		} else {
 			// text row packet
-			proto_item_append_text(pi, " - %s", val_to_str(ROW_PACKET, state_vals, "Unknown (%u)"));
+			proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, ROW_PACKET, state_vals, "Unknown (%u)"));
 			mysql_set_conn_state(pinfo, conn_data, ROW_PACKET);
 			offset = mysql_dissect_text_row_packet(tvb, offset, tree, my_frame_data);
 		}
@@ -3121,11 +3228,11 @@ mysql_dissect_response(tvbuff_t *tvb, packet_info *pinfo, int offset,
 		case RESPONSE_PREPARE:
 			proto_tree_add_item(tree, hf_mysql_response_code, tvb, offset, 1, ENC_NA);
 			offset+=1;
-			proto_item_append_text(pi, " - %s", val_to_str(RESPONSE_PREPARE, state_vals, "Unknown (%u)"));
+			proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, RESPONSE_PREPARE, state_vals, "Unknown (%u)"));
 			offset = mysql_dissect_response_prepare(tvb, pinfo, offset, tree, conn_data);
 			break;
 		case ROW_PACKET:
-			proto_item_append_text(pi, " - %s", val_to_str(ROW_PACKET, state_vals, "Unknown (%u)"));
+			proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, ROW_PACKET, state_vals, "Unknown (%u)"));
 			if (my_frame_data->resultset_fmt == BINARY) {
 				proto_tree_add_item(tree, hf_mysql_response_code, tvb, offset, 1, ENC_NA);
 				offset+=1;
@@ -3137,17 +3244,23 @@ mysql_dissect_response(tvbuff_t *tvb, packet_info *pinfo, int offset,
 		case BINLOG_DUMP:
 			proto_tree_add_item(tree, hf_mysql_response_code, tvb, offset, 1, ENC_NA);
 			offset+=1;
-			proto_item_append_text(pi, " - %s", val_to_str(BINLOG_DUMP, state_vals, "Unknown (%u)"));
+			proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, BINLOG_DUMP, state_vals, "Unknown (%u)"));
 			offset = mysql_dissect_binlog_event_packet(tvb, pinfo, offset, tree, pi);
 			break;
 		default:
+			if (current_state == FIELD_PACKET) {
+				proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, current_state, state_vals, "Unknown (%u)"));
+				offset = mysql_dissect_field_packet(tvb, pi, offset, tree, pinfo, conn_data, my_frame_data);
+				break;
+			}
 			proto_tree_add_item(tree, hf_mysql_response_code, tvb, offset, 1, ENC_NA);
 			offset+=1;
-			proto_item_append_text(pi, " - %s", val_to_str(RESPONSE_OK, state_vals, "Unknown (%u)"));
+			proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, RESPONSE_OK, state_vals, "Unknown (%u)"));
 			offset = mysql_dissect_ok_packet(tvb, pinfo, offset, tree, conn_data);
 			if (conn_data->compressed_state == MYSQL_COMPRESS_INIT) {
 				/* This is the OK packet which follows the compressed protocol setup */
 				conn_data->compressed_state = MYSQL_COMPRESS_ACTIVE;
+				conn_data->frame_start_compressed = pinfo->num;
 			}
 			if (current_state == CLONE_INIT)
 				mysql_set_conn_state(pinfo, conn_data, CLONE_ACTIVE);
@@ -3170,7 +3283,7 @@ mysql_dissect_response(tvbuff_t *tvb, packet_info *pinfo, int offset,
 				/* https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_local_infile_request.html */
 				col_append_str(pinfo->cinfo, COL_INFO, " LOCAL INFILE");
 				proto_tree_add_item(tree, hf_mysql_response_code, tvb, offset, 1, ENC_NA);
-				proto_item_append_text(pi, " - %s", val_to_str(RESPONSE_LOCALINFILE, state_vals, "Unknown (%u)"));
+				proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, RESPONSE_LOCALINFILE, state_vals, "Unknown (%u)"));
 
 				lenstr = tvb_reported_length_remaining(tvb, ++offset);
 				proto_tree_add_item(tree, hf_mysql_loaddata_filename, tvb, offset, lenstr, ENC_ASCII);
@@ -3178,11 +3291,11 @@ mysql_dissect_response(tvbuff_t *tvb, packet_info *pinfo, int offset,
 				mysql_set_conn_state(pinfo, conn_data, INFILE_DATA);
 				break;
 			}
-			proto_item_append_text(pi, " - %s", val_to_str(COLUMN_COUNT, state_vals, "Unknown (%u)"));
+			proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, COLUMN_COUNT, state_vals, "Unknown (%u)"));
 			offset = mysql_dissect_result_header(tvb, pinfo, offset, tree, conn_data, my_frame_data);
 			break;
 		case PREPARED_PARAMETERS:
-			proto_item_append_text(pi, " - %s", val_to_str(current_state, state_vals, "Unknown (%u)"));
+			proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, current_state, state_vals, "Unknown (%u)"));
 			offset = mysql_dissect_field_packet(tvb, pi, offset, tree, pinfo, conn_data, my_frame_data);
 			if (mysql_dec_remaining_field_packet_count(pinfo, conn_data)) {
 				if (conn_data->clnt_caps_ext & MYSQL_CAPS_DE) {
@@ -3198,7 +3311,7 @@ mysql_dissect_response(tvbuff_t *tvb, packet_info *pinfo, int offset,
 
 		case FIELD_PACKET:
 		case RESPONSE_SHOW_FIELDS:
-			proto_item_append_text(pi, " - %s", val_to_str(current_state, state_vals, "Unknown (%u)"));
+			proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, current_state, state_vals, "Unknown (%u)"));
 			offset = mysql_dissect_field_packet(tvb, pi, offset, tree, pinfo, conn_data, my_frame_data);
 			if (mysql_dec_remaining_field_packet_count(pinfo, conn_data) && (conn_data->clnt_caps_ext & MYSQL_CAPS_DE)) {
 				mysql_set_conn_state(pinfo, conn_data, ROW_PACKET);
@@ -3206,12 +3319,12 @@ mysql_dissect_response(tvbuff_t *tvb, packet_info *pinfo, int offset,
 			break;
 
 		case ROW_PACKET:
-			proto_item_append_text(pi, " - %s", val_to_str(current_state, state_vals, "Unknown (%u)"));
+			proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, current_state, state_vals, "Unknown (%u)"));
 			offset = mysql_dissect_text_row_packet(tvb, offset, tree, my_frame_data);
 			break;
 
 		case PREPARED_FIELDS:
-			proto_item_append_text(pi, " - %s", val_to_str(current_state, state_vals, "Unknown (%u)"));
+			proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, current_state, state_vals, "Unknown (%u)"));
 			offset = mysql_dissect_field_packet(tvb, pi, offset, tree, pinfo, conn_data, my_frame_data);
 			if (mysql_dec_remaining_field_packet_count(pinfo, conn_data) && (conn_data->clnt_caps_ext & MYSQL_CAPS_DE)) {
 				mysql_set_conn_state(pinfo, conn_data, REQUEST);
@@ -3220,16 +3333,16 @@ mysql_dissect_response(tvbuff_t *tvb, packet_info *pinfo, int offset,
 
 		case AUTH_SWITCH_REQUEST:
 			if (tvb_reported_length_remaining(tvb,offset) == 2) {
-				proto_item_append_text(pi, " - %s", val_to_str(AUTH_SHA2, state_vals, "Unknown (%u)"));
+				proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, AUTH_SHA2, state_vals, "Unknown (%u)"));
 				offset = mysql_dissect_auth_sha2(tvb, pinfo, offset, tree, conn_data);
 			} else {
-				proto_item_append_text(pi, " - %s", val_to_str(AUTH_SWITCH_REQUEST, state_vals, "Unknown (%u)"));
+				proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, AUTH_SWITCH_REQUEST, state_vals, "Unknown (%u)"));
 				offset = mysql_dissect_auth_switch_request(tvb, pinfo, offset, tree, conn_data);
 			}
 			break;
 
 		case AUTH_SHA2:
-			proto_item_append_text(pi, " - %s", val_to_str(AUTH_SHA2, state_vals, "Unknown (%u)"));
+			proto_item_append_text(pi, " - %s", val_to_str(pinfo->pool, AUTH_SHA2, state_vals, "Unknown (%u)"));
 			offset = mysql_dissect_auth_sha2(tvb, pinfo, offset, tree, conn_data);
 			break;
 
@@ -3248,8 +3361,46 @@ mysql_dissect_response(tvbuff_t *tvb, packet_info *pinfo, int offset,
 static int
 mysql_dissect_error_packet(tvbuff_t *tvb, packet_info *pinfo,
 			   int offset, proto_tree *tree,
-			   const mysql_frame_data_t *my_frame_data)
+			   const mysql_frame_data_t *my_frame_data,
+			   mysql_conn_data_t *conn_data)
 {
+	uint64_t status_length;
+	uint16_t errcode = tvb_get_uint16(tvb, offset, ENC_LITTLE_ENDIAN);
+	// If MARIADB_CAPS_PR is enabled and the error code is set to 65535 then this is a progress packet
+	// which is a special, MariaDB specific, kind of error packet.
+	// Docs:
+	// https://mariadb.com/docs/server/reference/product-development/mariadb-internals/using-mariadb-with-your-programs-api/progress-reporting
+	if (conn_data->mariadb_client_ext_caps & MARIADB_CAPS_PR
+		&& conn_data->mariadb_server_ext_caps & MARIADB_CAPS_PR
+		&& errcode == 65535) {
+
+		col_append_str(pinfo->cinfo, COL_INFO, "Progress Reporting");
+		col_set_fence(pinfo->cinfo, COL_INFO);
+		offset += 2;
+
+		// Skipping number of strings, currently always 1.
+		offset++;
+
+		col_append_fstr(pinfo->cinfo, COL_INFO, " %d/%d",
+				tvb_get_uint8(tvb, offset), // Current stage
+				tvb_get_uint8(tvb, offset+1) // Max stage
+		);
+		proto_tree_add_item(tree, hf_mariadb_progress_stage, tvb, offset++, 1, ENC_NA);
+		proto_tree_add_item(tree, hf_mariadb_progress_max_stage, tvb, offset++, 1, ENC_NA);
+
+		col_append_fstr(pinfo->cinfo, COL_INFO, " %.3f%%",
+				(double)tvb_get_uint24(tvb,offset,ENC_LITTLE_ENDIAN) / 1000);
+		proto_tree_add_item(tree, hf_mariadb_progress_progress, tvb, offset, 3, ENC_LITTLE_ENDIAN);
+		offset += 3;
+
+		int lenfle = tvb_get_fle(tvb, tree, offset, &status_length, NULL);
+		offset += lenfle;
+		proto_tree_add_item(tree, hf_mariadb_progress_status, tvb, offset, (int)status_length, ENC_ASCII);
+
+		offset += tvb_reported_length_remaining(tvb, offset);
+		return offset;
+	}
+
 	col_append_fstr(pinfo->cinfo, COL_INFO, " Error %d ", tvb_get_letohs(tvb, offset));
 	col_set_fence(pinfo->cinfo, COL_INFO);
 
@@ -3316,9 +3467,9 @@ add_session_tracker_entry_to_tree(tvbuff_t *tvb, packet_info *pinfo, proto_item 
 
 		proto_tree_add_item_ret_string(session_track_tree, hf_mysql_session_track_sysvar_value, tvb, offset, (int)lenstr, ENC_ASCII, pinfo->pool, &sysvar_value);
 		if (charset_client) {
-			mysql_set_encoding_client(pinfo, conn_data, charset_to_encoding(sysvar_value));
+			mysql_set_encoding_client(pinfo, conn_data, charset_to_encoding((char*)sysvar_value));
 		} else if (charset_results) {
-			mysql_set_encoding_results(pinfo, conn_data, charset_to_encoding(sysvar_value));
+			mysql_set_encoding_results(pinfo, conn_data, charset_to_encoding((char*)sysvar_value));
 		}
 		offset += (int)lenstr;
 		break;
@@ -3439,7 +3590,8 @@ mysql_dissect_ok_packet(tvbuff_t *tvb, packet_info *pinfo, int offset,
 		offset = mysql_dissect_server_status(tvb, offset, tree, &server_status);
 
 		/* 4.1+ protocol only: 2 bytes number of warnings */
-		if (conn_data->clnt_caps & conn_data->srv_caps & MYSQL_CAPS_CU) {
+		/* Warning count is not present in response from MySQL 4.1 servers */
+		if (tvb_reported_length_remaining(tvb, offset) >= 2 && (conn_data->clnt_caps & conn_data->srv_caps & MYSQL_CAPS_CU)) {
 			proto_tree_add_item(tree, hf_mysql_num_warn, tvb, offset, 2, ENC_LITTLE_ENDIAN);
 			lenstr = tvb_get_ntohs(tvb, offset);
 			offset += 2;
@@ -3579,8 +3731,7 @@ mysql_dissect_result_header(tvbuff_t *tvb, packet_info *pinfo, int offset,
 	if (conn_data->mariadb_client_ext_caps & MARIADB_CAPS_ME
 		&& conn_data->mariadb_server_ext_caps & MARIADB_CAPS_ME
 		&& tvb_reported_length_remaining(tvb, offset)) {
-		send_meta = tvb_get_uint8(tvb, offset);
-		proto_tree_add_item(tree, hf_mariadb_send_meta, tvb, offset, 1, ENC_NA);
+		proto_tree_add_item_ret_uint8(tree, hf_mariadb_send_meta, tvb, offset, 1, ENC_NA, &send_meta);
 		offset += 1;
 	}
 
@@ -3675,66 +3826,102 @@ mysql_dissect_field_packet(tvbuff_t *tvb, proto_item *pi _U_, int offset, proto_
 {
 	uint8_t fld_type;
 	uint16_t fld_flag;
-	unsigned fld_encoding;
+	unsigned fld_encoding = 0;
 	int length = tvb_reported_length(tvb);
 	mysql_state_t current_state = my_frame_data->state;
 
 	unsigned encoding = my_frame_data->encoding_results;
-
-	/* Are these fields optional? a trace suggests they are...*/
-	offset = mysql_field_add_lestring(tvb, offset, tree, hf_mysql_fld_catalog, encoding);
-	if (offset >= length) {
-		return offset;
-	}
-	offset = mysql_field_add_lestring(tvb, offset, tree, hf_mysql_fld_db, encoding);
-	offset = mysql_field_add_lestring(tvb, offset, tree, hf_mysql_fld_table, encoding);
-	offset = mysql_field_add_lestring(tvb, offset, tree, hf_mysql_fld_org_table, encoding);
-	offset = mysql_field_add_lestring(tvb, offset, tree, hf_mysql_fld_name, encoding);
-	offset = mysql_field_add_lestring(tvb, offset, tree, hf_mysql_fld_org_name, encoding);
-
-	// mariadb extended metadata infos
-	if (conn_data->mariadb_client_ext_caps & MARIADB_CAPS_EM
-		&& conn_data->mariadb_server_ext_caps & MARIADB_CAPS_EM) {
-		uint64_t extended_length;
-		proto_item *extended_tree = NULL;
-		proto_item *tf;
-		int fle;
-
-		fle = tvb_get_fle(tvb, tree, offset, &extended_length, NULL);
-		tf = proto_tree_add_item(tree, hf_mariadb_extmeta_data, tvb, offset, fle + (uint32_t) extended_length, ENC_NA);
-		extended_tree = proto_item_add_subtree(tf, ett_extmeta_data);
-		proto_tree_add_uint64(tf, hf_mariadb_extmeta_length, tvb, offset, fle, extended_length);
-		offset += fle;
-
-		while (extended_length > 0) {
-			length = add_extended_meta_entry_to_tree(tvb, pinfo, extended_tree, offset);
-			offset += length;
-			extended_length -= length;
+	if (conn_data->clnt_caps & MYSQL_CAPS_CU)
+	{
+		/* Are these fields optional? a trace suggests they are...*/
+		offset = mysql_field_add_lestring(tvb, offset, tree, hf_mysql_fld_catalog, encoding);
+		if (offset >= length) {
+			return offset;
 		}
+		offset = mysql_field_add_lestring(tvb, offset, tree, hf_mysql_fld_db, encoding);
+		offset = mysql_field_add_lestring(tvb, offset, tree, hf_mysql_fld_table, encoding);
+		offset = mysql_field_add_lestring(tvb, offset, tree, hf_mysql_fld_org_table, encoding);
+		offset = mysql_field_add_lestring(tvb, offset, tree, hf_mysql_fld_name, encoding);
+		offset = mysql_field_add_lestring(tvb, offset, tree, hf_mysql_fld_org_name, encoding);
+
+		// mariadb extended metadata infos
+		if (conn_data->mariadb_client_ext_caps & MARIADB_CAPS_EM
+			&& conn_data->mariadb_server_ext_caps & MARIADB_CAPS_EM) {
+			uint64_t extended_length;
+			proto_item *extended_tree = NULL;
+			proto_item *tf;
+			int fle;
+
+			fle = tvb_get_fle(tvb, tree, offset, &extended_length, NULL);
+			tf = proto_tree_add_item(tree, hf_mariadb_extmeta_data, tvb, offset, fle + (uint32_t) extended_length, ENC_NA);
+			extended_tree = proto_item_add_subtree(tf, ett_extmeta_data);
+			proto_tree_add_uint64(tf, hf_mariadb_extmeta_length, tvb, offset, fle, extended_length);
+			offset += fle;
+
+			while (extended_length > 0) {
+				length = add_extended_meta_entry_to_tree(tvb, pinfo, extended_tree, offset);
+				offset += length;
+				extended_length -= length;
+			}
+		}
+
+		offset +=1; /* filler */
+
+		uint32_t charsetnr;
+		proto_tree_add_item_ret_uint(tree, hf_mysql_fld_charsetnr, tvb, offset, 2, ENC_LITTLE_ENDIAN, &charsetnr);
+		fld_encoding = collation_to_encoding(charsetnr, conn_data->is_mariadb_server);
+		offset += 2; /* charset */
+	} else {
+		/*
+		 * Pre 4.1: Protocol::ColumnDefinition320
+		 * https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response_text_resultset_column_definition.html#sec_protocol_com_query_response_text_resultset_column_definition_320
+		 */
+
+		offset = mysql_field_add_lestring(tvb, offset, tree, hf_mysql_fld_table, encoding);
+		offset = mysql_field_add_lestring(tvb, offset, tree, hf_mysql_fld_name, encoding);
 	}
 
-	offset +=1; /* filler */
+	if (conn_data->clnt_caps & MYSQL_CAPS_CU) {
+		proto_tree_add_item(tree, hf_mysql_fld_length, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+		offset += 4; /* column length */
+	} else {
+		uint64_t field_length;
+		int lenfle = tvb_get_fle(tvb, tree, offset, &field_length, NULL);
+		offset += lenfle;
+		proto_tree_add_item(tree, hf_mysql_fld_length, tvb, offset, (int)field_length, ENC_LITTLE_ENDIAN);
+		offset += (int)field_length;
+	}
 
-	uint32_t charsetnr;
-	proto_tree_add_item_ret_uint(tree, hf_mysql_fld_charsetnr, tvb, offset, 2, ENC_LITTLE_ENDIAN, &charsetnr);
-	fld_encoding = collation_to_encoding(charsetnr, conn_data->is_mariadb_server);
-	offset += 2; /* charset */
+	if (conn_data->clnt_caps & MYSQL_CAPS_CU) {
+		proto_tree_add_item_ret_uint8(tree, hf_mysql_fld_type, tvb, offset, 1, ENC_NA, &fld_type);
+		offset += 1; /* type */
+	} else {
+		uint64_t field_type;
+		int lenfle = tvb_get_fle(tvb, tree, offset, &field_type, NULL);
+		offset += lenfle;
+		proto_tree_add_item(tree, hf_mysql_fld_type, tvb, offset, (int)field_type, ENC_LITTLE_ENDIAN);
+		fld_type = (uint8_t)field_type;
+		offset += (int)field_type;
+	}
 
-	proto_tree_add_item(tree, hf_mysql_fld_length, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-	offset += 4; /* length */
-
-	proto_tree_add_item(tree, hf_mysql_fld_type, tvb, offset, 1, ENC_NA);
-	fld_type = tvb_get_uint8(tvb, offset);
-	offset += 1; /* type */
-
+	if (!(conn_data->clnt_caps & MYSQL_CAPS_CU)) {
+		offset += 1;
+	}
 	proto_tree_add_bitmask_with_flags(tree, tvb, offset, hf_mysql_fld_flags, ett_field_flags, mysql_fld_flags, ENC_LITTLE_ENDIAN, BMT_NO_APPEND);
 	fld_flag = tvb_get_letohs(tvb, offset);
-	offset += 2; /* flags */
+
+	if (conn_data->clnt_caps & MYSQL_CAPS_LF) {
+		offset += 2; /* flags */
+	} else {
+		offset += 1; /* flags */
+	}
 
 	proto_tree_add_item(tree, hf_mysql_fld_decimals, tvb, offset, 1, ENC_NA);
 	offset += 1; /* decimals */
 
-	offset += 2; /* filler */
+	if (conn_data->clnt_caps & MYSQL_CAPS_CU) {
+		offset += 2; /* filler */
+	}
 
 	if (current_state == FIELD_PACKET || current_state == PREPARED_FIELDS) {
 		if (my_frame_data->field_metas.count) {
@@ -3745,7 +3932,9 @@ mysql_dissect_field_packet(tvbuff_t *tvb, proto_item *pi _U_, int offset, proto_
 			}
 			my_frame_data->field_metas.types[fieldpos] = fld_type;
 			my_frame_data->field_metas.flags[fieldpos] = fld_flag;
-			my_frame_data->field_metas.encodings[fieldpos] = fld_encoding;
+			if (conn_data->clnt_caps & MYSQL_CAPS_CU) {
+				my_frame_data->field_metas.encodings[fieldpos] = fld_encoding;
+			}
 		}
 	}
 
@@ -3788,10 +3977,9 @@ mysql_dissect_binary_row_packet(tvbuff_t *tvb, packet_info *pinfo, proto_item *p
 		int nfields = my_frame_data->field_metas.count;
 		int null_len = (nfields + 9) / 8;
 
-		char *null_buffer;
-		null_buffer = (uint8_t *)wmem_alloc(pinfo->pool, (size_t)null_len + 1);
-		tvb_get_raw_bytes_as_string(tvb, offset, null_buffer, (size_t)null_len + 1);
-		proto_tree_add_bytes_with_length(tree, hf_mysql_null_buffer, tvb, offset, null_len, null_buffer, null_len);
+		uint8_t *null_buffer;
+		null_buffer = tvb_memdup(pinfo->pool, tvb, offset, null_len);
+		proto_tree_add_bytes(tree, hf_mysql_null_buffer, tvb, offset, null_len, null_buffer);
 		offset += null_len;
 
 		for (fieldpos = 0; fieldpos < nfields; fieldpos++) {
@@ -3887,9 +4075,13 @@ mysql_dissect_response_prepare(tvbuff_t *tvb, packet_info *pinfo, int offset, pr
 	}
 
 	offset += 2;
-	/* Filler */
-	offset += 1;
-	proto_tree_add_item(tree, hf_mysql_num_warn, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+
+	/* Filler and warning count is not present in response from MySQL 4.1 servers */
+	if (tvb_reported_length_remaining(tvb, offset) >= 3) {
+		/* Filler */
+		offset += 1;
+		proto_tree_add_item(tree, hf_mysql_num_warn, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+	}
 
 	if (stmt_num_params > 0) {
 		mysql_set_remaining_field_packet_count(pinfo, conn_data, stmt_num_params);
@@ -4104,7 +4296,7 @@ mysql_dissect_binlog_event_heartbeat_v2(tvbuff_t *tvb, packet_info *pinfo, int o
 	proto_item_append_text(parent_item, " OTW_HB_LOG_FILENAME_FIELD");
 	offset += 1;
 
-	fle = tvb_get_fle(tvb, hb_v2_subtree, offset, &num, ENC_NA);
+	fle = tvb_get_fle(tvb, hb_v2_subtree, offset, &num, NULL);
 	offset += fle;
 
 	proto_tree_add_item(hb_v2_subtree, hf_mysql_binlog_hb_event_filename, tvb, offset, (int) num, ENC_ASCII);
@@ -4157,13 +4349,13 @@ mysql_dissect_binlog_semisync_ack(tvbuff_t *tvb, packet_info *pinfo, int offset,
 }
 
 static int
-mysql_dissect_binlog_event_header(tvbuff_t *tvb, int offset, proto_tree *tree, proto_item *pi)
+mysql_dissect_binlog_event_header(tvbuff_t *tvb, packet_info* pinfo, int offset, proto_tree *tree, proto_item *pi)
 {
 	proto_tree_add_item(tree, hf_mysql_binlog_event_header_timestamp, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 	offset += 4;
 
 	proto_tree_add_item(tree, hf_mysql_binlog_event_header_event_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-	proto_item_append_text(pi, ": %s", val_to_str(tvb_get_uint8(tvb, offset), mysql_binlog_event_type_vals, "Unknown event type: %d"));
+	proto_item_append_text(pi, ": %s", val_to_str(pinfo->pool, tvb_get_uint8(tvb, offset), mysql_binlog_event_type_vals, "Unknown event type: %d"));
 	offset += 1;
 
 	proto_tree_add_item(tree, hf_mysql_binlog_event_header_server_id, tvb, offset, 4, ENC_LITTLE_ENDIAN);
@@ -4205,7 +4397,7 @@ mysql_dissect_binlog_event_packet(tvbuff_t *tvb, packet_info *pinfo, int offset,
 		}
 
 		event_type = tvb_get_uint8(tvb, offset + 4);
-		offset = mysql_dissect_binlog_event_header(tvb, offset, tree, pi);
+		offset = mysql_dissect_binlog_event_header(tvb, pinfo, offset, tree, pi);
 
 		switch (event_type) {
 			case HEARTBEAT_LOG_EVENT_V2:
@@ -4232,9 +4424,12 @@ static int
 mysql_dissect_eof(tvbuff_t *tvb, packet_info *pinfo _U_, proto_item *pi _U_, int offset, proto_tree *tree, mysql_conn_data_t *conn_data _U_)
 {
 	uint16_t server_status = 0;
-	proto_tree_add_item(tree, hf_mysql_num_warn, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-	offset += 2;
-	offset = mysql_dissect_server_status(tvb, offset, tree, &server_status);
+	/* Warning count is not present in response from MySQL 4.1 servers */
+	if (tvb_reported_length_remaining(tvb, offset) >= 4) {
+		proto_tree_add_item(tree, hf_mysql_num_warn, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+		offset += 2;
+		offset = mysql_dissect_server_status(tvb, offset, tree, &server_status);
+	}
 	return offset + tvb_reported_length_remaining(tvb, offset);
 }
 
@@ -4284,7 +4479,7 @@ mysql_dissect_auth_switch_response(tvbuff_t *tvb, packet_info *pinfo, int offset
 	proto_tree_add_item(tree, hf_mysql_auth_switch_response_data, tvb, offset, lenstr, ENC_NA);
 	offset += lenstr;
 
-	if (g_strcmp0(conn_data->auth_method,"caching_sha2_password") == 0) {
+	if (g_strcmp0((char*)conn_data->auth_method,"caching_sha2_password") == 0) {
 		mysql_set_conn_state(pinfo, conn_data, AUTH_SHA2);
 	}
 
@@ -4342,10 +4537,10 @@ mysql_dissect_pubkey(tvbuff_t *tvb, packet_info *pinfo, int offset,
 	mysql_set_conn_state(pinfo, conn_data, AUTH_SHA2_RESPONSE);
 
 	offset++;
-	int len = tvb_reported_length_remaining(tvb, offset) - 1;
+	unsigned len = tvb_reported_length_remaining(tvb, offset);
 	next_tvb = tvb_new_subset_length(tvb, offset, len);
-	add_new_data_source(pinfo, next_tvb, "public key");
 	proto_tree_add_item(tree, hf_mysql_pubkey, tvb, offset, len, ENC_ASCII);
+	call_dissector(rfc7468_handle, next_tvb, pinfo, proto_tree_get_root(tree));
 	offset += len;
 
 	return offset + tvb_reported_length_remaining(tvb,offset);
@@ -4377,11 +4572,11 @@ mysql_dissect_clone_request(tvbuff_t *tvb _U_, packet_info *pinfo _U_, int offse
 		case MYSQL_CLONE_COM_REINIT:
 		case MYSQL_CLONE_COM_EXECUTE:
 		case MYSQL_CLONE_COM_ACK:
-			col_append_fstr(pinfo->cinfo, COL_INFO, " %s", val_to_str(req_code, mysql_clone_command_vals, "Unknown clone request: %d"));
+			col_append_fstr(pinfo->cinfo, COL_INFO, " %s", val_to_str(pinfo->pool, req_code, mysql_clone_command_vals, "Unknown clone request: %d"));
 			proto_tree_add_item(tree, hf_mysql_clone_command_code, tvb, offset, 1, ENC_NA);
 			break;
 		case MYSQL_CLONE_COM_EXIT:
-			col_append_fstr(pinfo->cinfo, COL_INFO, " %s", val_to_str(req_code, mysql_clone_command_vals, "Unknown clone request: %d"));
+			col_append_fstr(pinfo->cinfo, COL_INFO, " %s", val_to_str(pinfo->pool, req_code, mysql_clone_command_vals, "Unknown clone request: %d"));
 			proto_tree_add_item(tree, hf_mysql_clone_command_code, tvb, offset, 1, ENC_NA);
 			mysql_set_conn_state(pinfo, conn_data, CLONE_EXIT);
 			break;
@@ -4413,7 +4608,7 @@ mysql_dissect_clone_response(tvbuff_t *tvb, packet_info *pinfo, int offset,
 				mysql_set_conn_state(pinfo, conn_data, REQUEST);
 			/* fall through */
 		case MYSQL_CLONE_COM_RES_ERROR:
-			col_append_fstr(pinfo->cinfo, COL_INFO, " %s", val_to_str(resp_code, mysql_clone_response_vals, "unknown clone request: %d"));
+			col_append_fstr(pinfo->cinfo, COL_INFO, " %s", val_to_str(pinfo->pool, resp_code, mysql_clone_response_vals, "unknown clone request: %d"));
 			proto_tree_add_item(tree, hf_mysql_clone_response_code, tvb, offset, 1, ENC_NA);
 			break;
 		default:
@@ -4576,23 +4771,7 @@ dissect_mysql_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 	conversation= find_or_create_conversation(pinfo);
 
 	/* get associated state information, create if necessary */
-	conn_data= (mysql_conn_data_t *)conversation_get_proto_data(conversation, proto_mysql);
-	if (!conn_data) {
-		conn_data = wmem_new0(wmem_file_scope(), mysql_conn_data_t);
-		conn_data->stmts = wmem_tree_new(wmem_file_scope());
-		conn_data->encoding_client = ENC_UTF_8;
-		conn_data->encoding_results = ENC_UTF_8;
-
-		// Client and server capability flags
-		// Set in case the conversation doesn't start with greeting/login
-		conn_data->clnt_caps = MYSQL_CAPS_CU;    // CLIENT_PROTOCOL_41
-		conn_data->clnt_caps_ext = MYSQL_CAPS_DE // CLIENT_DEPRECATE_EOF
-			^ MYSQL_CAPS_ST;                 // CLIENT_SESSION_TRACK
-		conn_data->srv_caps = MYSQL_CAPS_CU;     // CLIENT_PROTOCOL_41
-		conn_data->srv_caps_ext = MYSQL_CAPS_DE; // CLIENT_DEPRECATE_EOF
-
-		conversation_add_proto_data(conversation, proto_mysql, conn_data);
-	}
+	conn_data = find_or_create_mysql_conn_data(conversation);
 
 	/* Using tvb_raw_offset(tvb) allows storage of multiple "proto data" in a single frame
 	 * (when there are multiple MySQL pdus in a single frame) */
@@ -4626,8 +4805,7 @@ dissect_mysql_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 		is_response= true;
 	}
 
-	packet_number = tvb_get_uint8(tvb, offset);
-	proto_tree_add_item(mysql_tree, hf_mysql_packet_number, tvb, offset, 1, ENC_NA);
+	proto_tree_add_item_ret_uint(mysql_tree, hf_mysql_packet_number, tvb, offset, 1, ENC_NA, &packet_number);
 	offset += 1;
 
 #ifdef CTDEBUG
@@ -4640,11 +4818,11 @@ dissect_mysql_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 		pi = proto_tree_add_debug_text(mysql_tree, "generation: %" PRId64, generation);
 		proto_item_set_generated(pi);
 		pi = proto_tree_add_debug_text(mysql_tree, "conn state: %s (%u)",
-				    val_to_str(conn_state_in, state_vals, "Unknown (%u)"),
+				    val_to_str(pinfo->pool, conn_state_in, state_vals, "Unknown (%u)"),
 				    conn_state_in);
 		proto_item_set_generated(pi);
 		pi = proto_tree_add_debug_text(mysql_tree, "frame state: %s (%u)",
-				    val_to_str(frame_state, state_vals, "Unknown (%u)"),
+				    val_to_str(pinfo->pool, frame_state, state_vals, "Unknown (%u)"),
 				    frame_state);
 		proto_item_set_generated(pi);
 	}
@@ -4671,15 +4849,15 @@ dissect_mysql_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 			col_set_str(pinfo->cinfo, COL_INFO, "Login Request");
 			offset = mysql_dissect_login(tvb, pinfo, offset, mysql_tree, conn_data);
 
-			// If both zlib and ZSTD flags are set then zlib is used.
-			if ((conn_data->srv_caps & MYSQL_CAPS_CP) && (conn_data->clnt_caps & MYSQL_CAPS_CP)) {
-				conn_data->frame_start_compressed = pinfo->num;
-				conn_data->compressed_state = MYSQL_COMPRESS_INIT;
-				conn_data->compressed_alg = MYSQL_COMPRESS_ALG_ZLIB;
-			} else if ((conn_data->srv_caps_ext & MYSQL_CAPS_ZS) && (conn_data->clnt_caps_ext & MYSQL_CAPS_ZS)) {
-				conn_data->frame_start_compressed = pinfo->num;
-				conn_data->compressed_state = MYSQL_COMPRESS_INIT;
-				conn_data->compressed_alg = MYSQL_COMPRESS_ALG_ZSTD;
+			if (conn_data->compressed_state == MYSQL_COMPRESS_NONE) {
+				// If both zlib and ZSTD flags are set then zlib is used.
+				if ((conn_data->srv_caps & MYSQL_CAPS_CP) && (conn_data->clnt_caps & MYSQL_CAPS_CP)) {
+					conn_data->compressed_state = MYSQL_COMPRESS_INIT;
+					conn_data->compressed_alg = MYSQL_COMPRESS_ALG_ZLIB;
+				} else if ((conn_data->srv_caps_ext & MYSQL_CAPS_ZS) && (conn_data->clnt_caps_ext & MYSQL_CAPS_ZS)) {
+					conn_data->compressed_state = MYSQL_COMPRESS_INIT;
+					conn_data->compressed_alg = MYSQL_COMPRESS_ALG_ZSTD;
+				}
 			}
 		} else if ((mysql_frame_data_p->state == CLONE_ACTIVE) || (mysql_frame_data_p->state == CLONE_EXIT)) {
 			col_set_str(pinfo->cinfo, COL_INFO, "Clone Request");
@@ -4697,7 +4875,7 @@ dissect_mysql_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 	conn_state_out= conn_data->state;
 	++(conn_data->generation);
 	pi = proto_tree_add_debug_text(mysql_tree, "next proto state: %s (%u)",
-			    val_to_str(conn_state_out, state_vals, "Unknown (%u)"),
+			    val_to_str(pinfo->pool, conn_state_out, state_vals, "Unknown (%u)"),
 			    conn_state_out);
 	proto_item_set_generated(pi);
 #endif
@@ -4798,6 +4976,7 @@ dissect_mysql_compressed_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
 		conn_data = wmem_new0(wmem_file_scope(), mysql_conn_data_t);
 		conn_data->stmts = wmem_tree_new(wmem_file_scope());
 		conn_data->compressed_state = MYSQL_COMPRESS_ACTIVE;
+		conn_data->frame_start_compressed = pinfo->num;
 		conn_data->encoding_client = ENC_UTF_8;
 		conn_data->encoding_results = ENC_UTF_8;
 		conversation_add_proto_data(conversation, proto_mysql, conn_data);
@@ -4841,7 +5020,7 @@ dissect_mysql_compressed_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
 
 			offset += clen;
 		} else {
-			expert_add_info_format(pinfo, mysql_tree, &ei_mysql_compression, "Can't uncompress packet");
+			expert_add_info(pinfo, mysql_tree, &ei_mysql_compression);
 		}
 	} else {
 		/* No compression was chosen. It's unlikely that there are
@@ -4880,6 +5059,14 @@ dissect_mysql(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 	}
 
 	return tvb_reported_length(tvb);
+}
+
+static void
+format_progress_percentage(char *buf, uint32_t value)
+{
+	double val;
+	val = (double) value / 1000;
+        snprintf(buf, ITEM_LABEL_LENGTH, "%.3f%%", val);
 }
 
 /* protocol registration */
@@ -5853,6 +6040,11 @@ void proto_register_mysql(void)
 		FT_BYTES, BASE_NONE, NULL, 0x0,
 		NULL, HFILL }},
 
+		{ &hf_mysql_fld_binary,
+		{ "Binary", "mysql.field.flags.binary",
+		FT_BOOLEAN, 16, TFS(&tfs_set_notset), MYSQL_FLD_BINARY_FLAG,
+		"Field: flag binary", HFILL }},
+
 		{ &hf_mysql_fld_enum,
 		{ "Enum", "mysql.field.flags.enum",
 		FT_BOOLEAN, 16, TFS(&tfs_set_notset), MYSQL_FLD_ENUM_FLAG,
@@ -6100,7 +6292,7 @@ void proto_register_mysql(void)
 
 		{ &hf_mysql_compressed_packet_number,
 		{ "Compressed Packet Number", "mysql.compressed_packet_number",
-		FT_UINT24, BASE_DEC, NULL,  0x0,
+		FT_UINT8, BASE_DEC, NULL,  0x0,
 		NULL, HFILL }},
 
 		{ &hf_mysql_compressed_packet_length_uncompressed,
@@ -6143,6 +6335,11 @@ void proto_register_mysql(void)
 		FT_BOOLEAN, 32, TFS(&tfs_set_notset), MARIADB_CAPS_ME,
 		NULL, HFILL }},
 
+		{ &hf_mariadb_cap_bulk_unit_results,
+		{ "Bulk unit results", "mariadb.caps.bu",
+		FT_BOOLEAN, 32, TFS(&tfs_set_notset), MARIADB_CAPS_BU,
+		NULL, HFILL }},
+
 		{ &hf_mariadb_extcaps_server,
 		{ "MariaDB Extended Server Capabilities", "mariadb.extcaps.server",
 		FT_UINT32, BASE_HEX, NULL, 0x0,
@@ -6181,6 +6378,26 @@ void proto_register_mysql(void)
 		{ &hf_mariadb_bulk_row_nr,
 		{ "Row nr", "mariadb.bulk.row_nr",
 		FT_UINT32, BASE_DEC, NULL, 0x00,
+		NULL, HFILL }},
+
+		{ &hf_mariadb_progress_stage,
+		{ "Stage", "mariadb.progress.stage",
+		FT_UINT8, BASE_DEC, NULL, 0x0,
+		NULL, HFILL }},
+
+		{ &hf_mariadb_progress_max_stage,
+		{ "Max Stage", "mariadb.progress.max_stage",
+		FT_UINT8, BASE_DEC, NULL, 0x0,
+		NULL, HFILL }},
+
+		{ &hf_mariadb_progress_progress,
+		{ "Progress Percentage", "mariadb.progress.progress",
+		FT_UINT24, BASE_CUSTOM, CF_FUNC(format_progress_percentage), 0x0,
+		NULL, HFILL }},
+
+		{ &hf_mariadb_progress_status,
+		{ "Status", "mariadb.progress.status",
+		FT_STRING, BASE_NONE, NULL, 0x0,
 		NULL, HFILL }},
 
 		{ &hf_mysql_fragments,
@@ -6274,7 +6491,7 @@ void proto_register_mysql(void)
 		{ &ei_mysql_command, { "mysql.command.invalid", PI_PROTOCOL, PI_WARN, "Unknown/invalid command code", EXPFILL }},
 		{ &ei_mysql_unknown_response, { "mysql.unknown_response", PI_UNDECODED, PI_WARN, "unknown/invalid response", EXPFILL }},
 		{ &ei_mysql_invalid_length, { "mysql.invalid_length", PI_MALFORMED, PI_ERROR, "Invalid length", EXPFILL }},
-		{ &ei_mysql_compression, { "mysql.uncompress_failure", PI_MALFORMED, PI_WARN, "Uncompression failed", EXPFILL }},
+		{ &ei_mysql_compression, { "mysql.uncompress_failure", PI_MALFORMED, PI_WARN, "Can't uncompress packet", EXPFILL }},
 	};
 
 	module_t *mysql_module;
@@ -6297,6 +6514,39 @@ void proto_register_mysql(void)
 					"Whether the MySQL dissector should display the SQL query string in the INFO column.",
 					&mysql_showquery);
 
+	prefs_register_bool_preference(mysql_module, "assume_deprecate_eof",
+					"Assume DEPRECATE_EOF capability",
+					"Whether the MySQL dissector should assume that the MYSQL_DEPRECATE_EOF"
+					" capability is negotiated when the login handshake is not captured."
+					" This capability was introduced with MySQL 5.5.7 to enable session"
+					" state tracking but is not supported by all connectors because of"
+					" backwards compatibility issues.",
+					&mysql_deprecate_eof);
+
+	prefs_register_bool_preference(mysql_module, "assume_query_attributes",
+					"Assume QUERY_ATTRIBUTES capability",
+					"Whether the MySQL dissector should assume that the MYSQL_QUERY_ATTRIBUTES"
+					" capability is negotiated when the login handshake is not captured."
+					" This capability was introduced with MySQL 8.0.23 and presents"
+					" backwards compatibility issues.",
+					&mysql_query_attributes);
+
+	prefs_register_bool_preference(mysql_module, "assume_extended_metadata",
+					"Assume MariaDB EXTENDED_METADATA capability",
+					"Whether the MySQL dissector should assume that the MariaDB EXTENDED_METADATA"
+					" capability is negotiated when the login handshake is not captured."
+					" This capability was introduced with MariaDB 10.5.2 and presents"
+					" backwards compatibility issues.",
+					&mariadb_extended_metadata);
+
+	prefs_register_bool_preference(mysql_module, "assume_cache_metadata",
+					"Assume MariaDB CACHE_METADATA capability",
+					"Whether the MySQL dissector should assume that the MariaDB CACHE_METADATA"
+					" capability is negotiated when the login handshake is not captured."
+					" This capability was introduced with MariaDB 10.6.0 and presents"
+					" backwards compatibility issues.",
+					&mariadb_cache_metadata);
+
 	reassembly_table_register(&mysql_reassembly_table,
 		&addresses_ports_reassembly_table_functions);
 	mysql_handle = register_dissector("mysql", dissect_mysql, proto_mysql);
@@ -6306,6 +6556,7 @@ void proto_register_mysql(void)
 void proto_reg_handoff_mysql(void)
 {
 	tls_handle = find_dissector("tls");
+	rfc7468_handle = find_dissector_add_dependency("rfc7468", proto_mysql);
 	decompressed_handle = create_dissector_handle(dissect_mysql_decompressed_pdus, proto_mysql);
 	dissector_add_uint_with_preference("tcp.port", TCP_PORT_MySQL, mysql_handle);
 }

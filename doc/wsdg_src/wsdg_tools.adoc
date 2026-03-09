@@ -118,10 +118,9 @@ Let you set the path to a locally-compiled version of c-ares. Most
 optional libraries have xxx_INCLUDE_DIR and xxx_LIB flags that let you
 control their discovery.
 
--DCMAKE_OSX_DEPLOYMENT_TARGET=10.14::
+-DCMAKE_OSX_DEPLOYMENT_TARGET=12.0::
 Specify the minimum macOS version for Wireshark and each command line utility.
 Note that this doesn’t affect the minimum target for third-party libraries.
-For example, if you’re building for macOS 10.14 you’ll need to install https://doc.qt.io/qt-5/supported-platforms.html[Qt 5.15 or earlier] and ensure that other libraries support macOS 10.14, for example by running `tools/macos-setup.sh -t 10.14`.
 
 -DENABLE_APPLICATION_BUNDLE=OFF:: Disable building an application bundle (Wireshark.app) on macOS
 
@@ -467,10 +466,9 @@ https://docs.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files[Red
 
 In all cases where _vc_redist.x64.exe_ or _vc_redist.arm64.exe_ is
 downloaded it should be downloaded to the directory into which the
-support libraries for Wireshark have been downloaded and installed. This
-directory is specified by the `WIRESHARK_BASE_DIR` or
-`WIRESHARK_LIB_DIR` environment variables. It need not, and should not,
-be run after being downloaded.
+support libraries for Wireshark have been downloaded and installed.
+This directory is specified by the `WIRESHARK_BASE_DIR` environment or CMake variable.
+It need not, and should not, be run after being downloaded.
 
 ==== Windows Platform SDK
 
@@ -486,8 +484,9 @@ Edition, it will include an SDK.
 [#ChToolsDocumentationToolchain]
 === Documentation Toolchain
 
-Wireshark’s documentation is split across two directories.
-The `doc` directory contains man pages, User’s Guide, Developer’s Guide, and the release notes, which are written in Asciidoctor markup.
+Wireshark’s documentation is located in the `doc` directory.
+It contains man pages, User’s Guide, Developer’s Guide, and the release notes, which are written in Asciidoctor markup.
+A bunch of README files in text format can also be found there.
 
 Our various output formats are generated using the following tools.
 Intermediate formats are in _italics_.
@@ -505,9 +504,10 @@ Release notes text:: Asciidoctor → _HTML_ → html2text.py
 
 https://asciidoctor.org/[Asciidoctor] comes in several flavors: a Ruby gem (Asciidoctor), a Java bundle (AsciidoctorJ), and transpiled JavaScript (Asciidoctor.js).
 The Ruby and Java flavors can be used to build Wireshark’s documentation, but the JavaScript flavor doesn’t support all of the features that we require.
+CMake will download a pre-built version of Ruby and the Asciidoctor gem on Windows.
 // We need docbook5, PDF & EPUB output and macros
 
-The guides and release notes were originally written in DocBook (hence the directory name).
+The guides and release notes were originally written in DocBook.
 They were later converted to AsciiDoc and then migrated to Asciidoctor.
 The man pages were originally in Perl’s POD (Plain Old Documentation) format and were later converted to Asciidoctor.
 We use Asciidoctor’s modern (>= 1.5.0) syntax.
@@ -871,7 +871,6 @@ However, the version string may vary.
 
 [#ChToolsWindowsPerl]
 
-[discrete]
 ==== Windows
 
 Unless you need to run one of the check or code generation scripts in the _tools_ directory or have a need for Perl outside of Wireshark development you should probably avoid installing it on Windows.

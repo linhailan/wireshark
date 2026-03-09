@@ -41,6 +41,7 @@ endmacro()
 ADD_MAN_PAGE(wireshark   1)
 ADD_MAN_PAGE(tshark      1)
 ADD_MAN_PAGE(stratoshark 1)
+ADD_MAN_PAGE(strato      1)
 
 ADD_MAN_PAGE(androiddump 1)
 ADD_MAN_PAGE(capinfos    1)
@@ -57,6 +58,7 @@ ADD_MAN_PAGE(reordercap  1)
 ADD_MAN_PAGE(sshdig      1)
 ADD_MAN_PAGE(sshdump     1)
 ADD_MAN_PAGE(text2pcap   1)
+ADD_MAN_PAGE(dumpcalls   1)
 ADD_MAN_PAGE(falcodump   1)
 ADD_MAN_PAGE(udpdump     1)
 ADD_MAN_PAGE(wifidump    1)
@@ -203,6 +205,7 @@ set(WSUG_FILES
 	wsug_src/wsug_use.adoc
 	wsug_src/wsug_work.adoc
 	wsug_src/capinfos-h.txt
+	wsug_src/captype-h.txt
 	wsug_src/dumpcap-h.txt
 	wsug_src/editcap-F.txt
 	wsug_src/editcap-T.txt
@@ -254,6 +257,7 @@ set(WSUG_GRAPHICS
 	wsug_src/images/toolbar/x-colorize-packets.png
 	wsug_src/images/toolbar/x-resize-columns.png
 	wsug_src/images/toolbar/x-stay-last.png
+	wsug_src/images/toolbar/aggregation.png
 	wsug_src/images/toolbar/zoom-in.png
 	wsug_src/images/toolbar/zoom-original.png
 	wsug_src/images/toolbar/zoom-out.png
@@ -352,6 +356,7 @@ set(WSUG_GRAPHICS
 	wsug_src/images/ws-stats-lte-mac-traffic.png
 	wsug_src/images/ws-stats-lte-rlc-traffic.png
 	wsug_src/images/ws-stats-packet-lengths.png
+	wsug_src/images/ws-stats-plots.png
 	wsug_src/images/ws-stats-srt-smb2.png
 	wsug_src/images/ws-stats-wlan-traffic.png # GTK+
 	wsug_src/images/ws-statusbar-empty.png
@@ -393,6 +398,7 @@ set(WSDG_FILES
 	wsdg_src/wsdg_tests.adoc
 	wsdg_src/wsdg_tools.adoc
 	wsdg_src/wsdg_userinterface.adoc
+	wsdg_src/wsdg_wiretap.adoc
 	wsdg_src/wsdg_works.adoc
 	${COMMON_GUIDE_FILES}
 )
@@ -405,10 +411,13 @@ set(WSDG_GRAPHICS
 	wsdg_src/images/note.svg
 	wsdg_src/images/tip.svg
 	wsdg_src/images/warning.svg
+	wsdg_src/images/win-setup-env.png
+	wsdg_src/images/win-setup-selectenv.png
+	wsdg_src/images/win-setup-vs18shell.png
 	wsdg_src/images/ws-capture_internals.dia
 	wsdg_src/images/ws-capture_internals.png
 	wsdg_src/images/ws-capture-sync.dia
-	wsdg_src/images/ws-capture-sync.png
+	wsdg_src/images/ws-capture-sync.dia
 	wsdg_src/images/ws-capture-sync.png
 	wsdg_src/images/ws-function-blocks.dia
 	wsdg_src/images/ws-function-blocks.svg
@@ -444,6 +453,7 @@ set(WSLUA_MODULES
 	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_pref.c
 	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_proto_expert.c
 	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_proto_field.c
+	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_proto_helpers.c
 	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_tree.c
 	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_tvb.c
 	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_byte_array.c
@@ -455,6 +465,7 @@ set(WSLUA_MODULES
 	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_wtap.c
 	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_utility.c
 	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_struct.c
+	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_gcrypt.c
 )
 
 # Empty file to trigger wsluarm generation.

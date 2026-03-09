@@ -4943,7 +4943,8 @@ CSN_DESCR_BEGIN(h_FreqBsicCell_t)
 CSN_DESCR_END  (h_FreqBsicCell_t)
 #endif
 
-static const CSN_DESCR_BEGIN(CellSelectionParamsWithFreqDiff_t)
+static const
+CSN_DESCR_BEGIN(CellSelectionParamsWithFreqDiff_t)
   /*FREQUENCY_DIFF is really an integer but the number of bits to decode it are stored in FREQ_DIFF_LENGTH*/
   M_VAR_BITMAP (CellSelectionParamsWithFreqDiff_t, FREQUENCY_DIFF, FREQ_DIFF_LENGTH, 0, &hf_cell_selection_param_with_freqdiff),
   M_UINT       (CellSelectionParamsWithFreqDiff_t,  BSIC,  6, &hf_cellselectionparamswithfreqdiff_bsic),
@@ -4984,9 +4985,10 @@ CSN_DESCR_BEGIN(Add_Frequency_list_t)
   M_VAR_TARRAY (Add_Frequency_list_t, CellSelectionParamsWithFreqDiff, CellSelectionParamsWithFreqDiff_t, NR_OF_FREQUENCIES),
 CSN_DESCR_END  (Add_Frequency_list_t)
 
-static const CSN_DESCR_BEGIN(Removed_Freq_Index_t)
-  M_UINT(Removed_Freq_Index_t, REMOVED_FREQ_INDEX, 6, &hf_removed_freq_index_removed_freq_index),
-CSN_DESCR_END(Removed_Freq_Index_t)
+static const
+CSN_DESCR_BEGIN(Removed_Freq_Index_t)
+  M_UINT       (Removed_Freq_Index_t, REMOVED_FREQ_INDEX, 6, &hf_removed_freq_index_removed_freq_index),
+CSN_DESCR_END  (Removed_Freq_Index_t)
 
 static const
 CSN_DESCR_BEGIN(NC_Frequency_list_t)
@@ -7604,14 +7606,16 @@ CSN_DESCR_BEGIN  (SI6_RestOctet_t)
 CSN_DESCR_END    (SI6_RestOctet_t)
 #endif
 
-static CSN_DESCR_BEGIN  (UL_Data_Mac_Header_t)
+static const
+CSN_DESCR_BEGIN  (UL_Data_Mac_Header_t)
   M_UINT         (UL_Data_Mac_Header_t,  Payload_Type, 2, &hf_ul_payload_type),
   M_UINT         (UL_Data_Mac_Header_t,  Countdown_Value, 4, &hf_countdown_value),
   M_UINT         (UL_Data_Mac_Header_t,  SI, 1, &hf_ul_data_si),
   M_UINT         (UL_Data_Mac_Header_t,  R, 1, &hf_ul_retry),
 CSN_DESCR_END    (UL_Data_Mac_Header_t)
 
-static CSN_DESCR_BEGIN  (UL_Data_Block_GPRS_t)
+static const
+CSN_DESCR_BEGIN  (UL_Data_Block_GPRS_t)
   M_TYPE         (UL_Data_Block_GPRS_t, UL_Data_Mac_Header, UL_Data_Mac_Header_t),
   M_UINT         (UL_Data_Block_GPRS_t, Spare, 1, &hf_ul_data_spare),
   M_UINT         (UL_Data_Block_GPRS_t, PI, 1, &hf_pi),
@@ -7621,7 +7625,8 @@ static CSN_DESCR_BEGIN  (UL_Data_Block_GPRS_t)
   M_UINT         (UL_Data_Block_GPRS_t, E, 1, &hf_e),
 CSN_DESCR_END    (UL_Data_Block_GPRS_t)
 
-static CSN_DESCR_BEGIN  (UL_Data_Block_EGPRS_Header_Type1_t)
+static const
+CSN_DESCR_BEGIN  (UL_Data_Block_EGPRS_Header_Type1_t)
   M_SPLIT_BITS   (UL_Data_Block_EGPRS_Header_Type1_t, TFI, bits_spec_ul_tfi, 5, &hf_uplink_tfi),
   M_BITS_CRUMB   (UL_Data_Block_EGPRS_Header_Type1_t, TFI, bits_spec_ul_tfi, 1, &hf_uplink_tfi),
   M_UINT         (UL_Data_Block_EGPRS_Header_Type1_t, Countdown_Value, 4, &hf_countdown_value),
@@ -7642,7 +7647,8 @@ static CSN_DESCR_BEGIN  (UL_Data_Block_EGPRS_Header_Type1_t)
   M_UINT         (UL_Data_Block_EGPRS_Header_Type1_t, SPARE2, 6, &hf_ul_data_spare),
 CSN_DESCR_END    (UL_Data_Block_EGPRS_Header_Type1_t)
 
-static CSN_DESCR_BEGIN  (UL_Data_Block_EGPRS_Header_Type2_t)
+static const
+CSN_DESCR_BEGIN  (UL_Data_Block_EGPRS_Header_Type2_t)
   M_SPLIT_BITS   (UL_Data_Block_EGPRS_Header_Type2_t, TFI, bits_spec_ul_tfi, 5, &hf_uplink_tfi),
   M_BITS_CRUMB   (UL_Data_Block_EGPRS_Header_Type2_t, TFI, bits_spec_ul_tfi, 1, &hf_uplink_tfi),
   M_UINT         (UL_Data_Block_EGPRS_Header_Type2_t, Countdown_Value, 4, &hf_countdown_value),
@@ -7662,7 +7668,8 @@ static CSN_DESCR_BEGIN  (UL_Data_Block_EGPRS_Header_Type2_t)
   M_UINT         (UL_Data_Block_EGPRS_Header_Type2_t, SPARE2, 5, &hf_ul_data_spare),
 CSN_DESCR_END    (UL_Data_Block_EGPRS_Header_Type2_t)
 
-static CSN_DESCR_BEGIN  (UL_Data_Block_EGPRS_Header_Type3_t)
+static const
+CSN_DESCR_BEGIN  (UL_Data_Block_EGPRS_Header_Type3_t)
   M_SPLIT_BITS   (UL_Data_Block_EGPRS_Header_Type3_t, TFI, bits_spec_ul_tfi, 5, &hf_uplink_tfi),
   M_BITS_CRUMB   (UL_Data_Block_EGPRS_Header_Type3_t, TFI, bits_spec_ul_tfi, 1, &hf_uplink_tfi),
   M_UINT         (UL_Data_Block_EGPRS_Header_Type3_t, Countdown_Value, 4, &hf_countdown_value),
@@ -7682,7 +7689,8 @@ static CSN_DESCR_BEGIN  (UL_Data_Block_EGPRS_Header_Type3_t)
   M_BITS_CRUMB   (UL_Data_Block_EGPRS_Header_Type3_t, CPS, bits_spec_ul_type3_cps, 0, &hf_cps3),
 CSN_DESCR_END    (UL_Data_Block_EGPRS_Header_Type3_t)
 
-static CSN_DESCR_BEGIN  (UL_Data_Block_EC_EGPRS_Header_Type3_t)
+static const
+CSN_DESCR_BEGIN  (UL_Data_Block_EC_EGPRS_Header_Type3_t)
   M_SPLIT_BITS   (UL_Data_Block_EC_EGPRS_Header_Type3_t, TFI, bits_spec_ul_tfi, 5, &hf_uplink_tfi),
   M_BITS_CRUMB   (UL_Data_Block_EC_EGPRS_Header_Type3_t, TFI, bits_spec_ul_tfi, 1, &hf_uplink_tfi),
   M_UINT         (UL_Data_Block_EC_EGPRS_Header_Type3_t, Countdown_Value, 4, &hf_countdown_value),
@@ -7700,29 +7708,34 @@ static CSN_DESCR_BEGIN  (UL_Data_Block_EC_EGPRS_Header_Type3_t)
   M_BITS_CRUMB   (UL_Data_Block_EC_EGPRS_Header_Type3_t, DL_CC_EST, bits_spec_ul_ec_type3_dl_cc_est, 0, &hf_ec_dl_cc_est),
 CSN_DESCR_END    (UL_Data_Block_EC_EGPRS_Header_Type3_t)
 
-static CSN_DESCR_BEGIN  (UL_Packet_Control_Ack_11_t)
+static const
+CSN_DESCR_BEGIN  (UL_Packet_Control_Ack_11_t)
   M_UINT         (UL_Packet_Control_Ack_11_t,  MESSAGE_TYPE, 9, &hf_prach11_message_type_9),
   M_UINT         (UL_Packet_Control_Ack_11_t,  CTRL_ACK, 2, &hf_packet_control_acknowledgement_ctrl_ack),
 CSN_DESCR_END    (UL_Packet_Control_Ack_11_t)
 
-static CSN_DESCR_BEGIN  (UL_Packet_Control_Ack_TN_RRBP_11_t)
+static const
+CSN_DESCR_BEGIN  (UL_Packet_Control_Ack_TN_RRBP_11_t)
   M_UINT         (UL_Packet_Control_Ack_TN_RRBP_11_t,  MESSAGE_TYPE, 6, &hf_prach11_message_type_6),
   M_UINT         (UL_Packet_Control_Ack_TN_RRBP_11_t,  TN_RRBP, 3, &hf_packet_control_acknowledgement_additionsr5_tn_rrbp),
   M_UINT         (UL_Packet_Control_Ack_TN_RRBP_11_t,  CTRL_ACK, 2, &hf_packet_control_acknowledgement_ctrl_ack),
 CSN_DESCR_END    (UL_Packet_Control_Ack_TN_RRBP_11_t)
 
-static CSN_DESCR_BEGIN  (UL_Packet_Control_Ack_8_t)
+static const
+CSN_DESCR_BEGIN  (UL_Packet_Control_Ack_8_t)
   M_UINT         (UL_Packet_Control_Ack_8_t,  MESSAGE_TYPE, 6, &hf_prach8_message_type_6),
   M_UINT         (UL_Packet_Control_Ack_8_t,  CTRL_ACK, 2, &hf_packet_control_acknowledgement_ctrl_ack),
 CSN_DESCR_END    (UL_Packet_Control_Ack_8_t)
 
-static CSN_DESCR_BEGIN  (UL_Packet_Control_Ack_TN_RRBP_8_t)
+static const
+CSN_DESCR_BEGIN  (UL_Packet_Control_Ack_TN_RRBP_8_t)
   M_UINT         (UL_Packet_Control_Ack_TN_RRBP_8_t,  MESSAGE_TYPE, 3, &hf_prach8_message_type_3),
   M_UINT         (UL_Packet_Control_Ack_TN_RRBP_8_t,  TN_RRBP, 3, &hf_packet_control_acknowledgement_additionsr5_tn_rrbp),
   M_UINT         (UL_Packet_Control_Ack_TN_RRBP_8_t,  CTRL_ACK, 2, &hf_packet_control_acknowledgement_ctrl_ack),
 CSN_DESCR_END    (UL_Packet_Control_Ack_TN_RRBP_8_t)
 
-static CSN_DESCR_BEGIN  (DL_Data_Mac_Header_t)
+static const
+CSN_DESCR_BEGIN  (DL_Data_Mac_Header_t)
   M_UINT         (DL_Data_Mac_Header_t, Payload_Type, 2, &hf_dl_payload_type),
   M_UINT         (DL_Data_Mac_Header_t,  RRBP,  2, &hf_rrbp),
   M_UINT         (DL_Data_Mac_Header_t,  S_P,  1, &hf_s_p),
@@ -7730,7 +7743,8 @@ static CSN_DESCR_BEGIN  (DL_Data_Mac_Header_t)
 CSN_DESCR_END    (DL_Data_Mac_Header_t)
 
 
-static CSN_DESCR_BEGIN  (DL_Data_Block_GPRS_t)
+static const
+CSN_DESCR_BEGIN  (DL_Data_Block_GPRS_t)
   M_TYPE         (DL_Data_Block_GPRS_t, DL_Data_Mac_Header, DL_Data_Mac_Header_t),
   M_UINT         (DL_Data_Block_GPRS_t, Power_Reduction, 2, &hf_dl_ctrl_pr),
   M_UINT         (DL_Data_Block_GPRS_t, TFI, 5, &hf_downlink_tfi),
@@ -7739,7 +7753,8 @@ static CSN_DESCR_BEGIN  (DL_Data_Block_GPRS_t)
   M_UINT         (DL_Data_Block_GPRS_t, E, 1, &hf_e),
 CSN_DESCR_END    (DL_Data_Block_GPRS_t)
 
-static CSN_DESCR_BEGIN  (DL_Data_Block_EGPRS_Header_Type1_t)
+static const
+CSN_DESCR_BEGIN  (DL_Data_Block_EGPRS_Header_Type1_t)
   M_SPLIT_BITS   (DL_Data_Block_EGPRS_Header_Type1_t, TFI, bits_spec_dl_tfi, 5, &hf_downlink_tfi),
   M_BITS_CRUMB   (DL_Data_Block_EGPRS_Header_Type1_t, TFI, bits_spec_dl_tfi, 1, &hf_downlink_tfi),
   M_UINT         (DL_Data_Block_EGPRS_Header_Type1_t, RRBP, 2, &hf_rrbp),
@@ -7757,7 +7772,8 @@ static CSN_DESCR_BEGIN  (DL_Data_Block_EGPRS_Header_Type1_t)
   M_BITS_CRUMB   (DL_Data_Block_EGPRS_Header_Type1_t, BSN2_offset, bits_spec_dl_type1_bsn2, 0, &hf_bsn2_offset),
 CSN_DESCR_END    (DL_Data_Block_EGPRS_Header_Type1_t)
 
-static CSN_DESCR_BEGIN  (DL_Data_Block_EGPRS_Header_Type2_t)
+static const
+CSN_DESCR_BEGIN  (DL_Data_Block_EGPRS_Header_Type2_t)
   M_SPLIT_BITS   (DL_Data_Block_EGPRS_Header_Type2_t, TFI, bits_spec_dl_tfi, 5, &hf_downlink_tfi),
   M_BITS_CRUMB   (DL_Data_Block_EGPRS_Header_Type2_t, TFI, bits_spec_dl_tfi, 1, &hf_downlink_tfi),
   M_UINT         (DL_Data_Block_EGPRS_Header_Type2_t, RRBP, 2, &hf_rrbp),
@@ -7773,7 +7789,8 @@ static CSN_DESCR_BEGIN  (DL_Data_Block_EGPRS_Header_Type2_t)
   M_BITS_CRUMB   (DL_Data_Block_EGPRS_Header_Type2_t, BSN1, bits_spec_dl_type2_bsn, 0, &hf_bsn),
 CSN_DESCR_END    (DL_Data_Block_EGPRS_Header_Type2_t)
 
-static CSN_DESCR_BEGIN  (DL_Data_Block_EGPRS_Header_Type3_t)
+static const
+CSN_DESCR_BEGIN  (DL_Data_Block_EGPRS_Header_Type3_t)
   M_SPLIT_BITS   (DL_Data_Block_EGPRS_Header_Type3_t, TFI, bits_spec_dl_tfi, 5, &hf_downlink_tfi),
   M_BITS_CRUMB   (DL_Data_Block_EGPRS_Header_Type3_t, TFI, bits_spec_dl_tfi, 1, &hf_downlink_tfi),
   M_UINT         (DL_Data_Block_EGPRS_Header_Type3_t, RRBP, 2, &hf_rrbp),
@@ -7790,7 +7807,8 @@ static CSN_DESCR_BEGIN  (DL_Data_Block_EGPRS_Header_Type3_t)
   M_BITS_CRUMB   (DL_Data_Block_EGPRS_Header_Type3_t, BSN1, bits_spec_dl_type3_bsn, 0, &hf_bsn),
 CSN_DESCR_END    (DL_Data_Block_EGPRS_Header_Type3_t)
 
-static CSN_DESCR_BEGIN  (DL_Data_Block_EC_EGPRS_Header_Type3_t)
+static const
+CSN_DESCR_BEGIN  (DL_Data_Block_EC_EGPRS_Header_Type3_t)
   M_SPLIT_BITS   (DL_Data_Block_EC_EGPRS_Header_Type3_t, TFI, bits_spec_dl_tfi, 5, &hf_downlink_tfi),
   M_BITS_CRUMB   (DL_Data_Block_EC_EGPRS_Header_Type3_t, TFI, bits_spec_dl_tfi, 1, &hf_downlink_tfi),
   M_UINT         (DL_Data_Block_EC_EGPRS_Header_Type3_t, SPARE1, 1, &hf_dl_data_spare),
@@ -9161,7 +9179,7 @@ dissect_dl_gprs_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, RlcMa
   }
   else
   {
-    proto_tree_add_expert_format(tree, pinfo, &ei_gsm_rlcmac_coding_scheme_invalid, tvb, bit_offset >> 3, -1, "GPRS block with invalid coding scheme (%d) for RLC Control",
+    proto_tree_add_expert_format_remaining(tree, pinfo, &ei_gsm_rlcmac_coding_scheme_invalid, tvb, bit_offset >> 3, "GPRS block with invalid coding scheme (%d) for RLC Control",
                         data->block_format);
   }
 }
@@ -9171,7 +9189,7 @@ dissect_egprs_dl_header_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 {
   if (data->flags & GSM_RLC_MAC_EGPRS_FANR_FLAG)
   {
-    proto_tree_add_expert(tree, pinfo, &ei_gsm_rlcmac_gprs_fanr_header_dissection_not_supported, tvb, 0, -1);
+    proto_tree_add_expert_remaining(tree, pinfo, &ei_gsm_rlcmac_gprs_fanr_header_dissection_not_supported, tvb, 0);
   }
   else
   {
@@ -9208,7 +9226,7 @@ dissect_egprs_dl_header_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
         break;
 
       default:
-        proto_tree_add_expert(tree, pinfo, &ei_gsm_rlcmac_egprs_header_type_not_handled, tvb, 0, -1);
+        proto_tree_add_expert_remaining(tree, pinfo, &ei_gsm_rlcmac_egprs_header_type_not_handled, tvb, 0);
         break;
     }
     rlc_mac->u.egprs_dl_header_info.bsn1 = data->u.DL_Data_Block_EGPRS_Header.BSN1;
@@ -9231,7 +9249,7 @@ dissect_ec_egprs_dl_header_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
 {
   if (data->flags & GSM_RLC_MAC_EGPRS_FANR_FLAG)
   {
-    proto_tree_add_expert(tree, pinfo, &ei_gsm_rlcmac_gprs_fanr_header_dissection_not_supported, tvb, 0, -1);
+    proto_tree_add_expert_remaining(tree, pinfo, &ei_gsm_rlcmac_gprs_fanr_header_dissection_not_supported, tvb, 0);
   }
   else
   {
@@ -9260,7 +9278,7 @@ dissect_ec_egprs_dl_header_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
       case RLCMAC_HDR_TYPE_1_EC:
       case RLCMAC_HDR_TYPE_2_EC:
       default:
-        proto_tree_add_expert(tree, pinfo, &ei_gsm_rlcmac_egprs_header_type_not_handled, tvb, 0, -1);
+        proto_tree_add_expert_remaining(tree, pinfo, &ei_gsm_rlcmac_egprs_header_type_not_handled, tvb, 0);
         break;
     }
     rlc_mac->u.egprs_dl_header_info.bsn1 = data->u.DL_Data_Block_EGPRS_Header.BSN1;
@@ -9449,7 +9467,7 @@ dissect_ul_pacch_access_burst(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
   }
   else
   {
-    proto_tree_add_expert(tree, pinfo, &ei_gsm_rlcmac_unknown_pacch_access_burst, tvb, 0, -1);
+    proto_tree_add_expert_remaining(tree, pinfo, &ei_gsm_rlcmac_unknown_pacch_access_burst, tvb, 0);
     call_data_dissector(tvb, pinfo, tree);
   }
 }
@@ -9535,7 +9553,7 @@ dissect_ul_gprs_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, RlcMa
   }
   else
   {
-    proto_tree_add_expert_format(tree, pinfo, &ei_gsm_rlcmac_coding_scheme_invalid, tvb, bit_offset >> 3, -1, "GPRS UL block with Coding Scheme CS%d and incompatible payload type",
+    proto_tree_add_expert_format_remaining(tree, pinfo, &ei_gsm_rlcmac_coding_scheme_invalid, tvb, bit_offset >> 3, "GPRS UL block with Coding Scheme CS%d and incompatible payload type",
                         data->block_format &0x0F);
   }
 }
@@ -9544,7 +9562,7 @@ dissect_egprs_ul_header_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 {
   if (data->flags & GSM_RLC_MAC_EGPRS_FANR_FLAG)
   {
-    proto_tree_add_expert(tree, pinfo, &ei_gsm_rlcmac_gprs_fanr_header_dissection_not_supported, tvb, 0, -1);
+    proto_tree_add_expert_remaining(tree, pinfo, &ei_gsm_rlcmac_gprs_fanr_header_dissection_not_supported, tvb, 0);
   }
   else
   {
@@ -9579,7 +9597,7 @@ dissect_egprs_ul_header_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
         break;
 
       default:
-        proto_tree_add_expert(tree, pinfo, &ei_gsm_rlcmac_egprs_header_type_not_handled, tvb, 0, -1);
+        proto_tree_add_expert_remaining(tree, pinfo, &ei_gsm_rlcmac_egprs_header_type_not_handled, tvb, 0);
         break;
     }
 
@@ -9601,7 +9619,7 @@ dissect_ec_egprs_ul_header_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
 {
   if (data->flags & GSM_RLC_MAC_EGPRS_FANR_FLAG)
   {
-    proto_tree_add_expert(tree, pinfo, &ei_gsm_rlcmac_gprs_fanr_header_dissection_not_supported, tvb, 0, -1);
+    proto_tree_add_expert_remaining(tree, pinfo, &ei_gsm_rlcmac_gprs_fanr_header_dissection_not_supported, tvb, 0);
   }
   else
   {
@@ -9628,7 +9646,7 @@ dissect_ec_egprs_ul_header_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
       case RLCMAC_HDR_TYPE_1_EC:
       case RLCMAC_HDR_TYPE_2_EC:
       default:
-        proto_tree_add_expert(tree, pinfo, &ei_gsm_rlcmac_egprs_header_type_not_handled, tvb, 0, -1);
+        proto_tree_add_expert_remaining(tree, pinfo, &ei_gsm_rlcmac_egprs_header_type_not_handled, tvb, 0);
         break;
     }
 
@@ -9807,7 +9825,7 @@ dissect_gsm_rlcmac_downlink(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       break;
 
     default:
-      proto_tree_add_expert_format(tree, pinfo, &ei_gsm_rlcmac_coding_scheme_unknown, tvb, 0, -1, "GSM RLCMAC unknown coding scheme (%d)", rlc_dl->block_format);
+      proto_tree_add_expert_format_remaining(tree, pinfo, &ei_gsm_rlcmac_coding_scheme_unknown, tvb, 0, "GSM RLCMAC unknown coding scheme (%d)", rlc_dl->block_format);
       break;
   }
 
@@ -9897,7 +9915,7 @@ dissect_gsm_rlcmac_uplink(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
         break;
 
     default:
-      proto_tree_add_expert_format(tree, pinfo, &ei_gsm_rlcmac_coding_scheme_unknown, tvb, 0, -1, "GSM RLCMAC unknown coding scheme (%d)", rlc_ul->block_format);
+      proto_tree_add_expert_format_remaining(tree, pinfo, &ei_gsm_rlcmac_coding_scheme_unknown, tvb, 0, "GSM RLCMAC unknown coding scheme (%d)", rlc_ul->block_format);
       break;
   }
 

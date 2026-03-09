@@ -25,7 +25,8 @@ typedef void plugins_t;
 typedef enum {
     WS_PLUGIN_EPAN,
     WS_PLUGIN_WIRETAP,
-    WS_PLUGIN_CODEC
+    WS_PLUGIN_CODEC,
+    WS_PLUGIN_UI
 } plugin_type_e;
 
 #define WS_PLUGIN_DESC_DISSECTOR    (1UL << 0)
@@ -34,8 +35,9 @@ typedef enum {
 #define WS_PLUGIN_DESC_EPAN         (1UL << 3)
 #define WS_PLUGIN_DESC_TAP_LISTENER (1UL << 4)
 #define WS_PLUGIN_DESC_DFILTER      (1UL << 5)
+#define WS_PLUGIN_DESC_UI           (1UL << 6)
 
-WS_DLL_PUBLIC plugins_t *plugins_init(plugin_type_e type);
+WS_DLL_PUBLIC plugins_t *plugins_init(plugin_type_e type, const char* app_env_var_prefix);
 
 typedef void (*plugin_description_callback)(const char *name, const char *version,
                                             uint32_t flags, const char *filename,
@@ -50,6 +52,14 @@ WS_DLL_PUBLIC int plugins_get_count(void);
 WS_DLL_PUBLIC void plugins_cleanup(plugins_t *plugins);
 
 WS_DLL_PUBLIC bool plugins_supported(void);
+
+/**
+ * Returns true if the given filename ends in .dll on Windows or .so on other platforms.
+ *
+ * @param filename The filename to check.
+ * @return true if the filename has a plugin suffix, false otherwise.
+ */
+WS_DLL_PUBLIC bool is_plugin_filename(const char *filename);
 
 #ifdef __cplusplus
 }

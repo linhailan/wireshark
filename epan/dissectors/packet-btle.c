@@ -1723,7 +1723,8 @@ static int
 dissect_periodic_sync_wr_ind(tvbuff_t *tvb, proto_tree *btle_tree, int offset, packet_info *pinfo, uint32_t interface_id, uint32_t adapter_id)
 {
     /* The first part of LL_PERIODIC_SYNC_WR_IND is identical to LL_PERIODIC_SYNC_IND */
-    offset += dissect_periodic_sync_ind(tvb, btle_tree, offset, pinfo, interface_id, adapter_id);
+    /* dissect_periodic_sync_ind returns the new offset, not bytes dissected. */
+    offset = dissect_periodic_sync_ind(tvb, btle_tree, offset, pinfo, interface_id, adapter_id);
 
     proto_tree_add_item(btle_tree, hf_control_sync_info_rsp_access_address, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -3781,8 +3782,7 @@ dissect_btle_acl(tvbuff_t *tvb,
         }
         break;
     case 0x03: /* Control PDU */
-        control_proc_item = proto_tree_add_item(btle_tree, hf_control_opcode, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-        control_opcode = tvb_get_uint8(tvb, offset);
+        control_proc_item = proto_tree_add_item_ret_uint8(btle_tree, hf_control_opcode, tvb, offset, 1, ENC_LITTLE_ENDIAN, &control_opcode);
         offset += 1;
 
         col_add_fstr(pinfo->cinfo, COL_INFO, "Control Opcode: %s",
@@ -5416,8 +5416,7 @@ dissect_btle_broadcast_iso(tvbuff_t *tvb,
         break;
 
     case 0x03: /* BIG Control PDU */
-        proto_tree_add_item(btle_tree, hf_big_control_opcode, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-        control_opcode = tvb_get_uint8(tvb, offset);
+		proto_tree_add_item_ret_uint8(btle_tree, hf_big_control_opcode, tvb, offset, 1, ENC_LITTLE_ENDIAN, &control_opcode);
         offset += 1;
 
         col_add_fstr(pinfo->cinfo, COL_INFO, "BIG Control Opcode: %s",
@@ -5567,6 +5566,26 @@ dissect_btle(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
         } else {
             /* Length is unknown. */
             length = 0;
+        }
+    }
+
+    /* Look up connection_info for CRC validation */
+    if (access_address != ACCESS_ADDRESS_ADVERTISING) {
+        wmem_tree_key_t key[4];
+        wmem_tree_t *wmem_tree;
+
+        key[0].length = 1;
+        key[0].key = &interface_id;
+        key[1].length = 1;
+        key[1].key = &adapter_id;
+        key[2].length = 1;
+        key[2].key = &access_address;
+        key[3].length = 0;
+        key[3].key = NULL;
+
+        wmem_tree = (wmem_tree_t *) wmem_tree_lookup32_array(connection_info_tree, key);
+        if (wmem_tree) {
+            connection_info = (connection_info_t *) wmem_tree_lookup32_le(wmem_tree, pinfo->num);
         }
     }
 

@@ -16,12 +16,12 @@
 #include <stdlib.h>
 #include <errno.h>
 
-#include <wsutil/application_flavor.h>
+#include <app/application_flavor.h>
 #include <wsutil/filesystem.h>
 #include <epan/prefs.h>
 #include <epan/prefs-int.h>
 #include <epan/column.h>
-#include <epan/value_string.h>
+#include <wsutil/value_string.h>
 
 #ifdef HAVE_PCAP_REMOTE
 #include "ui/capture_opts.h"
@@ -45,6 +45,7 @@
 #define RECENT_KEY_STATUSBAR_SHOW               "gui.statusbar_show"
 #define RECENT_KEY_PACKET_LIST_COLORIZE         "gui.packet_list_colorize"
 #define RECENT_KEY_CAPTURE_AUTO_SCROLL          "capture.auto_scroll"
+#define RECENT_KEY_AGGREGATION_VIEW             "capture.aggregation_view"
 #define RECENT_GUI_TIME_FORMAT                  "gui.time_format"
 #define RECENT_GUI_TIME_PRECISION               "gui.time_precision"
 #define RECENT_GUI_SECONDS_FORMAT               "gui.seconds_format"
@@ -85,6 +86,9 @@
 #define RECENT_GUI_FOLLOW_DELTA                 "gui.follow_delta"
 #define RECENT_GUI_SHOW_BYTES_DECODE            "gui.show_bytes_decode"
 #define RECENT_GUI_SHOW_BYTES_SHOW              "gui.show_bytes_show"
+#define RECENT_GUI_TSD_MA_WINDOW_SIZE           "gui.tsd_ma_window_size"
+#define RECENT_GUI_TSD_THROUGHPUT_SHOW          "gui.tsd_throughput_show"
+#define RECENT_GUI_TSD_GOODPUT_SHOW             "gui.tsd_goodput_show"
 
 #define RECENT_GUI_GEOMETRY                   "gui.geom."
 
@@ -98,6 +102,7 @@ recent_settings_t recent;
 
 static const value_string ts_type_values[] = {
     { TS_RELATIVE,             "RELATIVE"           },
+    { TS_RELATIVE_CAP,         "RELATIVE_CAP"       },
     { TS_ABSOLUTE,             "ABSOLUTE"           },
     { TS_ABSOLUTE_WITH_YMD,    "ABSOLUTE_WITH_YMD"  },
     { TS_ABSOLUTE_WITH_YDOY,   "ABSOLUTE_WITH_YDOY" },
@@ -725,15 +730,18 @@ cfilter_recent_write_all_list(FILE *rf, const char *ifname, GList *cfilter_list)
 {
     unsigned   max_count = 0;
     GList     *li;
+    char      *sanitized;
 
     /* write all non empty capture filter strings to the recent file (until max count) */
     li = g_list_first(cfilter_list);
     while (li && (max_count++ <= cfilter_combo_max_recent) ) {
         if (li->data && strlen((const char *)li->data)) {
+            sanitized = prefs_sanitize_string((char *)li->data);
             if (ifname == NULL)
-                fprintf (rf, RECENT_KEY_CAPTURE_FILTER ": %s\n", (char *)li->data);
+                fprintf (rf, RECENT_KEY_CAPTURE_FILTER ": %s\n", sanitized);
             else
-                fprintf (rf, RECENT_KEY_CAPTURE_FILTER ".%s: %s\n", ifname, (char *)li->data);
+                fprintf (rf, RECENT_KEY_CAPTURE_FILTER ".%s: %s\n", ifname, sanitized);
+            g_free(sanitized);
         }
         li = li->next;
     }
@@ -799,6 +807,15 @@ write_recent_boolean(FILE *rf, const char *description, const char *name,
 }
 
 static void
+write_recent_double(FILE *rf, const char *description, const char *name,
+                    double value)
+{
+    fprintf(rf, "\n# %s.\n", description);
+    char buf[G_ASCII_DTOSTR_BUF_SIZE];
+    fprintf(rf, "%s: %s\n", name, g_ascii_dtostr(buf, sizeof(buf), value));
+}
+
+static void
 write_recent_enum(FILE *rf, const char *description, const char *name,
                   const value_string *values, unsigned value)
 {
@@ -844,7 +861,7 @@ write_recent(void)
 
     /* Create the directory that holds personal configuration files, if
        necessary.  */
-    if (create_persconffile_dir(&pf_dir_path) == -1) {
+    if (create_persconffile_dir(application_configuration_environment_prefix(), &pf_dir_path) == -1) {
         simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK,
                 "Can't create directory\n\"%s\"\nfor recent file: %s.", pf_dir_path,
                 g_strerror(errno));
@@ -852,7 +869,7 @@ write_recent(void)
         return false;
     }
 
-    rf_path = get_persconffile_path(RECENT_COMMON_FILE_NAME, false);
+    rf_path = get_persconffile_path(RECENT_COMMON_FILE_NAME, false, application_configuration_environment_prefix());
     if ((rf = ws_fopen(rf_path, "w")) == NULL) {
         simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK,
                 "Can't open recent file\n\"%s\": %s.", rf_path,
@@ -989,7 +1006,7 @@ write_profile_recent(void)
 
     /* Create the directory that holds personal configuration files, if
        necessary.  */
-    if (create_persconffile_dir(&pf_dir_path) == -1) {
+    if (create_persconffile_dir(application_configuration_environment_prefix(), &pf_dir_path) == -1) {
         simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK,
                 "Can't create directory\n\"%s\"\nfor recent file: %s.", pf_dir_path,
                 g_strerror(errno));
@@ -997,7 +1014,7 @@ write_profile_recent(void)
         return false;
     }
 
-    rf_path = get_persconffile_path(RECENT_FILE_NAME, true);
+    rf_path = get_persconffile_path(RECENT_FILE_NAME, true, application_configuration_environment_prefix());
     if ((rf = ws_fopen(rf_path, "w")) == NULL) {
         simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK,
                 "Can't open recent file\n\"%s\": %s.", rf_path,
@@ -1054,6 +1071,10 @@ write_profile_recent(void)
     write_recent_boolean(rf, "Auto scroll packet list when capturing",
             RECENT_KEY_CAPTURE_AUTO_SCROLL,
             recent.capture_auto_scroll);
+
+    write_recent_boolean(rf, "use as aggragation view",
+        RECENT_KEY_AGGREGATION_VIEW,
+        recent.aggregation_view);
 
     write_recent_enum(rf, "Timestamp display format",
             RECENT_GUI_TIME_FORMAT, ts_type_values,
@@ -1222,6 +1243,16 @@ write_profile_recent(void)
     fprintf(rf, RECENT_GUI_INTERFACE_TOOLBAR_SHOW ": %s\n", string_list);
     g_free(string_list);
 
+    write_recent_double(rf, "TCP Stream Graphs Moving Average Window Size",
+            RECENT_GUI_TSD_MA_WINDOW_SIZE,
+            recent.gui_tsgd_ma_window_size);
+    write_recent_boolean(rf, "TCP Stream Graphs Dialog Throughput show (hide)",
+            RECENT_GUI_TSD_THROUGHPUT_SHOW,
+            recent.gui_tsgd_throughput_show);
+    write_recent_boolean(rf, "TCP Stream Graphs Dialog Goodput show (hide)",
+            RECENT_GUI_TSD_GOODPUT_SHOW,
+            recent.gui_tsgd_goodput_show);
+
     fclose(rf);
 
     /* XXX - catch I/O errors (e.g. "ran out of disk space") and return
@@ -1272,7 +1303,7 @@ read_set_recent_common_pair_static(char *key, const char *value,
         g_free(recent.gui_geometry_main);
         recent.gui_geometry_main = g_strdup(value);
     } else if (strcmp(key, RECENT_LAST_USED_PROFILE) == 0) {
-        if ((strcmp(value, DEFAULT_PROFILE) != 0) && profile_exists (value, false)) {
+        if ((strcmp(value, DEFAULT_PROFILE) != 0) && profile_exists(application_configuration_environment_prefix(), value, false)) {
             set_profile_name (value);
         }
     } else if (strcmp(key, RECENT_PROFILE_SWITCH_CHECK_COUNT) == 0) {
@@ -1322,6 +1353,7 @@ read_set_recent_pair_static(char *key, const char *value,
 {
     long num;
     int32_t num_int32;
+    double val_as_dbl;
     char *p;
     GList *col_l, *col_l_elt;
     col_width_data *cfmt;
@@ -1347,6 +1379,8 @@ read_set_recent_pair_static(char *key, const char *value,
         parse_recent_boolean(value, &recent.packet_list_colorize);
     } else if (strcmp(key, RECENT_KEY_CAPTURE_AUTO_SCROLL) == 0) {
         parse_recent_boolean(value, &recent.capture_auto_scroll);
+    } else if (strcmp(key, RECENT_KEY_AGGREGATION_VIEW) == 0) {
+        parse_recent_boolean(value, &recent.aggregation_view);
     } else if (strcmp(key, RECENT_GUI_TIME_FORMAT) == 0) {
         recent.gui_time_format = (ts_type)str_to_val(value, ts_type_values,
             application_flavor_is_wireshark() ? TS_RELATIVE : TS_ABSOLUTE);
@@ -1484,6 +1518,19 @@ read_set_recent_pair_static(char *key, const char *value,
         recent.gui_additional_toolbars = prefs_get_string_list(value);
     } else if (strcmp(key, RECENT_GUI_INTERFACE_TOOLBAR_SHOW) == 0) {
         recent.interface_toolbars = prefs_get_string_list(value);
+    } else if (strcmp(key, RECENT_GUI_TSD_THROUGHPUT_SHOW) == 0) {
+        parse_recent_boolean(value, &recent.gui_tsgd_throughput_show);
+    } else if (strcmp(key, RECENT_GUI_TSD_GOODPUT_SHOW) == 0) {
+        parse_recent_boolean(value, &recent.gui_tsgd_goodput_show);
+    } else if (strcmp(key, RECENT_GUI_TSD_MA_WINDOW_SIZE) == 0) {
+        val_as_dbl = g_ascii_strtod(value, &p);
+        if (p == value || *p != '\0') {
+            return PREFS_SET_SYNTAX_ERR;      /* number was bad */
+        }
+        if (val_as_dbl <= 0) {
+            return PREFS_SET_SYNTAX_ERR;      /* number must be positive */
+        }
+        recent.gui_tsgd_ma_window_size = val_as_dbl;
     } else {
         return PREFS_SET_NO_SUCH_PREF;
     }
@@ -1501,9 +1548,7 @@ read_set_recent_pair_dynamic(char *key, const char *value,
     if (!g_utf8_validate(value, -1, NULL)) {
         return PREFS_SET_SYNTAX_ERR;
     }
-    if (strcmp(key, RECENT_KEY_CAPTURE_FILE) == 0) {
-        add_menu_recent_capture_file(value, true);
-    } else if (strcmp(key, RECENT_KEY_DISPLAY_FILTER) == 0) {
+    if (strcmp(key, RECENT_KEY_DISPLAY_FILTER) == 0) {
         dfilter_combo_add_recent(value);
     } else if (strcmp(key, RECENT_KEY_CAPTURE_FILTER) == 0) {
         recent_add_cfilter(NULL, value);
@@ -1589,7 +1634,7 @@ recent_read_static(char **rf_path_return, int *rf_errno_return)
     recent.gui_fileopen_remembered_dir = NULL;
 
     /* Construct the pathname of the user's recent common file. */
-    rf_path = get_persconffile_path(RECENT_COMMON_FILE_NAME, false);
+    rf_path = get_persconffile_path(RECENT_COMMON_FILE_NAME, false, application_configuration_environment_prefix());
 
     /* Read the user's recent common file, if it exists. */
     *rf_path_return = NULL;
@@ -1644,6 +1689,11 @@ recent_read_profile_static(char **rf_path_return, int *rf_errno_return)
     recent.gui_show_bytes_decode     = DecodeAsNone;
     recent.gui_show_bytes_show       = SHOW_ASCII;
 
+    /* defaults for the TCP Stream Graph Dialog */
+    recent.gui_tsgd_ma_window_size = 1.0;
+    recent.gui_tsgd_throughput_show = true;
+    recent.gui_tsgd_goodput_show = false;
+
     /* pane size of zero will autodetect */
     recent.gui_geometry_main_upper_pane   = 0;
     recent.gui_geometry_main_lower_pane   = 0;
@@ -1682,7 +1732,7 @@ recent_read_profile_static(char **rf_path_return, int *rf_errno_return)
     }
 
     /* Construct the pathname of the user's profile recent file. */
-    rf_path = get_persconffile_path(RECENT_FILE_NAME, true);
+    rf_path = get_persconffile_path(RECENT_FILE_NAME, true, application_configuration_environment_prefix());
 
     /* Read the user's recent file, if it exists. */
     *rf_path_return = NULL;
@@ -1699,7 +1749,7 @@ recent_read_profile_static(char **rf_path_return, int *rf_errno_return)
          *  know what's supposed to happen at this point.
          *  ToDo: Determine if the "recent common file" should be read at this point
          */
-        rf_common_path = get_persconffile_path(RECENT_COMMON_FILE_NAME, false);
+        rf_common_path = get_persconffile_path(RECENT_COMMON_FILE_NAME, false, application_configuration_environment_prefix());
         if (!file_exists(rf_common_path)) {
             /* Read older common settings from recent file */
             rf = ws_fopen(rf_path, "r");
@@ -1730,11 +1780,11 @@ recent_read_dynamic(char **rf_path_return, int *rf_errno_return)
 
 
     /* Construct the pathname of the user's recent common file. */
-    rf_path = get_persconffile_path(RECENT_COMMON_FILE_NAME, false);
+    rf_path = get_persconffile_path(RECENT_COMMON_FILE_NAME, false, application_configuration_environment_prefix());
     if (!file_exists (rf_path)) {
         /* Recent common file does not exist, read from default recent */
         g_free (rf_path);
-        rf_path = get_persconffile_path(RECENT_FILE_NAME, false);
+        rf_path = get_persconffile_path(RECENT_FILE_NAME, false, application_configuration_environment_prefix());
     }
 
     /* Read the user's recent file, if it exists. */

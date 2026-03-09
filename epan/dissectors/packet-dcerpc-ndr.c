@@ -12,17 +12,20 @@
 #include "config.h"
 
 #include <epan/packet.h>
+
+#include <wsutil/ws_roundup.h>
+#include <wsutil/ws_padding_to.h>
+
 #include "packet-dcerpc.h"
 
-
 /*
- * The NDR routines are for use by dcerpc subdissetors.  They're
+ * The NDR routines are for use by dcerpc subdissectors.  They're
  * primarily for making sure things are aligned properly according
  * to the rules of NDR.
  */
 
-int
-dissect_ndr_uint8(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+dissect_ndr_uint8(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                   proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                   int hfindex, uint8_t *pdata)
 {
@@ -41,8 +44,8 @@ dissect_ndr_uint8(tvbuff_t *tvb, int offset, packet_info *pinfo,
                                 tree, drep, hfindex, pdata);
 }
 
-int
-PIDL_dissect_uint8_val(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+PIDL_dissect_uint8_val(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                        proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                        int hfindex, uint32_t param, uint8_t *pval)
 {
@@ -69,14 +72,14 @@ PIDL_dissect_uint8_val(tvbuff_t *tvb, int offset, packet_info *pinfo,
         switch (hf_info->display) {
         case BASE_DEC:
             if (hf_info->strings) {
-                snprintf(valstr, 64, "%s(%d)",val_to_str(val, (const value_string *)hf_info->strings, "Unknown:%u"), val);
+                snprintf(valstr, 64, "%s(%d)",val_to_str(pinfo->pool, val, (const value_string *)hf_info->strings, "Unknown:%u"), val);
             } else {
                 snprintf(valstr, 64, "%d", val);
             }
             break;
         case BASE_HEX:
             if (hf_info->strings) {
-                snprintf(valstr, 64, "%s(0x%02x)",val_to_str(val, (const value_string *)hf_info->strings, "Unknown:%u"), val);
+                snprintf(valstr, 64, "%s(0x%02x)",val_to_str(pinfo->pool, val, (const value_string *)hf_info->strings, "Unknown:%u"), val);
             } else {
                 snprintf(valstr, 64, "0x%02x", val);
             }
@@ -94,8 +97,8 @@ PIDL_dissect_uint8_val(tvbuff_t *tvb, int offset, packet_info *pinfo,
     return offset;
 }
 
-int
-PIDL_dissect_uint8(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+PIDL_dissect_uint8(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                    proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                    int hfindex, uint32_t param)
 {
@@ -103,8 +106,8 @@ PIDL_dissect_uint8(tvbuff_t *tvb, int offset, packet_info *pinfo,
 }
 
 
-int
-dissect_ndr_uint16(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+dissect_ndr_uint16(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                    proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                    int hfindex, uint16_t *pdata)
 {
@@ -119,15 +122,15 @@ dissect_ndr_uint16(tvbuff_t *tvb, int offset, packet_info *pinfo,
     }
 
 
-    if (!di->no_align && (offset % 2)) {
-        offset++;
+    if (!di->no_align) {
+        offset = WS_ROUNDUP_2(offset);
     }
     return dissect_dcerpc_uint16(tvb, offset, pinfo,
                                  tree, drep, hfindex, pdata);
 }
 
-int
-PIDL_dissect_uint16_val(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+PIDL_dissect_uint16_val(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                         proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                         int hfindex, uint32_t param, uint16_t *pval)
 {
@@ -139,8 +142,8 @@ PIDL_dissect_uint16_val(tvbuff_t *tvb, int offset, packet_info *pinfo,
     }
 
 
-    if (!di->no_align && (offset % 2)) {
-        offset++;
+    if (!di->no_align) {
+        offset = WS_ROUNDUP_2(offset);
     }
     offset = dissect_dcerpc_uint16(tvb, offset, pinfo,
                                    tree, drep, hfindex, &val);
@@ -157,14 +160,14 @@ PIDL_dissect_uint16_val(tvbuff_t *tvb, int offset, packet_info *pinfo,
         switch (hf_info->display) {
         case BASE_DEC:
             if (hf_info->strings) {
-                snprintf(valstr, 64, "%s(%d)",val_to_str(val, (const value_string *)hf_info->strings, "Unknown:%u"), val);
+                snprintf(valstr, 64, "%s(%d)",val_to_str(pinfo->pool, val, (const value_string *)hf_info->strings, "Unknown:%u"), val);
             } else {
                 snprintf(valstr, 64, "%d", val);
             }
             break;
         case BASE_HEX:
             if (hf_info->strings) {
-                snprintf(valstr, 64, "%s(0x%04x)",val_to_str(val, (const value_string *)hf_info->strings, "Unknown:%u"), val);
+                snprintf(valstr, 64, "%s(0x%04x)",val_to_str(pinfo->pool, val, (const value_string *)hf_info->strings, "Unknown:%u"), val);
             } else {
                 snprintf(valstr, 64, "0x%04x", val);
             }
@@ -182,16 +185,16 @@ PIDL_dissect_uint16_val(tvbuff_t *tvb, int offset, packet_info *pinfo,
     return offset;
 }
 
-int
-PIDL_dissect_uint16(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+PIDL_dissect_uint16(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                     proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                     int hfindex, uint32_t param)
 {
     return PIDL_dissect_uint16_val(tvb, offset, pinfo, tree, di, drep, hfindex, param, NULL);
 }
 
-int
-dissect_ndr_uint32(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+dissect_ndr_uint32(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                    proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                    int hfindex, uint32_t *pdata)
 {
@@ -206,8 +209,8 @@ dissect_ndr_uint32(tvbuff_t *tvb, int offset, packet_info *pinfo,
     }
 
 
-    if ((di != NULL) && (!di->no_align) && (offset % 4)) {
-        offset += 4 - (offset % 4);
+    if ((di != NULL) && (!di->no_align)) {
+        offset = WS_ROUNDUP_4(offset);
     }
     return dissect_dcerpc_uint32(tvb, offset, pinfo,
                                  tree, drep, hfindex, pdata);
@@ -216,8 +219,8 @@ dissect_ndr_uint32(tvbuff_t *tvb, int offset, packet_info *pinfo,
 /* This is used to dissect the new datatypes, such as pointers and conformance
    data, which is 4 bytes in size in NDR but 8 bytes in NDR64.
 */
-int
-dissect_ndr_uint3264(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+dissect_ndr_uint3264(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                      proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                      int hfindex, uint3264_t *pdata)
 {
@@ -236,8 +239,8 @@ dissect_ndr_uint3264(tvbuff_t *tvb, int offset, packet_info *pinfo,
 /* This is used to dissect the new datatypes, such as enums
    that are 2 bytes in size in NDR but 4 bytes in NDR64.
 */
-int
-dissect_ndr_uint1632(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+dissect_ndr_uint1632(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                      proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                      int hfindex, uint1632_t *pdata)
 {
@@ -253,8 +256,8 @@ dissect_ndr_uint1632(tvbuff_t *tvb, int offset, packet_info *pinfo,
     }
 }
 
-int
-PIDL_dissect_uint32_val(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+PIDL_dissect_uint32_val(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                     proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                     int hfindex, uint32_t param, uint32_t *rval)
 {
@@ -266,8 +269,8 @@ PIDL_dissect_uint32_val(tvbuff_t *tvb, int offset, packet_info *pinfo,
     }
 
 
-    if (!di->no_align && (offset % 4)) {
-        offset += 4 - (offset % 4);
+    if (!di->no_align) {
+        offset = WS_ROUNDUP_4(offset);
     }
     offset = dissect_dcerpc_uint32(tvb, offset, pinfo,
                                    tree, drep, hfindex, &val);
@@ -284,14 +287,14 @@ PIDL_dissect_uint32_val(tvbuff_t *tvb, int offset, packet_info *pinfo,
         switch (hf_info->display) {
         case BASE_DEC:
             if (hf_info->strings) {
-                snprintf(valstr, 64, "%s(%d)",val_to_str(val, (const value_string *)hf_info->strings, "Unknown:%u"), val);
+                snprintf(valstr, 64, "%s(%d)",val_to_str(pinfo->pool, val, (const value_string *)hf_info->strings, "Unknown:%u"), val);
             } else {
                 snprintf(valstr, 64, "%d", val);
             }
             break;
         case BASE_HEX:
             if (hf_info->strings) {
-                snprintf(valstr, 64, "%s(0x%08x)",val_to_str(val, (const value_string *)hf_info->strings, "Unknown:%u"), val);
+                snprintf(valstr, 64, "%s(0x%08x)",val_to_str(pinfo->pool, val, (const value_string *)hf_info->strings, "Unknown:%u"), val);
             } else {
                 snprintf(valstr, 64, "0x%08x", val);
             }
@@ -308,8 +311,8 @@ PIDL_dissect_uint32_val(tvbuff_t *tvb, int offset, packet_info *pinfo,
     return offset;
 }
 
-int
-PIDL_dissect_uint32(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+PIDL_dissect_uint32(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                     proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                     int hfindex, uint32_t param)
 {
@@ -321,8 +324,8 @@ PIDL_dissect_uint32(tvbuff_t *tvb, int offset, packet_info *pinfo,
    ms interfaces and which is 32bit aligned.
    It is really just 2 uint32's
 */
-int
-dissect_ndr_duint32(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+dissect_ndr_duint32(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                     proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                     int hfindex, uint64_t *pdata)
 {
@@ -336,8 +339,8 @@ dissect_ndr_duint32(tvbuff_t *tvb, int offset, packet_info *pinfo,
         return offset;
     }
 
-    if (!di->no_align && (offset % 4)) {
-        offset += 4 - (offset % 4);
+    if (!di->no_align) {
+        offset = WS_ROUNDUP_4(offset);
     }
     return dissect_dcerpc_uint64(tvb, offset, pinfo,
                                  tree, di, drep, hfindex, pdata);
@@ -346,8 +349,8 @@ dissect_ndr_duint32(tvbuff_t *tvb, int offset, packet_info *pinfo,
 /* uint64 : hyper
    a 64 bit integer  aligned to proper 8 byte boundaries
 */
-int
-dissect_ndr_uint64(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+dissect_ndr_uint64(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                    proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                    int hfindex, uint64_t *pdata)
 {
@@ -361,17 +364,19 @@ dissect_ndr_uint64(tvbuff_t *tvb, int offset, packet_info *pinfo,
         return offset;
     }
 
-    if (!di->no_align && (offset % 8)) {
-        int padding = 8 - (offset % 8);
-        proto_tree_add_item(tree, hf_dcerpc_ndr_padding, tvb, offset, padding, ENC_NA);
-        offset += padding;
+    if (!di->no_align) {
+        unsigned padding = WS_PADDING_TO_8(offset);
+        if (padding != 0) {
+            proto_tree_add_item(tree, hf_dcerpc_ndr_padding, tvb, offset, padding, ENC_NA);
+            offset += padding;
+        }
     }
     return dissect_dcerpc_uint64(tvb, offset, pinfo,
                                  tree, di, drep, hfindex, pdata);
 }
 
-int
-PIDL_dissect_uint64_val(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+PIDL_dissect_uint64_val(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                         proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                         int hfindex, uint32_t param, uint64_t *pval)
 {
@@ -382,8 +387,8 @@ PIDL_dissect_uint64_val(tvbuff_t *tvb, int offset, packet_info *pinfo,
         return offset;
     }
 
-    if (!di->no_align && (offset % 8)) {
-        offset += 8 - (offset % 8);
+    if (!di->no_align) {
+        offset = WS_ROUNDUP_8(offset);
     }
     offset = dissect_dcerpc_uint64(tvb, offset, pinfo,
                                    tree, di, drep, hfindex, &val);
@@ -400,14 +405,14 @@ PIDL_dissect_uint64_val(tvbuff_t *tvb, int offset, packet_info *pinfo,
         switch (hf_info->display) {
         case BASE_DEC:
             if (hf_info->strings) {
-                snprintf(valstr, 64, "%s(%" PRIu64 ")",val_to_str( (uint32_t) val, (const value_string *)hf_info->strings, "Unknown:%u"), val);
+                snprintf(valstr, 64, "%s(%" PRIu64 ")",val_to_str(pinfo->pool, (uint32_t) val, (const value_string *)hf_info->strings, "Unknown:%u"), val);
             } else {
                 snprintf(valstr, 64, "%" PRIu64, val);
             }
             break;
         case BASE_HEX:
             if (hf_info->strings) {
-                snprintf(valstr, 64, "%s(0x%" PRIx64 ")",val_to_str( (uint32_t) val, (const value_string *)hf_info->strings, "Unknown:%u"), val);
+                snprintf(valstr, 64, "%s(0x%" PRIx64 ")",val_to_str(pinfo->pool, (uint32_t) val, (const value_string *)hf_info->strings, "Unknown:%u"), val);
             } else {
                 snprintf(valstr, 64, "0x%" PRIx64, val);
             }
@@ -425,16 +430,16 @@ PIDL_dissect_uint64_val(tvbuff_t *tvb, int offset, packet_info *pinfo,
     return offset;
 }
 
-int
-PIDL_dissect_uint64(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+PIDL_dissect_uint64(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                     proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                     int hfindex, uint32_t param)
 {
     return PIDL_dissect_uint64_val(tvb, offset, pinfo, tree, di, drep, hfindex, param, NULL);
 }
 
-int
-dissect_ndr_float(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+dissect_ndr_float(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                   proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                   int hfindex, float *pdata)
 {
@@ -449,16 +454,16 @@ dissect_ndr_float(tvbuff_t *tvb, int offset, packet_info *pinfo,
         return offset;
     }
 
-    if (!di->no_align && (offset % 4)) {
-        offset += 4 - (offset % 4);
+    if (!di->no_align) {
+        offset = WS_ROUNDUP_4(offset);
     }
     return dissect_dcerpc_float(tvb, offset, pinfo,
                                 tree, drep, hfindex, pdata);
 }
 
 
-int
-dissect_ndr_double(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+dissect_ndr_double(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                    proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                    int hfindex, double *pdata)
 {
@@ -472,16 +477,16 @@ dissect_ndr_double(tvbuff_t *tvb, int offset, packet_info *pinfo,
         return offset;
     }
 
-    if (!di->no_align && (offset % 8)) {
-        offset += 8 - (offset % 8);
+    if (!di->no_align) {
+        offset = WS_ROUNDUP_8(offset);
     }
     return dissect_dcerpc_double(tvb, offset, pinfo,
                                  tree, drep, hfindex, pdata);
 }
 
 /* handles unix 32 bit time_t */
-int
-dissect_ndr_time_t(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+dissect_ndr_time_t(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                    proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                    int hfindex, uint32_t *pdata)
 {
@@ -496,15 +501,15 @@ dissect_ndr_time_t(tvbuff_t *tvb, int offset, packet_info *pinfo,
     }
 
 
-    if (!di->no_align && (offset % 4)) {
-        offset += 4 - (offset % 4);
+    if (!di->no_align) {
+        offset = WS_ROUNDUP_4(offset);
     }
     return dissect_dcerpc_time_t(tvb, offset, pinfo,
                                  tree, drep, hfindex, pdata);
 }
 
-int
-dissect_ndr_uuid_t(tvbuff_t *tvb, int offset, packet_info *pinfo,
+unsigned
+dissect_ndr_uuid_t(tvbuff_t *tvb, unsigned offset, packet_info *pinfo,
                    proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                    int hfindex, e_guid_t *pdata)
 {
@@ -519,8 +524,8 @@ dissect_ndr_uuid_t(tvbuff_t *tvb, int offset, packet_info *pinfo,
     }
 
     /* uuid's are aligned to 4 bytes, due to initial uint32 in struct */
-    if (!di->no_align && (offset % 4)) {
-        offset += 4 - (offset % 4);
+    if (!di->no_align) {
+        offset = WS_ROUNDUP_4(offset);
     }
     return dissect_dcerpc_uuid_t(tvb, offset, pinfo,
                                  tree, drep, hfindex, pdata);
@@ -535,8 +540,8 @@ dissect_ndr_uuid_t(tvbuff_t *tvb, int offset, packet_info *pinfo,
  * Should we display an "ndr_context_handle" with a tree holding the
  * attributes and the uuid_t?
  */
-int
-dissect_ndr_ctx_hnd(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
+unsigned
+dissect_ndr_ctx_hnd(tvbuff_t *tvb, unsigned offset, packet_info *pinfo _U_,
                     proto_tree *tree, dcerpc_info *di, uint8_t *drep,
                     int hfindex, e_ctx_hnd *pdata)
 {
@@ -547,8 +552,8 @@ dissect_ndr_ctx_hnd(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
         return offset;
     }
 
-    if (!di->no_align && (offset % 4)) {
-        offset += 4 - (offset % 4);
+    if (!di->no_align) {
+        offset = WS_ROUNDUP_4(offset);
     }
     ctx_hnd.attributes = dcerpc_tvb_get_ntohl(tvb, offset, drep);
     dcerpc_tvb_get_uuid(tvb, offset+4, drep, &ctx_hnd.uuid);

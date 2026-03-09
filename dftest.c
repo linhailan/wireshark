@@ -33,16 +33,20 @@
 #include <wsutil/filesystem.h>
 #include <wsutil/file_util.h>
 #include <wsutil/privileges.h>
+#include <wsutil/clopts_common.h>
 #include <wsutil/wslog.h>
 #include <wsutil/ws_getopt.h>
 #include <wsutil/utf8_entities.h>
+#include <app/application_flavor.h>
 
 #include <wiretap/wtap.h>
 
 #include "ui/util.h"
-#include "wsutil/cmdarg_err.h"
 #include "ui/failure_message.h"
+#include "wsutil/cmdarg_err.h"
+#include "wsutil/report_message.h"
 #include "wsutil/version_info.h"
+#include "cli_main.h"
 
 static int opt_verbose;
 static int opt_debug_level; /* currently up to 2 */
@@ -51,7 +55,7 @@ static int opt_lemon;
 static int opt_syntax_tree;
 static int opt_return_vals;
 static int opt_timer;
-static long opt_optimize = 1;
+static int opt_optimize = 1;
 static int opt_show_types;
 static int opt_dump_refs;
 static int opt_dump_macros;
@@ -91,8 +95,8 @@ putloc(FILE *fp, df_loc_t loc)
     fputc('\n', fp);
 }
 
-WS_NORETURN static void
-print_usage(int status)
+static void
+print_usage(void)
 {
     FILE *fp = stdout;
     fprintf(fp, "\n");
@@ -120,7 +124,6 @@ print_usage(int status)
     fprintf(fp, "  -v, --version       print version\n");
     fprintf(fp, "\n");
     ws_log_print_usage(fp);
-    exit(status);
 }
 
 static void
@@ -234,20 +237,22 @@ compile_filter(const char *text, dfilter_t **dfp)
     return ok;
 }
 
-static int
-optarg_to_digit(const char *arg)
+static bool
+optarg_to_digit(const char *arg, int* digit)
 {
     if (strlen(arg) > 1 || !g_ascii_isdigit(*arg)) {
         printf("Error: \"%s\" is not a valid number 0-9\n", arg);
-        print_usage(WS_EXIT_INVALID_OPTION);
+        print_usage();
+        return false;
     }
     errno = 0;
-    int digit = (int)strtol(ws_optarg, NULL, 10);
+    *digit = (int)strtol(ws_optarg, NULL, 10);
     if (errno) {
         printf("Error: %s\n", g_strerror(errno));
-        print_usage(WS_EXIT_INVALID_OPTION);
+        print_usage();
+        return false;
     }
-    return digit;
+    return true;
 }
 
 static int
@@ -317,6 +322,33 @@ main(int argc, char **argv)
     char        *text = NULL;
     int          exit_status = EXIT_FAILURE;
 
+    const char* optstring = "hvC:dDflsmrtV0";
+    static const struct ws_option long_options[] = {
+        { "help",     ws_no_argument,   0,  'h' },
+        { "version",  ws_no_argument,   0,  'v' },
+        { "debug",    ws_optional_argument, 0, 'd' },
+        { "flex",     ws_no_argument,   0,  'f' },
+        { "lemon",    ws_no_argument,   0,  'l' },
+        { "syntax",   ws_no_argument,   0,  's' },
+        { "macros",   ws_no_argument,   0,  'm' },
+        { "timer",    ws_no_argument,   0,  't' },
+        { "verbose",  ws_no_argument,   0,  'V' },
+        { "return-vals", ws_no_argument,   0,  'r' },
+        { "optimize", ws_required_argument, 0, 1000 },
+        { "types",    ws_no_argument,   0, 2000 },
+        { "refs",     ws_no_argument,   0, 3000 },
+        { "file",     ws_required_argument, 0, 4000 },
+        LONGOPT_WSLOG
+        { NULL,       0,                0,  0   }
+    };
+    int opt;
+    const struct file_extension_info* file_extensions;
+    unsigned num_extensions;
+    epan_app_data_t app_data;
+
+    /* Future proof by zeroing out all data */
+    memset(&app_data, 0, sizeof(app_data));
+
     /* Set the program name. */
     g_set_prgname("dftest");
 
@@ -333,10 +365,10 @@ main(int argc, char **argv)
     cmdarg_err_init(stderr_cmdarg_err, stderr_cmdarg_err_cont);
 
     /* Initialize log handler early for startup. */
-    ws_log_init(vcmdarg_err);
+    ws_log_init(vcmdarg_err, "DFTest Debug Console");
 
     /* Early logging command-line initialization. */
-    ws_log_parse_args(&argc, argv, vcmdarg_err, 1);
+    ws_log_parse_args(&argc, argv, optstring, long_options, vcmdarg_err, WS_EXIT_INVALID_OPTION);
 
     ws_noisy("Finished log init and parsing command line log arguments");
 
@@ -349,7 +381,7 @@ main(int argc, char **argv)
      * Attempt to get the pathname of the directory containing the
      * executable file.
      */
-    configuration_init_error = configuration_init(argv[0]);
+    configuration_init_error = configuration_init(argv[0], "wireshark");
     if (configuration_init_error != NULL) {
         fprintf(stderr, "Error: Can't get pathname of directory containing "
                         "the dftest program: %s.\n",
@@ -357,27 +389,7 @@ main(int argc, char **argv)
         g_free(configuration_init_error);
     }
 
-    ws_init_version_info("DFTest", NULL, NULL);
-
-    const char *optstring = "hvC:dDflsmrtV0";
-    static struct ws_option long_options[] = {
-        { "help",     ws_no_argument,   0,  'h' },
-        { "version",  ws_no_argument,   0,  'v' },
-        { "debug",    ws_optional_argument, 0, 'd' },
-        { "flex",     ws_no_argument,   0,  'f' },
-        { "lemon",    ws_no_argument,   0,  'l' },
-        { "syntax",   ws_no_argument,   0,  's' },
-        { "macros",   ws_no_argument,   0,  'm' },
-        { "timer",    ws_no_argument,   0,  't' },
-        { "verbose",  ws_no_argument,   0,  'V' },
-        { "return-vals", ws_no_argument,   0,  'r' },
-        { "optimize", ws_required_argument, 0, 1000 },
-        { "types",    ws_no_argument,   0, 2000 },
-        { "refs",     ws_no_argument,   0, 3000 },
-        { "file",     ws_required_argument, 0, 4000 },
-        { NULL,       0,                0,  0   }
-    };
-    int opt;
+    ws_init_version_info("DFTest", NULL, application_get_vcs_version_info, NULL, NULL);
 
     for (;;) {
         opt = ws_getopt_long(argc, argv, optstring, long_options, NULL);
@@ -390,7 +402,8 @@ main(int argc, char **argv)
                 break;
             case 'd':
                 if (ws_optarg) {
-                    opt_debug_level = optarg_to_digit(ws_optarg);
+                    if (!optarg_to_digit(ws_optarg, &opt_debug_level))
+                        return WS_EXIT_INVALID_OPTION;
                 }
                 else {
                     opt_debug_level++;
@@ -398,11 +411,12 @@ main(int argc, char **argv)
                 opt_show_types = 1;
                 break;
             case 'C':   /* Configuration Profile */
-                if (profile_exists (ws_optarg, false)) {
+                if (profile_exists (application_configuration_environment_prefix(), ws_optarg, false)) {
                     set_profile_name (ws_optarg);
                 } else {
                     cmdarg_err("Configuration Profile \"%s\" does not exist", ws_optarg);
-                    print_usage(WS_EXIT_INVALID_OPTION);
+                    print_usage();
+                    return WS_EXIT_INVALID_OPTION;
                 }
                 break;
             case 'D':
@@ -433,7 +447,8 @@ main(int argc, char **argv)
                 opt_optimize = 0;
                 break;
             case 1000:
-                opt_optimize = optarg_to_digit(ws_optarg);
+                if (!optarg_to_digit(ws_optarg, &opt_optimize))
+                    return WS_EXIT_INVALID_OPTION;
                 break;
             case 2000:
                 opt_show_types = 1;
@@ -446,16 +461,22 @@ main(int argc, char **argv)
                 break;
             case 'v':
                 show_version();
-                exit(EXIT_SUCCESS);
-                break;
+                return EXIT_SUCCESS;
             case 'h':
                 show_help_header(NULL);
-                print_usage(EXIT_SUCCESS);
-                break;
+                print_usage();
+                return EXIT_SUCCESS;
             case '?':
-                print_usage(EXIT_FAILURE);
+                print_usage();
+                return EXIT_FAILURE;
+                break;
             default:
+                /* wslog arguments are okay */
+                if (ws_log_is_wslog_arg(opt))
+                    break;
+
                 ws_assert_not_reached();
+                break;
         }
     }
 
@@ -464,7 +485,8 @@ main(int argc, char **argv)
         /* If not printing macros we need a filter expression to compile. */
         if (!opt_dump_macros && !path) {
             printf("Error: Missing argument.\n");
-            print_usage(EXIT_FAILURE);
+            print_usage();
+            return EXIT_FAILURE;
         }
     }
 
@@ -487,13 +509,20 @@ main(int argc, char **argv)
      * dissection-time handlers for file-type-dependent blocks can
      * register using the file type/subtype value for the file type.
      */
-    wtap_init(true);
+    application_file_extensions(&file_extensions, &num_extensions);
+    wtap_init(true, application_configuration_environment_prefix(), file_extensions, num_extensions);
+
 
     /* Register all dissectors; we must do this before checking for the
        "-g" flag, as the "-g" flag dumps a list of fields registered
        by the dissectors, and we must do it before we read the preferences,
        in case any dissectors register preferences. */
-    if (!epan_init(NULL, NULL, true))
+    app_data.env_var_prefix = application_configuration_environment_prefix();
+    app_data.col_fmt = application_columns();
+    app_data.num_cols = application_num_columns();
+    app_data.register_func = register_all_protocols;
+    app_data.handoff_func = register_all_protocol_handoffs;
+    if (!epan_init(NULL, NULL, true, &app_data))
         goto out;
 
     /* Load libwireshark settings from the current profile. */
@@ -508,7 +537,7 @@ main(int argc, char **argv)
         print_macros();
         if (argv[ws_optind] == NULL) {
             /* No filter expression, we're done. */
-            exit(EXIT_SUCCESS);
+            return EXIT_SUCCESS;
         }
     }
 
@@ -528,7 +557,7 @@ main(int argc, char **argv)
         } else {
             filter_p = ws_fopen(path, "r");
             if (filter_p == NULL) {
-                open_failure_message(path, errno, false);
+                report_open_failure(path, errno, false);
                 exit_status = WS_EXIT_INVALID_FILE;
                 goto out;
             }
@@ -559,19 +588,20 @@ main(int argc, char **argv)
     } else {
 
         /* Check again for filter on command line */
-        if (argv[ws_optind] == NULL) {
+        if (argv[ws_optind] != NULL) {
+            /* Get filter text */
+            text = get_args_as_string(argc, argv, ws_optind);
+
+            exit_status = test_filter(text);
+        } else {
             printf("Error: Missing argument.\n");
-            print_usage(EXIT_FAILURE);
+            print_usage();
+            exit_status = EXIT_FAILURE;
         }
-
-        /* Get filter text */
-        text = get_args_as_string(argc, argv, ws_optind);
-
-        exit_status = test_filter(text);
     }
 
 out:
     epan_cleanup();
     g_free(text);
-    exit(exit_status);
+    return exit_status;
 }

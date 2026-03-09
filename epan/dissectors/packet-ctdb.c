@@ -425,7 +425,7 @@ static int dissect_control_get_recmode_reply(packet_info *pinfo, proto_tree *tre
 	proto_tree_add_uint(tree, hf_ctdb_recmode, tvb, 0, 0, status);
 
 	col_append_fstr(pinfo->cinfo, COL_INFO, " RecMode:%s",
-		val_to_str(status, recmode_vals, "Unknown:%d"));
+		val_to_str(pinfo->pool, status, recmode_vals, "Unknown:%d"));
 
 	return offset;
 }
@@ -866,7 +866,7 @@ dissect_ctdb_req_control(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tr
 	offset+=4;
 
 	col_add_fstr(pinfo->cinfo, COL_INFO, "%s Request %d->%d",
-		val_to_str(opcode, ctrl_opcode_vals, "Unknown:%d"),
+		val_to_str(pinfo->pool, opcode, ctrl_opcode_vals, "Unknown:%d"),
 		src, dst);
 
 	/* srvid */
@@ -972,7 +972,7 @@ dissect_ctdb_reply_control(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_
 	proto_item_set_generated(item);
 
 	col_add_fstr(pinfo->cinfo, COL_INFO, "%s Reply %d->%d",
-		val_to_str(ctdb_control->opcode, ctrl_opcode_vals, "Unknown:%d"),
+		val_to_str(pinfo->pool, ctdb_control->opcode, ctrl_opcode_vals, "Unknown:%d"),
 		src, dst);
 
 
@@ -1122,7 +1122,7 @@ dissect_ctdb_req_call(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree 
 	return offset;
 }
 
-static gboolean
+static int
 dissect_ctdb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *data _U_)
 {
 	proto_tree *tree=NULL;
@@ -1133,7 +1133,7 @@ dissect_ctdb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *d
 
 	/* does this look like CTDB? */
 	if(tvb_captured_length(tvb)<8){
-		return FALSE;
+		return 0;
 	}
 	switch(tvb_get_letohl(tvb, offset+4)){
 	case 0x42445443:
@@ -1143,7 +1143,7 @@ dissect_ctdb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *d
 		endianess=true;
 		break;
 	default:
-		return FALSE;
+		return 0;
 	}
 
 
@@ -1210,41 +1210,41 @@ dissect_ctdb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *d
 	offset+=4;
 
 	col_append_fstr(pinfo->cinfo, COL_INFO, "%s %d->%d",
-		val_to_str(opcode, ctdb_opcodes, "Unknown:%d"),
+		val_to_str(pinfo->pool, opcode, ctdb_opcodes, "Unknown:%d"),
 		src, dst);
 
 	switch(opcode){
 	case CTDB_REQ_CALL:
-		dissect_ctdb_req_call(tvb, offset, pinfo, tree, reqid, src, endianess);
+		offset = dissect_ctdb_req_call(tvb, offset, pinfo, tree, reqid, src, endianess);
 		break;
 	case CTDB_REPLY_CALL:
-		dissect_ctdb_reply_call(tvb, offset, pinfo, tree, endianess);
+		offset = dissect_ctdb_reply_call(tvb, offset, pinfo, tree, endianess);
 		break;
 	case CTDB_REPLY_DMASTER:
-		dissect_ctdb_reply_dmaster(tvb, offset, pinfo, tree, reqid, dst, endianess);
+		offset = dissect_ctdb_reply_dmaster(tvb, offset, pinfo, tree, reqid, dst, endianess);
 		break;
 	case CTDB_REQ_DMASTER:
-		dissect_ctdb_req_dmaster(tvb, offset, pinfo, tree, reqid, endianess);
+		offset = dissect_ctdb_req_dmaster(tvb, offset, pinfo, tree, reqid, endianess);
 		break;
 	case CTDB_REPLY_ERROR:
 		break;
 	case CTDB_REQ_MESSAGE:
 		break;
 	case CTDB_REQ_CONTROL:
-		dissect_ctdb_req_control(tvb, offset, pinfo, tree, reqid, src, dst, endianess);
+		offset = dissect_ctdb_req_control(tvb, offset, pinfo, tree, reqid, src, dst, endianess);
 		break;
 	case CTDB_REPLY_CONTROL:
-		dissect_ctdb_reply_control(tvb, offset, pinfo, tree, reqid, src, dst, endianess);
+		offset = dissect_ctdb_reply_control(tvb, offset, pinfo, tree, reqid, src, dst, endianess);
 		break;
 	};
 
-	return TRUE;
+	return offset;
 }
 
 static bool
 dissect_ctdb_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
-    return (bool)dissect_ctdb(tvb, pinfo, tree, data);
+    return dissect_ctdb(tvb, pinfo, tree, data) > 0;
 }
 
 /*

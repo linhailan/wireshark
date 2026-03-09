@@ -713,14 +713,14 @@
     </message>
 </context>
 <context>
-    <name>ByteViewTab</name>
+    <name>DataSourceTab</name>
     <message>
         <source>Packet bytes</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
-    <name>ByteViewText</name>
+    <name>HexDataSourceView</name>
     <message>
         <source>Allow hover selection</source>
         <translation type="unfinished"></translation>
@@ -2051,7 +2051,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Filter Button Preferences...</source>
+        <source>Filter Button Preferences…</source>
+        <oldsource>Filter Button Preferences...</oldsource>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -2632,9 +2633,12 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <source>The help for the extcap interface %1 cannot be found. Given file: %2</source>
         <translation type="unfinished"></translation>
     </message>
-    <message>
+    <message numerus="yes">
         <source>Save parameter(s) on capture start</source>
-        <translation type="unfinished">Save parameter on capture start</translation>
+        <translation>
+            <numerusform>Save parameter on capture start</numerusform>
+            <numerusform>Save parameters on capture start</numerusform>
+        </translation>
     </message>
 </context>
 <context>
@@ -2822,7 +2826,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 <context>
     <name>FilterExpressionToolBar</name>
     <message>
-        <source>Filter Button Preferences...</source>
+        <source>Filter Button Preferences…</source>
+        <oldsource>Filter Button Preferences...</oldsource>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -3410,7 +3415,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
-    <name>IOGraphDialog</name>
+    <name>StratosharkIOGraphDialog</name>
     <message>
         <source>Dialog</source>
         <translation type="unfinished"></translation>
@@ -5913,7 +5918,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
-    <name>MainStatusBar</name>
+    <name>StratosharkMainStatusBar</name>
     <message>
         <source>Ready to load or capture</source>
         <translation type="unfinished"></translation>
@@ -13417,7 +13422,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
-    <name>WelcomePage</name>
+    <name>StratosharkWelcomePage</name>
     <message>
         <source>Form</source>
         <translation type="unfinished"></translation>

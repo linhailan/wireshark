@@ -61,10 +61,6 @@
 #define ATOM_CACHE_REF      'R'
 #define COMPRESSED          'P'
 
-#define PNAME  "Erlang Distribution Protocol"
-#define PSNAME "ErlDP"
-#define PFNAME "erldp"
-
 void proto_register_erldp(void);
 void proto_reg_handoff_erldp(void);
 
@@ -303,7 +299,7 @@ static int dissect_etf_pdu_data(packet_info *pinfo, tvbuff_t *tvb, int offset, p
 
 static int dissect_etf_dist_header(packet_info *pinfo, tvbuff_t *tvb, int offset, proto_tree *tree) {
   uint32_t num, isi;
-  uint8_t flen, i, flg;
+  uint8_t flen, flg;
   int flg_offset, acrs_offset, acr_offset;
   uint32_t atom_txt_len;
   bool new_entry, long_atom;
@@ -321,7 +317,7 @@ static int dissect_etf_dist_header(packet_info *pinfo, tvbuff_t *tvb, int offset
   flen = num / 2 + 1;
   ti_tmp = proto_tree_add_item(tree, hf_erldp_etf_flags, tvb, offset, flen, ENC_NA );
   flags_tree = proto_item_add_subtree(ti_tmp, ett_etf_flags);
-  for (i=0; i<num; i++) {
+  for (unsigned i=0; i<num; i++) {
     flg = tvb_get_uint8(tvb, offset + i / 2);
     proto_tree_add_boolean_format_value(flags_tree, hf_etf_dist_header_new_cache, tvb, offset + i / 2, 1,
                             (flg & (0x08 << 4*(i%2))), "NewCacheEntryFlag[%2d]: %s",
@@ -337,7 +333,7 @@ static int dissect_etf_dist_header(packet_info *pinfo, tvbuff_t *tvb, int offset
 
   acrs_offset = offset;
   acrs_tree = proto_tree_add_subtree(tree, tvb, offset, 0, ett_etf_acrs, &ti_acrs, "AtomCacheRefs");
-  for (i=0; i<num; i++) {
+  for (unsigned i=0; i<num; i++) {
     flg = tvb_get_uint8(tvb, flg_offset + i / 2);
     new_entry = flg & (0x08 << 4*(i%2));
     acr_offset = offset;
@@ -691,7 +687,7 @@ static int dissect_etf_pdu_data(packet_info *pinfo, tvbuff_t *tvb, int offset, p
 
   if ((tvb_get_uint8(tvb, offset) == SMALL_TUPLE_EXT) && (tvb_get_uint8(tvb, offset + 2) == SMALL_INTEGER_EXT)) {
     ctl_op = tvb_get_uint8(tvb, offset + 3);
-    col_add_str(pinfo->cinfo, COL_INFO, val_to_str(ctl_op, VALS(erldp_ctlmsg_vals), "unknown ControlMessage operation (%d)"));
+    col_add_str(pinfo->cinfo, COL_INFO, val_to_str(pinfo->pool, ctl_op, VALS(erldp_ctlmsg_vals), "unknown ControlMessage operation (%d)"));
   }
   offset = dissect_etf_type("ControlMessage", pinfo, tvb, offset, tree);
   if (tvb_reported_length_remaining(tvb, offset) > 0)
@@ -721,7 +717,7 @@ static int dissect_etf_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
   offset++;
 
   if (!label)
-    proto_item_set_text(ti, "%s", val_to_str(tag, VALS(etf_header_tag_vals), "unknown tag (%d)"));
+    proto_item_set_text(ti, "%s", val_to_str(pinfo->pool, tag, VALS(etf_header_tag_vals), "unknown tag (%d)"));
 
   switch (tag) {
     case DIST_HEADER:
@@ -811,7 +807,7 @@ static int dissect_etf_type(const char *label, packet_info *pinfo, tvbuff_t *tvb
   offset++;
 
   if (!label)
-    proto_item_set_text(ti, "%s", val_to_str(tag, VALS(etf_tag_vals), "unknown tag (%d)"));
+    proto_item_set_text(ti, "%s", val_to_str(pinfo->pool, tag, VALS(etf_tag_vals), "unknown tag (%d)"));
 
   offset = dissect_etf_type_content(tag, pinfo, tvb, offset, etf_tree, &value_str);
   if (value_str)
@@ -874,7 +870,7 @@ static void dissect_erldp_handshake(tvbuff_t *tvb, packet_info *pinfo, proto_tre
 
   proto_tree_add_item(tree, hf_erldp_length_2, tvb, offset, 2, ENC_BIG_ENDIAN);
   offset += 2;
-  proto_tree_add_item_ret_uint(tree, hf_erldp_tag, tvb, offset, 1, ENC_ASCII|ENC_NA, &tag);
+  proto_tree_add_item_ret_uint(tree, hf_erldp_tag, tvb, offset, 1, ENC_ASCII, &tag);
   offset++;
 
   switch (tag) {
@@ -951,7 +947,7 @@ static int dissect_erldp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
   proto_item *ti;
   tvbuff_t *next_tvb = NULL;
 
-  col_set_str(pinfo->cinfo, COL_PROTOCOL, PSNAME);
+  col_set_str(pinfo->cinfo, COL_PROTOCOL, "ErlDP");
 
   ti = proto_tree_add_item(tree, proto_erldp, tvb, 0, -1, ENC_NA);
   erldp_tree = proto_item_add_subtree(ti, ett_erldp);
@@ -984,7 +980,7 @@ static int dissect_erldp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
       break;
 
     case VERSION_MAGIC:
-      next_tvb = tvb_new_subset_length_caplen(tvb, offset, -1, 4 + msg_len - offset);
+      next_tvb = tvb_new_subset_length(tvb, offset, 4 + msg_len - offset);
       dissect_etf_pdu(next_tvb, pinfo, erldp_tree, "DistributionHeader");
      break;
 
@@ -1375,11 +1371,11 @@ void proto_register_erldp(void) {
   };
 
   /* Register protocol and dissector */
-  proto_erldp = proto_register_protocol(PNAME, PSNAME, PFNAME);
+  proto_erldp = proto_register_protocol("Erlang Distribution Protocol", "ErlDP", "erldp");
   reassembly_table_register(&erldp_reassembly_table,
                           &addresses_reassembly_table_functions);
 
-  erldp_handle = register_dissector(PFNAME, dissect_erldp, proto_erldp);
+  erldp_handle = register_dissector("erldp", dissect_erldp, proto_erldp);
 
   /* Register fields and subtrees */
   proto_register_field_array(proto_erldp, hf, array_length(hf));

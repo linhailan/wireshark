@@ -24,6 +24,9 @@
 #include <epan/addr_resolv.h>
 #include <epan/wmem_scopes.h>
 #include <epan/conversation.h>
+
+#include <wsutil/ws_padding_to.h>
+
 #include "packet-tcp.h"
 
 #define RTITCP_MAGIC_NUMBER             0xdd54dd55
@@ -397,7 +400,7 @@ static unsigned dissect_attribute(tvbuff_t *tvb, packet_info *pinfo,
             break;
     }
 
-    padding = (4 - attribute_length%4)%4;
+    padding = WS_PADDING_TO_4(attribute_length);
     return (attribute_length+padding+4);
 }
 static proto_tree* print_header(proto_tree *tree, proto_tree *rtitcp_message, tvbuff_t *tvb, unsigned offset,
@@ -493,8 +496,7 @@ static uint16_t dissect_control_message(proto_tree *rtitcp_tree, tvbuff_t *tvb, 
     offset += 2;
 
     /* Take the length in bytes of the attributes list */
-    attributes_list_length = tvb_get_uint16(tvb, offset, ENC_BIG_ENDIAN);
-    proto_tree_add_item(rtitcp_message, hf_rtitcp_attributes_list_length, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint16(rtitcp_message, hf_rtitcp_attributes_list_length, tvb, offset, 2, ENC_BIG_ENDIAN, &attributes_list_length);
     offset += 2;
 
     /* We expect now the RTI TCP Control Magic Cookie */
@@ -715,7 +717,7 @@ static int dissect_rtitcp_common(tvbuff_t *tvb, packet_info *pinfo,
 
         /* Take the payload and call the registered sub-dissectors. So far, RTPS */
         next_tvb = tvb_new_subset_remaining(tvb, offset);
-        dissector_try_heuristic(heur_subdissector_list, next_tvb, pinfo, tree, &hdtbl_entry, NULL);
+        (void) dissector_try_heuristic(heur_subdissector_list, next_tvb, pinfo, tree, &hdtbl_entry, NULL);
         return tvb_captured_length(tvb);
 
     } else {

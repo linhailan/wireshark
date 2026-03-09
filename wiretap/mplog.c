@@ -38,7 +38,10 @@
 #include "mplog.h"
 
 #include <string.h>
-#include <wtap-int.h>
+
+#include <wsutil/pint.h>
+
+#include <wtap_module.h>
 #include <file_wrappers.h>
 
 /* the block types */
@@ -90,7 +93,7 @@ void register_mplog(void);
    - if two blocks of our packet's block type are more than 200us apart,
      we treat this as a packet boundary as described above
    */
-static bool mplog_read_packet(FILE_T fh, wtap_rec *rec,
+static bool mplog_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
         int *err, char **err_info)
 {
     uint8_t *p, *start_p;
@@ -128,7 +131,7 @@ static bool mplog_read_packet(FILE_T fh, wtap_rec *rec,
         }
         data = block[0];
         type = block[1];
-        ctr = pletoh48(&block[2]);
+        ctr = pletohu48(&block[2]);
 
         if (pkt_type == TYPE_UNKNOWN) {
             if (KNOWN_TYPE(type)) {
@@ -145,7 +148,9 @@ static bool mplog_read_packet(FILE_T fh, wtap_rec *rec,
                    ctr and last_ctr are in units of 10ns
                    at 106kbit/s, it takes approx 75us to send one byte */
                 if (ctr - last_ctr > 200*100) {
-                    file_seek(fh, -MPLOG_BLOCK_SIZE, SEEK_CUR, err);
+                    if (file_seek(fh, -MPLOG_BLOCK_SIZE, SEEK_CUR, err) == -1) {
+                        return false;
+                    }
                     break;
                 }
             }
@@ -155,7 +160,9 @@ static bool mplog_read_packet(FILE_T fh, wtap_rec *rec,
             last_ctr = ctr;
         }
         else if (KNOWN_TYPE(type)) {
-            file_seek(fh, -MPLOG_BLOCK_SIZE, SEEK_CUR, err);
+            if (file_seek(fh, -MPLOG_BLOCK_SIZE, SEEK_CUR, err) == -1) {
+                return false;
+            }
             break;
         }
     } while (pkt_bytes < ISO14443_MAX_PKT_LEN);
@@ -170,12 +177,10 @@ static bool mplog_read_packet(FILE_T fh, wtap_rec *rec,
     else
         start_p[1] = ISO14443_PSEUDO_HDR_PICC_TO_PCD;
 
-    start_p[2] = pkt_bytes >> 8;
-    start_p[3] = pkt_bytes & 0xFF;
+    phtonu16(&start_p[2], pkt_bytes);
 
-    rec->rec_type = REC_TYPE_PACKET;
+    wtap_setup_packet_rec(rec, wth->file_encap);
     rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
-    rec->rec_header.packet_header.pkt_encap = WTAP_ENCAP_ISO14443;
     rec->presence_flags = WTAP_HAS_TS | WTAP_HAS_CAP_LEN;
     rec->ts.secs = (time_t)((pkt_ctr*10)/(1000*1000*1000));
     rec->ts.nsecs = (int)((pkt_ctr*10)%(1000*1000*1000));
@@ -192,7 +197,7 @@ mplog_read(wtap *wth, wtap_rec *rec, int *err, char **err_info,
 {
     *data_offset = file_tell(wth->fh);
 
-    return mplog_read_packet(wth->fh, rec, err, err_info);
+    return mplog_read_packet(wth, wth->fh, rec, err, err_info);
 }
 
 
@@ -203,7 +208,7 @@ mplog_seek_read(wtap *wth, int64_t seek_off, wtap_rec *rec,
     if (-1 == file_seek(wth->random_fh, seek_off, SEEK_SET, err))
         return false;
 
-    if (!mplog_read_packet(wth->random_fh, rec, err, err_info)) {
+    if (!mplog_read_packet(wth, wth->random_fh, rec, err, err_info)) {
         /* Even if we got an immediate EOF, that's an error. */
         if (*err == 0)
             *err = WTAP_ERR_SHORT_READ;

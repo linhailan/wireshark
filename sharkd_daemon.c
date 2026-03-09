@@ -31,9 +31,11 @@
 #include <wsutil/please_report_bug.h>
 #include <wsutil/wslog.h>
 #include <wsutil/ws_getopt.h>
+#include <app/application_flavor.h>
 
 #ifndef _WIN32
 #include <sys/un.h>
+#include <sys/wait.h>
 #include <netinet/tcp.h>
 #endif
 
@@ -241,40 +243,6 @@ print_usage(FILE* output)
 int
 sharkd_init(int argc, char **argv)
 {
-    /*
-     * The leading + ensures that getopt_long() does not permute the argv[]
-     * entries.
-     *
-     * We have to make sure that the first getopt_long() preserves the content
-     * of argv[] for the subsequent getopt_long() call.
-     *
-     * We use getopt_long() in both cases to ensure that we're using a routine
-     * whose permutation behavior we can control in the same fashion on all
-     * platforms, and so that, if we ever need to process a long argument before
-     * doing further initialization, we can do so.
-     *
-     * Glibc and Solaris libc document that a leading + disables permutation
-     * of options, regardless of whether POSIXLY_CORRECT is set or not; *BSD
-     * and macOS don't document it, but do so anyway.
-     *
-     * We do *not* use a leading - because the behavior of a leading - is
-     * platform-dependent.
-     */
-
-#define OPTSTRING "+" "a:hmvC:"
-#define LONGOPT_FOREGROUND 4000
-
-    static const char    optstring[] = OPTSTRING;
-
-    static const struct ws_option long_options[] = {
-        {"api", ws_required_argument, NULL, 'a'},
-        {"foreground", ws_no_argument, NULL, LONGOPT_FOREGROUND},
-        {"help", ws_no_argument, NULL, 'h'},
-        {"version", ws_no_argument, NULL, 'v'},
-        {"config-profile", ws_required_argument, NULL, 'C'},
-        {0, 0, 0, 0 }
-    };
-
     int opt;
 
 #ifndef _WIN32
@@ -329,15 +297,25 @@ sharkd_init(int argc, char **argv)
            where we repeatedly spawn a new session process.
            */
 
+        /*
+         * To reset the options parser, set ws_optreset to 1 and set ws_optind to 1.
+         *
+         * Also reset ws_opterr to 1, so that error messages are printed by
+         * getopt_long().
+         */
+        ws_optreset = 1;
+        ws_optind = 1;
+        ws_opterr = 1;
+
         do {
             if (ws_optind > (argc - 1))
                 break;
 
-            opt = ws_getopt_long(argc, argv, optstring, long_options, NULL);
+            opt = ws_getopt_long(argc, argv, sharkd_optstring(), sharkd_long_options(), NULL);
 
             switch (opt) {
                 case 'C':        /* Configuration Profile */
-                    if (profile_exists(ws_optarg, false)) {
+                    if (profile_exists(application_configuration_environment_prefix(), ws_optarg, false)) {
                         set_profile_name(ws_optarg);  // In Daemon Mode, we may need to do this again in the child process
                     }
                     else {
@@ -378,6 +356,10 @@ sharkd_init(int argc, char **argv)
                     break;
 
                 default:
+                    /* wslog arguments are okay */
+                    if (ws_log_is_wslog_arg(opt))
+                        break;
+
                     if (!ws_optopt)
                         fprintf(stderr, "This option isn't supported: %s\n", argv[ws_optind]);
                     fprintf(stderr, "Use sharkd -h for details of supported options\n");
@@ -441,6 +423,19 @@ sharkd_loop(int argc _U_, char* argv[])
 
         /* wireshark is not ready for handling multiple capture files in single process, so fork(), and handle it in separate process */
 #ifndef _WIN32
+        /* wait for completed child processes to avoid zombie processes consuming slots in the kernel process table */
+        while (1)
+        {
+            pid_t current_pid;
+            current_pid = waitpid(-1, NULL, WNOHANG);
+            /* if a child was successfully waited for, current_pid will be a positive value indicated the pid of the child process */
+            /* other values indicate either an error, or that no child is available to be waited for */
+            if (current_pid < 1)
+            {
+                break;
+            }
+        }
+
         pid = fork();
         if (pid == 0)
         {

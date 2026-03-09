@@ -311,11 +311,11 @@ add_string_param_update_parent(tvbuff_t *tvb, int offset, int count, packet_info
     proto_tree *tree, int convert _U_, int hf_index, smb_info_t *smb_info _U_)
 {
 	proto_item *ti, *parent_ti;
-	const uint8_t *str;
+	const char *str;
 
 	DISSECTOR_ASSERT(hf_index > 0);
 	ti = proto_tree_add_item_ret_string(tree, hf_index, tvb, offset,
-	    count, ENC_ASCII|ENC_NA, pinfo->pool, &str);
+	    count, ENC_ASCII|ENC_NA, pinfo->pool, (const uint8_t**)&str);
 	    /* XXX - code page? */
 	parent_ti = proto_item_get_parent(ti);
 	proto_item_append_text(parent_ti, ": %s",
@@ -358,7 +358,7 @@ add_string_param(tvbuff_t *tvb, int offset, int count _U_,
 		proto_tree_add_item(tree, hf_index, tvb, offset, string_len,
 		    ENC_ASCII|ENC_NA);	/* XXX - code page? */
 	} else {
-		proto_tree_add_item(tree, hf_smb_pipe_string_param, tvb, offset, string_len, ENC_NA|ENC_ASCII);
+		proto_tree_add_item(tree, hf_smb_pipe_string_param, tvb, offset, string_len, ENC_ASCII);
 	}
 	offset += string_len;
 	return offset;
@@ -403,7 +403,7 @@ add_stringz_pointer_param(tvbuff_t *tvb, int offset, int count _U_,
 			proto_tree_add_item(tree, hf_index, tvb, cptr,
 			    string_len, ENC_ASCII|ENC_NA);	/* XXX - code page? */
 		} else {
-			proto_tree_add_item(tree, hf_smb_pipe_stringz_param, tvb, cptr, string_len, ENC_NA|ENC_ASCII);
+			proto_tree_add_item(tree, hf_smb_pipe_stringz_param, tvb, cptr, string_len, ENC_ASCII);
 		}
 	} else {
 		if (hf_index > 0) {
@@ -1593,8 +1593,8 @@ find_lanman(int lanman_num)
 	return &lmd[i];
 }
 
-static const unsigned char *
-get_count(const unsigned char *desc, int *countp)
+static const char *
+get_count(const char *desc, int *countp)
 {
 	int count = 0;
 	unsigned char c;
@@ -1615,7 +1615,7 @@ get_count(const unsigned char *desc, int *countp)
 
 static int
 dissect_request_parameters(tvbuff_t *tvb, int offset, packet_info *pinfo,
-    proto_tree *tree, const unsigned char *desc, const item_t *items,
+    proto_tree *tree, const char *desc, const item_t *items,
     bool *has_data_p, smb_info_t *smb_info)
 {
 	unsigned c;
@@ -1823,7 +1823,7 @@ dissect_request_parameters(tvbuff_t *tvb, int offset, packet_info *pinfo,
 
 static int
 dissect_response_parameters(tvbuff_t *tvb, int offset, packet_info *pinfo,
-    proto_tree *tree, const unsigned char *desc, const item_t *items,
+    proto_tree *tree, const char *desc, const item_t *items,
     bool *has_data_p, bool *has_ent_count_p, uint16_t *ent_count_p, smb_info_t *smb_info)
 {
 	unsigned c;
@@ -1957,7 +1957,7 @@ dissect_response_parameters(tvbuff_t *tvb, int offset, packet_info *pinfo,
 
 static int
 dissect_transact_data(tvbuff_t *tvb, int offset, int convert,
-    packet_info *pinfo, proto_tree *tree, const unsigned char *desc,
+    packet_info *pinfo, proto_tree *tree, const char *desc,
     const item_t *items, uint16_t *aux_count_p, smb_info_t *smb_info)
 {
 	unsigned c;
@@ -2598,7 +2598,7 @@ dissect_pipe_lanman(tvbuff_t *pd_tvb, tvbuff_t *p_tvb, tvbuff_t *d_tvb,
 	const struct lanman_desc *lanman;
 	proto_item *item = NULL;
 	proto_tree *tree = NULL;
-	unsigned descriptor_len;
+	int descriptor_len;
 	const char *param_descrip, *data_descrip, *aux_data_descrip = NULL;
 	bool has_data;
 	bool has_ent_count;
@@ -2631,7 +2631,7 @@ dissect_pipe_lanman(tvbuff_t *pd_tvb, tvbuff_t *p_tvb, tvbuff_t *d_tvb,
 	if (smb_info->request) { /* this is a request */
 		/* function code */
 		cmd = tvb_get_letohs(p_tvb, offset);
-		col_add_fstr(pinfo->cinfo, COL_INFO, "%s Request", val_to_str_ext(cmd, &commands_ext, "Unknown Command (%u)"));
+		col_add_fstr(pinfo->cinfo, COL_INFO, "%s Request", val_to_str_ext(pinfo->pool, cmd, &commands_ext, "Unknown Command (%u)"));
 
 		proto_tree_add_uint(tree, hf_function_code, p_tvb, offset, 2,
 		    cmd);
@@ -2656,8 +2656,7 @@ dissect_pipe_lanman(tvbuff_t *pd_tvb, tvbuff_t *p_tvb, tvbuff_t *d_tvb,
 		}
 
 		/* parameter descriptor */
-		param_descrip = tvb_get_stringz_enc(pinfo->pool, p_tvb, offset, &descriptor_len, ENC_ASCII);
-		proto_tree_add_string(tree, hf_param_desc, p_tvb, offset, descriptor_len, param_descrip);
+		proto_tree_add_item_ret_string_and_length(tree, hf_param_desc, p_tvb, offset, -1, ENC_ASCII, pinfo->pool, (const uint8_t**)&param_descrip, &descriptor_len);
 		if (!pinfo->fd->visited) {
 			/*
 			 * Save the parameter descriptor for future use.
@@ -2668,8 +2667,7 @@ dissect_pipe_lanman(tvbuff_t *pd_tvb, tvbuff_t *p_tvb, tvbuff_t *d_tvb,
 		offset += descriptor_len;
 
 		/* return descriptor */
-		data_descrip = tvb_get_stringz_enc(pinfo->pool, p_tvb, offset, &descriptor_len, ENC_ASCII);
-		proto_tree_add_string(tree, hf_return_desc, p_tvb, offset, descriptor_len, data_descrip);
+		proto_tree_add_item_ret_string_and_length(tree, hf_return_desc, p_tvb, offset, -1, ENC_ASCII, pinfo->pool, (const uint8_t**)&data_descrip, &descriptor_len);
 		if (!pinfo->fd->visited) {
 			/*
 			 * Save the return descriptor for future use.
@@ -2692,8 +2690,7 @@ dissect_pipe_lanman(tvbuff_t *pd_tvb, tvbuff_t *p_tvb, tvbuff_t *d_tvb,
 			 * There are more parameters left, so the next
 			 * item is the auxiliary data descriptor.
 			 */
-			aux_data_descrip = tvb_get_stringz_enc(pinfo->pool, p_tvb, offset, &descriptor_len, ENC_ASCII);
-			proto_tree_add_string(tree, hf_aux_data_desc, p_tvb, offset, descriptor_len, aux_data_descrip);
+			proto_tree_add_item_ret_string_and_length(tree, hf_aux_data_desc, p_tvb, offset, -1, ENC_ASCII, pinfo->pool, (const uint8_t**)&aux_data_descrip, &descriptor_len);
 			if (!pinfo->fd->visited) {
 				/*
 				 * Save the auxiliary data descriptor for
@@ -2768,7 +2765,7 @@ dissect_pipe_lanman(tvbuff_t *pd_tvb, tvbuff_t *p_tvb, tvbuff_t *d_tvb,
 		&&  ( tvb_reported_length(d_tvb)==0 ) ){
 			/* command */
 			col_add_fstr(pinfo->cinfo, COL_INFO, "%s Interim Response",
-					     val_to_str_ext(trp->lanman_cmd, &commands_ext, "Unknown Command (%u)"));
+					     val_to_str_ext(pinfo->pool, trp->lanman_cmd, &commands_ext, "Unknown Command (%u)"));
 
 			proto_tree_add_uint(tree, hf_function_code, p_tvb, 0, 0, trp->lanman_cmd);
 			return true;
@@ -2776,7 +2773,7 @@ dissect_pipe_lanman(tvbuff_t *pd_tvb, tvbuff_t *p_tvb, tvbuff_t *d_tvb,
 
 		/* command */
 		col_add_fstr(pinfo->cinfo, COL_INFO, "%s Response",
-				     val_to_str_ext(trp->lanman_cmd, &commands_ext, "Unknown Command (%u)"));
+				     val_to_str_ext(pinfo->pool, trp->lanman_cmd, &commands_ext, "Unknown Command (%u)"));
 
 		proto_tree_add_uint(tree, hf_function_code, p_tvb, 0, 0,
 		    trp->lanman_cmd);
@@ -2862,15 +2859,15 @@ proto_register_pipe_lanman(void)
 			&commands_ext, 0, "LANMAN Function Code/Command", HFILL }},
 
 		{ &hf_param_desc,
-			{ "Parameter Descriptor", "lanman.param_desc", FT_STRING, BASE_NONE,
+			{ "Parameter Descriptor", "lanman.param_desc", FT_STRINGZ, BASE_NONE,
 			NULL, 0, "LANMAN Parameter Descriptor", HFILL }},
 
 		{ &hf_return_desc,
-			{ "Return Descriptor", "lanman.ret_desc", FT_STRING, BASE_NONE,
+			{ "Return Descriptor", "lanman.ret_desc", FT_STRINGZ, BASE_NONE,
 			NULL, 0, "LANMAN Return Descriptor", HFILL }},
 
 		{ &hf_aux_data_desc,
-			{ "Auxiliary Data Descriptor", "lanman.aux_data_desc", FT_STRING, BASE_NONE,
+			{ "Auxiliary Data Descriptor", "lanman.aux_data_desc", FT_STRINGZ, BASE_NONE,
 			NULL, 0, "LANMAN Auxiliary Data Descriptor", HFILL }},
 
 		{ &hf_detail_level,
@@ -3511,7 +3508,7 @@ dissect_pipe_smb(tvbuff_t *sp_tvb, tvbuff_t *s_tvb, tvbuff_t *pd_tvb,
 		    offset, 2, function);
 		offset += 2;
 		col_add_fstr(pinfo->cinfo, COL_INFO, "%s %s",
-			    val_to_str(function, functions, "Unknown function (0x%04x)"),
+			    val_to_str(pinfo->pool, function, functions, "Unknown function (0x%04x)"),
 			    smb_info->request ? "Request" : "Response");
 
 		if (tri != NULL)
@@ -3542,7 +3539,7 @@ dissect_pipe_smb(tvbuff_t *sp_tvb, tvbuff_t *s_tvb, tvbuff_t *pd_tvb,
 			 * It's a FID.
 			 */
 			fid = tvb_get_letohs(s_tvb, 2);
-			dissect_smb_fid(s_tvb, pinfo, pipe_tree, offset, 2, (uint16_t) fid, false, false, false, smb_info);
+			dissect_smb_fid(s_tvb, pinfo, pipe_tree, offset, 2, (uint16_t) fid, false, false, false, true, smb_info);
 			if (tri != NULL)
 				tri->fid = fid;
 			break;
@@ -3569,12 +3566,12 @@ dissect_pipe_smb(tvbuff_t *sp_tvb, tvbuff_t *s_tvb, tvbuff_t *pd_tvb,
 			proto_tree_add_uint(pipe_tree, hf_smb_pipe_function, NULL,
 			    0, 0, function);
 			col_add_fstr(pinfo->cinfo, COL_INFO, "%s %s",
-				    val_to_str(function, functions, "Unknown function (0x%04x)"),
+				    val_to_str(pinfo->pool, function, functions, "Unknown function (0x%04x)"),
 				    smb_info->request ? "Request" : "Response");
 
 			fid = tri->fid;
 			if (fid != -1)
-				dissect_smb_fid(d_tvb, pinfo, pipe_tree, 0, 0, (uint16_t) fid, false, false, true, smb_info);
+				dissect_smb_fid(d_tvb, pinfo, pipe_tree, 0, 0, (uint16_t) fid, false, false, true, true, smb_info);
 		} else {
 			function = -1;
 			fid = -1;

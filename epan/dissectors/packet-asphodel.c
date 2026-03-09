@@ -12,6 +12,9 @@
 
 /*
  * Asphodel: https://bitbucket.org/suprocktech/asphodel
+ * The "Asphodel protocol" is a communication protocol for streaming real-time data from industrial sensors,
+ * primarily developed by Suprock Technologies LLC.
+ * It is used for communicating with both USB and TCP devices
  */
 
 #include <config.h>
@@ -291,7 +294,7 @@ dissect_asphodel_tcp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                 proto_tree_add_item(asphodel_tree, hf_asphodel_seq, tvb, 3, 1, ENC_NA);
                 proto_tree_add_item_ret_uint(asphodel_tree, hf_asphodel_cmd, tvb, 4, 1, ENC_NA, &cmd);
 
-                col_append_sep_fstr(pinfo->cinfo, COL_INFO, ", ", "%s", val_to_str(cmd, asphodel_cmd_vals, "Unknown type (0x%02x)"));
+                col_append_sep_fstr(pinfo->cinfo, COL_INFO, ", ", "%s", val_to_str(pinfo->pool, cmd, asphodel_cmd_vals, "Unknown type (0x%02x)"));
 
                 if (cmd == ASPHODEL_CMD_REPLY_ERROR)
                 {
@@ -455,7 +458,7 @@ dissect_asphodel_response(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
     offset = 9;
 
     len = tvb_strsize(tvb, offset);
-    proto_tree_add_item(asphodel_tree, hf_asphodel_serial_number, tvb, offset, len, ENC_UTF_8 | ENC_NA);
+    proto_tree_add_item(asphodel_tree, hf_asphodel_serial_number, tvb, offset, len, ENC_UTF_8);
     serial_number = tvb_get_string_enc(pinfo->pool, tvb, offset, len, ENC_UTF_8);
     col_add_fstr(pinfo->cinfo, COL_INFO, "Asphodel Response (%s)", serial_number);
     offset += len;
@@ -464,23 +467,23 @@ dissect_asphodel_response(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
     offset += 1;
 
     len = tvb_strsize(tvb, offset);
-    proto_tree_add_item(asphodel_tree, hf_asphodel_board_type, tvb, offset, len, ENC_UTF_8 | ENC_NA);
+    proto_tree_add_item(asphodel_tree, hf_asphodel_board_type, tvb, offset, len, ENC_UTF_8);
     offset += len;
 
     len = tvb_strsize(tvb, offset);
-    proto_tree_add_item(asphodel_tree, hf_asphodel_build_info, tvb, offset, len, ENC_UTF_8 | ENC_NA);
+    proto_tree_add_item(asphodel_tree, hf_asphodel_build_info, tvb, offset, len, ENC_UTF_8);
     offset += len;
 
     len = tvb_strsize(tvb, offset);
-    proto_tree_add_item(asphodel_tree, hf_asphodel_build_date, tvb, offset, len, ENC_UTF_8 | ENC_NA);
+    proto_tree_add_item(asphodel_tree, hf_asphodel_build_date, tvb, offset, len, ENC_UTF_8);
     offset += len;
 
     len = tvb_strsize(tvb, offset);
-    proto_tree_add_item(asphodel_tree, hf_asphodel_user_tag1, tvb, offset, len, ENC_UTF_8 | ENC_NA);
+    proto_tree_add_item(asphodel_tree, hf_asphodel_user_tag1, tvb, offset, len, ENC_UTF_8);
     offset += len;
 
     len = tvb_strsize(tvb, offset);
-    proto_tree_add_item(asphodel_tree, hf_asphodel_user_tag2, tvb, offset, len, ENC_UTF_8 | ENC_NA);
+    proto_tree_add_item(asphodel_tree, hf_asphodel_user_tag2, tvb, offset, len, ENC_UTF_8);
     offset += len;
 
     if (protocol_type & ASPHODEL_PROTOCOL_TYPE_RADIO)
@@ -534,7 +537,7 @@ dissect_asphodel_inquiry(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
 
             if (tvb_captured_length(tvb) > 2)
             {
-                proto_tree_add_item(asphodel_tree, hf_asphodel_identifier, tvb, 2, -1, ENC_UTF_8 | ENC_NA);
+                proto_tree_add_item(asphodel_tree, hf_asphodel_identifier, tvb, 2, -1, ENC_UTF_8);
             }
         }
     }
@@ -775,7 +778,7 @@ void
 proto_reg_handoff_asphodel(void)
 {
     heur_dissector_add("udp", dissect_asphodel_heur_udp, "Asphodel over UDP",
-                       "asphodel_inquiry", proto_asphodel, HEURISTIC_ENABLE);
+                       "asphodel_inquiry", proto_asphodel, HEURISTIC_DISABLE);
     dissector_add_for_decode_as("udp.port", asphodel_response_handle);
     dissector_add_for_decode_as("tcp.port", asphodel_tcp_handle);
 }

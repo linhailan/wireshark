@@ -40,7 +40,7 @@ def check_lua_script(cmd_tshark, features, dirs, capture_file, test_env):
         if check_passed:
             logging.info(tshark_proc.stdout)
             logging.info(tshark_proc.stderr)
-            if not 'All tests passed!' in tshark_proc.stdout:
+            if 'All tests passed!' not in tshark_proc.stdout:
                 pytest.fail("Some test failed, check the logs (eg: pytest --lf --log-cli-level=info)")
 
         return tshark_proc
@@ -101,7 +101,7 @@ def check_lua_script_locale(cmd_tshark, features, dirs, capture_file, test_env):
         if check_passed:
             logging.info(tshark_proc.stdout)
             logging.info(tshark_proc.stderr)
-            if not 'All tests passed!' in tshark_proc.stdout:
+            if 'All tests passed!' not in tshark_proc.stdout:
                 pytest.fail("Some test failed, check the logs (eg: pytest --lf --log-cli-level=info)")
 
         return tshark_proc
@@ -169,6 +169,10 @@ class TestWslua:
     def test_wslua_field(self, check_lua_script):
         '''wslua fields'''
         check_lua_script('field.lua', dhcp_pcap, True, '-q', '-c1')
+
+    def test_wslua_request_protocol_fields(self, check_lua_script):
+        '''wslua request_protocol_fields'''
+        check_lua_script('request_protocol_fields.lua', empty_pcap, True, '-q')
 
     # reader, writer, and acme_reader were all under wslua_step_file_test
     # in the Bash version.
@@ -300,7 +304,7 @@ class TestWslua:
         '''wslua globals'''
         check_lua_script('verify_globals.lua', empty_pcap, True,
             '-X', 'lua_script1:' + os.path.join(dirs.lua_dir, ''),
-            '-X', 'lua_script1:' + os.path.join(dirs.lua_dir, 'globals_4.4.txt'),
+            '-X', 'lua_script1:' + os.path.join(dirs.lua_dir, 'globals_5.0.txt'),
         )
 
     def test_wslua_struct(self, check_lua_script):
@@ -315,6 +319,10 @@ class TestWslua:
         '''wslua tvb without a tree'''
         check_lua_script('tvb.lua', dns_port_pcap, True, '-c1')
 
+    def test_wslua_tree_api(self, check_lua_script):
+        '''wslua tree api'''
+        check_lua_script('tree_api.lua', dns_port_pcap, True, '-V', '-c1')
+
     def test_wslua_try_heuristics(self, check_lua_script):
         '''wslua try_heuristics'''
         check_lua_script('try_heuristics.lua', dns_port_pcap, True)
@@ -326,6 +334,10 @@ class TestWslua:
     def test_wslua_conversation(self, check_lua_script):
         '''wslua conversation'''
         check_lua_script('conversation.lua', dns_port_pcap, True)
+
+    def test_wslua_gcrypt(self, check_lua_script):
+        '''wslua gcrypt'''
+        check_lua_script('gcrypt.lua', empty_pcap, True)
 
 class TestWsluaUnicode:
     def test_wslua_unicode(self, cmd_tshark, features, dirs, capture_file, unicode_env):
@@ -357,8 +369,16 @@ class TestWsluaUnicode:
             assert f.read() == 'Feedback from Lua: Ф-€-中\n'
 
 class TestWsluaLocale:
-    # Some tests under different a locale, e.g. German uses comma as the decimal
+    # Some tests under a different locale, e.g. German uses comma as the decimal
     # separator (and dot as the thousands separator.)
+    def test_wslua_globals_locale(self, check_lua_script_locale, dirs):
+        '''wslua globals'''
+        check_lua_script_locale('verify_globals.lua', empty_pcap, True,
+            'de_DE.utf-8',
+            '-X', 'lua_script2:' + os.path.join(dirs.lua_dir, ''),
+            '-X', 'lua_script2:' + os.path.join(dirs.lua_dir, 'globals_5.0.txt'),
+        )
+
     def test_wslua_util_locale(self, check_lua_script_locale):
         '''wslua utility functions in a non-English locale'''
         check_lua_script_locale('util.lua', empty_pcap, True, 'de_DE.utf-8')

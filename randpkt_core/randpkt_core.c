@@ -20,9 +20,8 @@
 #include <wsutil/array.h>
 #include <wsutil/file_util.h>
 #include <wsutil/wslog.h>
+#include <wsutil/report_message.h>
 #include <wiretap/wtap_opttypes.h>
-
-#include "ui/failure_message.h"
 
 #define INVALID_LEN 1
 #define WRITE_ERROR 2
@@ -567,9 +566,8 @@ void randpkt_loop(randpkt_example* example, uint64_t produce_count, uint64_t pac
 
 	wtap_rec_init(&rec, example->sample_length);
 
-	rec.rec_type = REC_TYPE_PACKET;
+	wtap_setup_packet_rec(&rec, example->sample_wtap_encap);
 	rec.presence_flags = WTAP_HAS_TS;
-	rec.rec_header.packet_header.pkt_encap = example->sample_wtap_encap;
 
 	ps_header = &rec.rec_header.packet_header.pseudo_header;
 
@@ -620,14 +618,14 @@ void randpkt_loop(randpkt_example* example, uint64_t produce_count, uint64_t pac
 		}
 
 		if (!wtap_dump(example->dump, &rec, &err, &err_info)) {
-			cfile_write_failure_message(NULL,
+			report_cfile_write_failure(NULL,
 			    example->filename, err, err_info, 0,
 			    wtap_dump_file_type_subtype(example->dump));
 		}
 		if (packet_delay_ms) {
 			g_usleep(1000 * (unsigned long)packet_delay_ms);
 			if (!wtap_dump_flush(example->dump, &err)) {
-				cfile_write_failure_message(NULL,
+				report_cfile_write_failure(NULL,
 				    example->filename, err, NULL, 0,
 				    wtap_dump_file_type_subtype(example->dump));
 			}
@@ -644,7 +642,7 @@ bool randpkt_example_close(randpkt_example* example)
 	bool ok = true;
 
 	if (!wtap_dump_close(example->dump, NULL, &err, &err_info)) {
-		cfile_close_failure_message(example->filename, err, err_info);
+		report_cfile_close_failure(example->filename, err, err_info);
 		ok = false;
 	}
 
@@ -672,15 +670,15 @@ int randpkt_example_init(randpkt_example* example, char* produce_filename, int p
 	if (strcmp(produce_filename, "-") == 0) {
 		/* Write to the standard output. */
 		example->dump = wtap_dump_open_stdout(file_type_subtype,
-			WTAP_UNCOMPRESSED, &params, &err, &err_info);
+			WS_FILE_UNCOMPRESSED, &params, &err, &err_info);
 		example->filename = "the standard output";
 	} else {
 		example->dump = wtap_dump_open(produce_filename, file_type_subtype,
-			WTAP_UNCOMPRESSED, &params, &err, &err_info);
+			WS_FILE_UNCOMPRESSED, &params, &err, &err_info);
 		example->filename = produce_filename;
 	}
 	if (!example->dump) {
-		cfile_dump_open_failure_message(produce_filename,
+		report_cfile_dump_open_failure(produce_filename,
 			err, err_info, file_type_subtype);
 		return WRITE_ERROR;
 	}

@@ -205,7 +205,7 @@ dissect_adb_service(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *d
 
             offset = dissect_ascii_uint32(main_tree, hf_hex_ascii_length, ett_length, hf_length, tvb, offset, &data_length);
 
-            sub_item = proto_tree_add_item(main_tree, hf_devices, tvb, offset, -1, ENC_NA | ENC_ASCII);
+            sub_item = proto_tree_add_item(main_tree, hf_devices, tvb, offset, -1, ENC_ASCII);
             if ((int64_t) data_length < tvb_reported_length_remaining(tvb, offset)) {
                 expert_add_info(pinfo, sub_item, &ei_incomplete_message);
             }
@@ -218,7 +218,7 @@ dissect_adb_service(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *d
 
             offset = dissect_ascii_uint32(main_tree, hf_hex_ascii_length, ett_length, hf_length, tvb, offset, &data_length);
 
-            sub_item = proto_tree_add_item(main_tree, hf_result, tvb, offset, -1, ENC_NA | ENC_ASCII);
+            sub_item = proto_tree_add_item(main_tree, hf_result, tvb, offset, -1, ENC_ASCII);
             if ((int64_t) data_length < tvb_reported_length_remaining(tvb, offset)) {
                 expert_add_info(pinfo, sub_item, &ei_incomplete_message);
             }
@@ -380,7 +380,7 @@ dissect_adb_service(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *d
             offset = dissect_ascii_uint32(main_tree, hf_hex_ascii_length, ett_length, hf_length, tvb, offset, &data_length);
 
             if (tvb_reported_length_remaining(tvb, offset) > 0) {
-                sub_item = proto_tree_add_item(main_tree, hf_pids, tvb, offset, -1, ENC_NA | ENC_ASCII);
+                sub_item = proto_tree_add_item(main_tree, hf_pids, tvb, offset, -1, ENC_ASCII);
                 if ((int64_t) data_length < tvb_reported_length_remaining(tvb, offset)) {
                     expert_add_info(pinfo, sub_item, &ei_incomplete_message);
                 }
@@ -399,7 +399,7 @@ dissect_adb_service(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *d
             uint8_t      c2 = '\0';
             uint16_t     payload_length;
             uint16_t     try_header_size;
-            int          logcat_length = 0;
+            unsigned     logcat_length = 0;
             fragment_t  *fragment;
 
             DISSECTOR_ASSERT_HINT(adb_service_data->session_key_length + 1 <= array_length(key), "Tree session key is too small");

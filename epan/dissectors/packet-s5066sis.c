@@ -978,9 +978,8 @@ dissect_s5066_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
 	proto_item *ti_s5066 = NULL;
 	proto_item *ti_pdu = NULL;
 	tvbuff_t *next_tvb;
-	int available_length = 0;
 	int reported_length = 0;
-	int client_app_id = 0;
+	unsigned client_app_id = 0;
 	proto_tree *s5066_tree = NULL;
 	proto_tree *s5066_tree_pdu = NULL;
 
@@ -989,12 +988,12 @@ dissect_s5066_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "S5066");
 	/* Clear out stuff in the info column, the add PDU type */
-	col_add_fstr(pinfo->cinfo, COL_INFO, "PDU type %s", val_to_str(pdu_type, s5066_pdu_type, "Unknown (0x%02x)"));
+	col_add_fstr(pinfo->cinfo, COL_INFO, "PDU type %s", val_to_str(pinfo->pool, pdu_type, s5066_pdu_type, "Unknown (0x%02x)"));
 
 	pdu_size = tvb_get_ntohs(tvb, s5066_size_offset) + s5066_header_size;
 
 	ti_s5066 = proto_tree_add_item(tree, proto_s5066, tvb, 0, -1, ENC_NA);
-	proto_item_append_text(ti_s5066, ", PDU type %s", val_to_str(pdu_type, s5066_pdu_type, "Unknown (0x%02x)"));
+	proto_item_append_text(ti_s5066, ", PDU type %s", val_to_str(pinfo->pool, pdu_type, s5066_pdu_type, "Unknown (0x%02x)"));
 	s5066_tree = proto_item_add_subtree(ti_s5066, ett_s5066);
 	proto_tree_add_item(s5066_tree, hf_s5066_sync_word, tvb, offset, 2, ENC_BIG_ENDIAN); offset +=2;
 	if (!s5066_edition_one) {
@@ -1036,9 +1035,8 @@ dissect_s5066_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
 
 	/* Call sub dissector(s) */
 	reported_length = pdu_size - offset;
-	available_length = tvb_captured_length(tvb) - offset;
 
-	next_tvb = tvb_new_subset_length_caplen(tvb, offset, MIN(available_length, reported_length), reported_length);
+	next_tvb = tvb_new_subset_length(tvb, offset, reported_length);
 
 	if(dissector_try_uint(s5066sis_dissector_table, client_app_id, next_tvb, pinfo, tree) == 0) {
 		call_data_dissector(next_tvb, pinfo, tree);

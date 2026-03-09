@@ -107,7 +107,7 @@ static int ett_h224;
 /* Definition of Standard Client IDs */
 #define H224_CME_CLIENT_ID                      0x00
 #define H224_FECC_CLIENT_ID                     0x01
-#define H224_EXTENED_CLIENT_ID                  0x7E
+#define H224_EXTENDED_CLIENT_ID                 0x7E
 #define H224_NON_STANDARD_CLIENT_ID             0x7F
 
 /* definitions of CME messages type */
@@ -138,7 +138,7 @@ typedef struct {
 static const h224_opt_t h224opt[] = {
 /* CME */           {H224_CME_CLIENT_ID, dissect_h224_cme_client_data},
 /* FECC */          {H224_FECC_CLIENT_ID, dissect_h224_fecc_client_data},
-/* EXTENED */       {H224_EXTENED_CLIENT_ID, dissect_h224_extended_client_data},
+/* EXTENDED */      {H224_EXTENDED_CLIENT_ID, dissect_h224_extended_client_data},
 /* NON_STANDARD */  {H224_NON_STANDARD_CLIENT_ID, dissect_h224_non_standard_client_data},
                     {0, NULL}
 };
@@ -155,7 +155,7 @@ static const value_string h224_client_data_type[] =
         {
                 { H224_CME_CLIENT_ID, "Client Data For CME(Client Management Entity)" },
                 { H224_FECC_CLIENT_ID, "Client Data For FECC(Far-End Camera Control)" },
-                { H224_EXTENED_CLIENT_ID, "Client Data For Extended Client ID list" },
+                { H224_EXTENDED_CLIENT_ID, "Client Data For Extended Client ID list" },
                 { H224_NON_STANDARD_CLIENT_ID, "Client Data For Non-standard client" },
                 { 0, NULL}
         };
@@ -182,7 +182,7 @@ dissect_h224_standard_clients_ids(tvbuff_t* tvb, proto_tree* tree, unsigned offs
 {
     uint32_t manufacturer_code;
 
-    if (client_id == H224_EXTENED_CLIENT_ID) {
+    if (client_id == H224_EXTENDED_CLIENT_ID) {
         proto_tree_add_item(tree, hf_h224_extended_client_id_list, tvb, offset, 1, ENC_NA);
         offset++;
         proto_tree_add_item(tree, hf_h224_extended_client_id, tvb, offset, 1, ENC_NA);
@@ -213,7 +213,7 @@ dissect_h224_cme_client_data(tvbuff_t* tvb, proto_tree* tree, unsigned offset)
     uint8_t num;
     uint8_t oct;
     uint8_t source_id;
-    uint8_t zero_offset;
+    unsigned zero_offset;
     proto_tree *ext_tree;
 
     ext_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_h224, NULL,
@@ -270,7 +270,7 @@ dissect_h224_cme_client_data(tvbuff_t* tvb, proto_tree* tree, unsigned offset)
                 offset++;
                 source_id = (oct & 0xf0) >> 4;
                 if (source_id > 5) {
-                    zero_offset = tvb_find_uint8(tvb, offset, FECC_MAX_LENGTH_ASCII_STR, 0);
+                    tvb_find_uint8_length(tvb, offset, FECC_MAX_LENGTH_ASCII_STR, 0, &zero_offset);
                     if (zero_offset > offset) {
                         proto_tree_add_item(ext_tree, hf_h224_encoded_characters, tvb, offset, zero_offset - offset, ENC_ASCII);
                         offset = zero_offset;
@@ -381,7 +381,7 @@ static unsigned dissect_h224_extended_client_data(tvbuff_t* tvb, proto_tree* tre
     proto_tree *ext_tree;
 
     ext_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_h224, NULL,
-                                      val_to_str_ext_const(H224_EXTENED_CLIENT_ID, &h224_client_data_ext, "Unknown field"));
+                                      val_to_str_ext_const(H224_EXTENDED_CLIENT_ID, &h224_client_data_ext, "Unknown field"));
     proto_tree_add_item(ext_tree, hf_h224_other_client_data, tvb, offset, -1, ENC_NA);
     offset++;
     return offset;

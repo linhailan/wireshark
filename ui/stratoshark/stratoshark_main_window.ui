@@ -44,6 +44,12 @@
     </property>
     <item>
      <widget class="AccordionFrame" name="goToFrame">
+      <property name="accessibleName">
+       <string>Go to packet</string>
+      </property>
+      <property name="accessibleDescription">
+       <string>Allows jumping to a specific packet by its number.</string>
+      </property>
       <layout class="QHBoxLayout" name="goToHB">
        <property name="topMargin">
         <number>0</number>
@@ -108,26 +114,61 @@
      </widget>
     </item>
     <item>
-     <widget class="SearchFrame" name="searchFrame" native="true"/>
+     <widget class="StratosharkSearchFrame" name="searchFrame" native="true">
+      <property name="accessibleName">
+       <string>Search packet</string>
+      </property>
+      <property name="accessibleDescription">
+       <string>Allows searching for packets based on different criteria like display filters or text.</string>
+      </property>
+     </widget>
     </item>
     <item>
-     <widget class="AddressEditorFrame" name="addressEditorFrame"/>
+     <widget class="AddressEditorFrame" name="addressEditorFrame">
+      <property name="accessibleName">
+       <string>Edit Address</string>
+      </property>
+      <property name="accessibleDescription">
+       <string>Allows editing address resolution information for the current capture.</string>
+      </property>
+     </widget>
     </item>
     <item>
-     <widget class="ColumnEditorFrame" name="columnEditorFrame"/>
+     <widget class="ColumnEditorFrame" name="columnEditorFrame">
+      <property name="accessibleName">
+       <string>Edit Column</string>
+      </property>
+      <property name="accessibleDescription">
+       <string>Allows adding, removing, or modifying columns in the packet list.</string>
+      </property>
+     </widget>
     </item>
     <item>
-     <widget class="PreferenceEditorFrame" name="preferenceEditorFrame"/>
+     <widget class="PreferenceEditorFrame" name="preferenceEditorFrame">
+      <property name="accessibleName">
+       <string>Edit Preference</string>
+      </property>
+      <property name="accessibleDescription">
+       <string>Allows changing protocol or application preferences.</string>
+      </property>
+     </widget>
     </item>
     <item>
-     <widget class="FilterExpressionFrame" name="filterExpressionFrame"/>
+     <widget class="FilterExpressionFrame" name="filterExpressionFrame">
+      <property name="accessibleName">
+       <string>Edit Filter Expression</string>
+      </property>
+      <property name="accessibleDescription">
+       <string>Allows creating or editing display filter buttons.</string>
+      </property>
+     </widget>
     </item>
     <item>
      <widget class="QStackedWidget" name="mainStack">
       <property name="enabled">
        <bool>true</bool>
       </property>
-      <widget class="WelcomePage" name="welcomePage"/>
+      <widget class="StratosharkWelcomePage" name="welcomePage"/>
      </widget>
     </item>
    </layout>
@@ -337,11 +378,12 @@
     </widget>
     <widget class="QMenu" name="menuInternals">
      <property name="title">
-      <string>Internals</string>
-     </property>
-     <addaction name="actionViewInternalsConversationHashTables"/>
-     <addaction name="actionViewInternalsDissectorTables"/>
-     <addaction name="actionViewInternalsSupportedProtocols"/>
+     <string>Internals</string>
+    </property>
+    <addaction name="actionViewInternalsConversationHashTables"/>
+    <addaction name="actionViewInternalsDissectorTables"/>
+    <addaction name="actionViewInternalsSupportedProtocols"/>
+    <addaction name="actionViewInternalsKeyboardShortcuts"/>
     </widget>
     <widget class="QMenu" name="menuAdditionalToolbars">
      <property name="title">
@@ -380,6 +422,7 @@
     <addaction name="menuInternals"/>
     <addaction name="separator"/>
     <addaction name="actionViewShowPacketInNewWindow"/>
+    <addaction name="actionViewRedissect"/>
     <addaction name="actionViewReload_as_File_Format_or_Capture"/>
     <addaction name="actionViewReload"/>
    </widget>
@@ -438,6 +481,7 @@
     <addaction name="actionStatisticsEndpoints"/>
     <addaction name="actionStatisticsPacketLengths"/>
     <addaction name="actionStatisticsIOGraph"/>
+    <addaction name="actionStatisticsPlot"/>
     <addaction name="separator"/>
     <addaction name="actionStatistics_REGISTER_STAT_GROUP_UNSORTED"/>
     <addaction name="actionStatisticsFlowGraph"/>
@@ -512,6 +556,12 @@
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
+   <property name="accessibleName">
+    <string>Main Toolbar</string>
+   </property>
+   <property name="accessibleDescription">
+    <string>Contains buttons for common actions like starting a capture or opening a file.</string>
+   </property>
    <property name="sizePolicy">
     <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
      <horstretch>0</horstretch>
@@ -548,6 +598,7 @@
    <addaction name="actionFileSave"/>
    <addaction name="actionFileClose"/>
    <addaction name="actionViewReload"/>
+   <!-- XXX - Need an icon <addaction name="actionViewRedissect"/> -->
    <addaction name="separator"/>
    <addaction name="actionEditFindPacket"/>
    <addaction name="actionGoPreviousPacket"/>
@@ -565,8 +616,21 @@
    <addaction name="actionViewResizeColumns"/>
    <addaction name="actionViewResetLayout"/>
   </widget>
-  <widget class="MainStatusBar" name="statusBar"/>
+  <widget class="StratosharkMainStatusBar" name="statusBar">
+   <property name="accessibleName">
+    <string>Status Bar</string>
+   </property>
+   <property name="accessibleDescription">
+    <string>Shows information about the current capture file and application state.</string>
+   </property>
+  </widget>
   <widget class="QToolBar" name="displayFilterToolBar">
+   <property name="accessibleName">
+    <string>Display Filter Toolbar</string>
+   </property>
+   <property name="accessibleDescription">
+    <string>Contains the display filter edit box and expression buttons.</string>
+   </property>
    <property name="windowTitle">
     <string>Display Filter Toolbar</string>
    </property>
@@ -1008,6 +1072,11 @@
   <action name="actionFileSetPreviousFile">
    <property name="text">
     <string>Previous File</string>
+   </property>
+  </action>
+  <action name="actionViewRedissect">
+   <property name="text">
+    <string>Redissect Events</string>
    </property>
   </action>
   <action name="actionViewReload">
@@ -1495,6 +1564,14 @@
     <string>Create graphs based on display filter fields</string>
    </property>
   </action>
+  <action name="actionStatisticsPlot">
+   <property name="text">
+    <string>Plots</string>
+   </property>
+   <property name="toolTip">
+    <string>Plot display filter fields over time</string>
+   </property>
+  </action>
   <action name="actionViewMainToolbar">
    <property name="checkable">
     <bool>true</bool>
@@ -1954,6 +2031,14 @@
     <string>Show the currently supported protocols and display filter fields</string>
    </property>
   </action>
+  <action name="actionViewInternalsKeyboardShortcuts">
+   <property name="text">
+    <string>&amp;Keyboard Shortcuts</string>
+   </property>
+   <property name="toolTip">
+    <string>Show the current keyboard shortcuts</string>
+   </property>
+  </action>
   <action name="actionViewColoringRules">
    <property name="text">
     <string>&amp;Coloring Rules…</string>
@@ -2235,20 +2320,20 @@
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>MainStatusBar</class>
+   <class>StratosharkMainStatusBar</class>
    <extends>QStatusBar</extends>
-   <header>main_status_bar.h</header>
+   <header>stratoshark_main_status_bar.h</header>
   </customwidget>
   <customwidget>
-   <class>WelcomePage</class>
-   <extends>QFrame</extends>
-   <header>welcome_page.h</header>
+   <class>StratosharkWelcomePage</class>
+   <extends>WelcomePage</extends>
+   <header>stratoshark_welcome_page.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>SearchFrame</class>
-   <extends>QWidget</extends>
-   <header>search_frame.h</header>
+   <class>StratosharkSearchFrame</class>
+   <extends>SearchFrame</extends>
+   <header>stratoshark_search_frame.h</header>
   </customwidget>
   <customwidget>
    <class>ColumnEditorFrame</class>

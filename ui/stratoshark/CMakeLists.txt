@@ -18,7 +18,7 @@ ADD_CUSTOM_CMAKE_INCLUDE()
 set(WIRESHARK_WIDGET_HEADERS
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/additional_toolbar.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/apply_line_edit.h
-	${CMAKE_SOURCE_DIR}/ui/qt/widgets/byte_view_text.h
+	${CMAKE_SOURCE_DIR}/ui/qt/widgets/base_data_source_view.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/capture_filter_combo.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/capture_filter_edit.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/clickable_label.h
@@ -38,7 +38,9 @@ set(WIRESHARK_WIDGET_HEADERS
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/filter_expression_toolbar.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/find_line_edit.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/follow_stream_text.h
+	${CMAKE_SOURCE_DIR}/ui/qt/widgets/hex_data_source_view.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/interface_toolbar_lineedit.h
+	${CMAKE_SOURCE_DIR}/ui/qt/widgets/json_data_source_view.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/label_stack.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/overlay_scroll_bar.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/packet_list_header.h
@@ -47,6 +49,7 @@ set(WIRESHARK_WIDGET_HEADERS
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/profile_tree_view.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/qcp_axis_ticker_elided.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/qcp_axis_ticker_si.h
+	${CMAKE_SOURCE_DIR}/ui/qt/widgets/qcp_spacer_legend_item.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/qcp_string_legend_item.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/range_syntax_lineedit.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/resize_header_view.h
@@ -55,12 +58,12 @@ set(WIRESHARK_WIDGET_HEADERS
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/splash_overlay.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/stock_icon_tool_button.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/syntax_line_edit.h
-	${CMAKE_SOURCE_DIR}/ui/qt/widgets/wireless_timeline.h # Required by PacketListModel
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/tabnav_tree_view.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/traffic_tab.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/traffic_tree.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/traffic_types_list.h
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/wireshark_file_dialog.h
+	${CMAKE_SOURCE_DIR}/ui/qt/widgets/customplot.h
 )
 
 set (STRATOSHARK_WIDGET_HEADERS ${WIRESHARK_WIDGET_HEADERS})
@@ -92,6 +95,7 @@ set(WIRESHARK_UTILS_HEADERS
 	${CMAKE_SOURCE_DIR}/ui/qt/utils/variant_pointer.h
 	${CMAKE_SOURCE_DIR}/ui/qt/utils/wireshark_mime_data.h
 	${CMAKE_SOURCE_DIR}/ui/qt/utils/wireshark_zip_helper.h
+	${CMAKE_SOURCE_DIR}/ui/qt/utils/workspace_state.h
 )
 
 set (STRATOSHARK_UTILS_HEADERS ${WIRESHARK_UTILS_HEADERS})
@@ -124,6 +128,7 @@ set(WIRESHARK_MODEL_HEADERS
 	${CMAKE_SOURCE_DIR}/ui/qt/models/pref_models.h
 	${CMAKE_SOURCE_DIR}/ui/qt/models/profile_model.h
 	${CMAKE_SOURCE_DIR}/ui/qt/models/proto_tree_model.h
+	${CMAKE_SOURCE_DIR}/ui/qt/models/recentcapturefiles_list_model.h
 	${CMAKE_SOURCE_DIR}/ui/qt/models/related_packet_delegate.h
 	${CMAKE_SOURCE_DIR}/ui/qt/models/resolved_addresses_models.h
 	${CMAKE_SOURCE_DIR}/ui/qt/models/sparkline_delegate.h
@@ -143,7 +148,6 @@ set(WIRESHARK_QT_HEADERS
 	${CMAKE_SOURCE_DIR}/ui/qt/about_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/accordion_frame.h
 	${CMAKE_SOURCE_DIR}/ui/qt/address_editor_frame.h
-	${CMAKE_SOURCE_DIR}/ui/qt/byte_view_tab.h
 	${CMAKE_SOURCE_DIR}/ui/qt/capture_comment_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/capture_file_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/capture_file_properties_dialog.h
@@ -158,6 +162,7 @@ set(WIRESHARK_QT_HEADERS
 	${CMAKE_SOURCE_DIR}/ui/qt/conversation_colorize_action.h
 	${CMAKE_SOURCE_DIR}/ui/qt/conversation_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/conversation_hash_tables_dialog.h
+	${CMAKE_SOURCE_DIR}/ui/qt/data_source_tab.h
 	${CMAKE_SOURCE_DIR}/ui/qt/decode_as_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/display_filter_expression_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/dissector_tables_dialog.h
@@ -181,11 +186,13 @@ set(WIRESHARK_QT_HEADERS
 	${CMAKE_SOURCE_DIR}/ui/qt/funnel_text_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/geometry_state_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/glib_mainloop_on_qeventloop.h
+	${CMAKE_SOURCE_DIR}/ui/qt/graph.h
 	${CMAKE_SOURCE_DIR}/ui/qt/import_text_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/interface_frame.h
 	${CMAKE_SOURCE_DIR}/ui/qt/interface_toolbar_reader.h
 	${CMAKE_SOURCE_DIR}/ui/qt/interface_toolbar.h
 	${CMAKE_SOURCE_DIR}/ui/qt/io_console_dialog.h
+	${CMAKE_SOURCE_DIR}/ui/qt/io_graph.h
 	${CMAKE_SOURCE_DIR}/ui/qt/io_graph_action.h
 	${CMAKE_SOURCE_DIR}/ui/qt/io_graph_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/layout_preferences_frame.h
@@ -201,6 +208,9 @@ set(WIRESHARK_QT_HEADERS
 	${CMAKE_SOURCE_DIR}/ui/qt/packet_format_stack.h
 	${CMAKE_SOURCE_DIR}/ui/qt/packet_list.h
 	${CMAKE_SOURCE_DIR}/ui/qt/packet_range_group_box.h
+	${CMAKE_SOURCE_DIR}/ui/qt/plot.h
+	${CMAKE_SOURCE_DIR}/ui/qt/plot_action.h
+	${CMAKE_SOURCE_DIR}/ui/qt/plot_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/preference_editor_frame.h
 	${CMAKE_SOURCE_DIR}/ui/qt/preferences_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/print_dialog.h
@@ -209,7 +219,6 @@ set(WIRESHARK_QT_HEADERS
 	${CMAKE_SOURCE_DIR}/ui/qt/proto_tree.h
 	${CMAKE_SOURCE_DIR}/ui/qt/protocol_hierarchy_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/protocol_preferences_menu.h
-	${CMAKE_SOURCE_DIR}/ui/qt/recent_file_status.h
 	${CMAKE_SOURCE_DIR}/ui/qt/resolved_addresses_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/response_time_delay_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/rsa_keys_frame.h
@@ -220,6 +229,7 @@ set(WIRESHARK_QT_HEADERS
 	${CMAKE_SOURCE_DIR}/ui/qt/show_packet_bytes_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/simple_statistics_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/stats_tree_dialog.h
+	${CMAKE_SOURCE_DIR}/ui/qt/keyboard_shortcuts_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/supported_protocols_dialog.h
 	${CMAKE_SOURCE_DIR}/ui/qt/tabnav_tree_widget.h
 	${CMAKE_SOURCE_DIR}/ui/qt/tap_parameter_dialog.h
@@ -230,6 +240,7 @@ set(WIRESHARK_QT_HEADERS
 	${CMAKE_SOURCE_DIR}/ui/qt/uat_frame.h
 	${CMAKE_SOURCE_DIR}/ui/qt/welcome_page.h
 	${CMAKE_SOURCE_DIR}/ui/qt/wireshark_dialog.h
+	${CMAKE_SOURCE_DIR}/ui/qt/marker_dialog.h
 )
 
 if(WIRESHARK_CUSTOM_QT_HEADERS)
@@ -253,13 +264,21 @@ endif()
 set (STRATOSHARK_QT_HEADERS
 	stratoshark_application.h
 	stratoshark_main_window.h
+	stratoshark_about_dialog.h
+	stratoshark_capture_file_properties_dialog.h
+	stratoshark_follow_stream_dialog.h
+	stratoshark_io_graph_dialog.h
+	stratoshark_main_status_bar.h
+	stratoshark_plot_dialog.h
+	stratoshark_profile_dialog.h
+	stratoshark_search_frame.h
+	stratoshark_welcome_page.h
 	${WIRESHARK_QT_HEADERS}
 )
 
 set(WIRESHARK_WIDGET_SRCS
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/additional_toolbar.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/apply_line_edit.cpp
-	${CMAKE_SOURCE_DIR}/ui/qt/widgets/byte_view_text.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/capture_filter_combo.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/capture_filter_edit.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/clickable_label.cpp
@@ -279,7 +298,9 @@ set(WIRESHARK_WIDGET_SRCS
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/filter_expression_toolbar.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/find_line_edit.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/follow_stream_text.cpp
+	${CMAKE_SOURCE_DIR}/ui/qt/widgets/hex_data_source_view.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/interface_toolbar_lineedit.cpp
+	${CMAKE_SOURCE_DIR}/ui/qt/widgets/json_data_source_view.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/label_stack.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/overlay_scroll_bar.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/packet_list_header.cpp
@@ -288,6 +309,7 @@ set(WIRESHARK_WIDGET_SRCS
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/profile_tree_view.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/qcp_axis_ticker_elided.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/qcp_axis_ticker_si.cpp
+	${CMAKE_SOURCE_DIR}/ui/qt/widgets/qcp_spacer_legend_item.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/qcp_string_legend_item.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/range_syntax_lineedit.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/resize_header_view.cpp
@@ -296,12 +318,12 @@ set(WIRESHARK_WIDGET_SRCS
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/splash_overlay.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/stock_icon_tool_button.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/syntax_line_edit.cpp
-	${CMAKE_SOURCE_DIR}/ui/qt/widgets/wireless_timeline.cpp # Required by PacketListModel
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/tabnav_tree_view.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/traffic_tab.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/traffic_tree.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/traffic_types_list.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/widgets/wireshark_file_dialog.cpp
+	${CMAKE_SOURCE_DIR}/ui/qt/widgets/customplot.cpp
 )
 
 set (STRATOSHARK_WIDGET_SRCS ${WIRESHARK_WIDGET_SRCS})
@@ -330,6 +352,7 @@ set(WIRESHARK_UTILS_SRCS
 	${CMAKE_SOURCE_DIR}/ui/qt/utils/stock_icon.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/utils/wireshark_mime_data.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/utils/wireshark_zip_helper.cpp
+	${CMAKE_SOURCE_DIR}/ui/qt/utils/workspace_state.cpp
 )
 
 set (STRATOSHARK_UTILS_SRCS ${WIRESHARK_UTILS_SRCS})
@@ -362,6 +385,7 @@ set(WIRESHARK_MODEL_SRCS
 	${CMAKE_SOURCE_DIR}/ui/qt/models/pref_models.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/models/profile_model.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/models/proto_tree_model.cpp
+	${CMAKE_SOURCE_DIR}/ui/qt/models/recentcapturefiles_list_model.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/models/related_packet_delegate.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/models/resolved_addresses_models.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/models/sparkline_delegate.cpp
@@ -378,7 +402,6 @@ set(WIRESHARK_QT_SRC
 	${CMAKE_SOURCE_DIR}/ui/qt/about_dialog.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/accordion_frame.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/address_editor_frame.cpp
-	${CMAKE_SOURCE_DIR}/ui/qt/byte_view_tab.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/capture_comment_dialog.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/capture_file_dialog.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/capture_file_properties_dialog.cpp
@@ -393,6 +416,7 @@ set(WIRESHARK_QT_SRC
 	${CMAKE_SOURCE_DIR}/ui/qt/conversation_colorize_action.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/conversation_dialog.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/conversation_hash_tables_dialog.cpp
+	${CMAKE_SOURCE_DIR}/ui/qt/data_source_tab.cpp
 	# XXX Required by packet list
 	${CMAKE_SOURCE_DIR}/ui/qt/decode_as_dialog.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/display_filter_expression_dialog.cpp
@@ -435,6 +459,7 @@ set(WIRESHARK_QT_SRC
 	${CMAKE_SOURCE_DIR}/ui/qt/packet_format_stack.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/packet_list.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/packet_range_group_box.cpp
+	${CMAKE_SOURCE_DIR}/ui/qt/plot_action.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/preference_editor_frame.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/preferences_dialog.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/print_dialog.cpp
@@ -443,17 +468,14 @@ set(WIRESHARK_QT_SRC
 	${CMAKE_SOURCE_DIR}/ui/qt/proto_tree.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/protocol_hierarchy_dialog.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/protocol_preferences_menu.cpp
-	${CMAKE_SOURCE_DIR}/ui/qt/recent_file_status.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/resolved_addresses_dialog.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/response_time_delay_dialog.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/rsa_keys_frame.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/search_frame.cpp
-	# XXX Depends on RTP Stream Dialog
-	# ${CMAKE_SOURCE_DIR}/ui/qt/sequence_diagram.cpp
-	# ${CMAKE_SOURCE_DIR}/ui/qt/sequence_dialog.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/show_packet_bytes_dialog.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/simple_dialog.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/simple_statistics_dialog.cpp
+	${CMAKE_SOURCE_DIR}/ui/qt/keyboard_shortcuts_dialog.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/supported_protocols_dialog.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/tabnav_tree_widget.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/tap_parameter_dialog.cpp
@@ -464,6 +486,7 @@ set(WIRESHARK_QT_SRC
 	${CMAKE_SOURCE_DIR}/ui/qt/uat_frame.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/welcome_page.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/wireshark_dialog.cpp
+	${CMAKE_SOURCE_DIR}/ui/qt/marker_dialog.cpp
 )
 
 if(WIRESHARK_CUSTOM_QT_SRCS)
@@ -489,12 +512,25 @@ set (STRATOSHARK_QT_SRC
 	stratoshark_main.cpp
 	stratoshark_main_window.cpp
 	stratoshark_main_window_slots.cpp
+	stratoshark_about_dialog.cpp
+	stratoshark_capture_file_properties_dialog.cpp
+	stratoshark_follow_stream_dialog.cpp
+	stratoshark_io_graph_dialog.cpp
+	stratoshark_main_status_bar.cpp
+	stratoshark_plot_dialog.cpp
+	stratoshark_profile_dialog.cpp
+	stratoshark_search_frame.cpp
+	stratoshark_welcome_page.cpp
 	${WIRESHARK_QT_SRC})
 
 set(WIRESHARK_QT_TAP_SRC
 	${CMAKE_SOURCE_DIR}/ui/qt/expert_info_dialog.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/funnel_statistics.cpp
+	${CMAKE_SOURCE_DIR}/ui/qt/graph.cpp
+	${CMAKE_SOURCE_DIR}/ui/qt/io_graph.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/io_graph_dialog.cpp
+	${CMAKE_SOURCE_DIR}/ui/qt/plot.cpp
+	${CMAKE_SOURCE_DIR}/ui/qt/plot_dialog.cpp
 	${CMAKE_SOURCE_DIR}/ui/qt/stats_tree_dialog.cpp
 	${WIRESHARK_CUSTOM_TAP_SRC}
 )
@@ -537,6 +573,7 @@ set(WIRESHARK_QT_UI
 	${CMAKE_SOURCE_DIR}/ui/qt/import_text_dialog.ui
 	${CMAKE_SOURCE_DIR}/ui/qt/interface_frame.ui
 	${CMAKE_SOURCE_DIR}/ui/qt/interface_toolbar.ui
+	${CMAKE_SOURCE_DIR}/ui/qt/keyboard_shortcuts_dialog.ui
 	${CMAKE_SOURCE_DIR}/ui/qt/io_console_dialog.ui
 	${CMAKE_SOURCE_DIR}/ui/qt/io_graph_dialog.ui
 	${CMAKE_SOURCE_DIR}/ui/qt/layout_preferences_frame.ui
@@ -548,6 +585,7 @@ set(WIRESHARK_QT_UI
 	${CMAKE_SOURCE_DIR}/ui/qt/packet_format_group_box.ui
 	${CMAKE_SOURCE_DIR}/ui/qt/packet_format_json_group_box.ui
 	${CMAKE_SOURCE_DIR}/ui/qt/packet_range_group_box.ui
+	${CMAKE_SOURCE_DIR}/ui/qt/plot_dialog.ui
 	${CMAKE_SOURCE_DIR}/ui/qt/preference_editor_frame.ui
 	${CMAKE_SOURCE_DIR}/ui/qt/preferences_dialog.ui
 	${CMAKE_SOURCE_DIR}/ui/qt/print_dialog.ui
@@ -640,17 +678,15 @@ add_custom_command(
 set(CMAKE_AUTORCC_OPTIONS --format-version 1)
 list(APPEND CMAKE_AUTORCC_OPTIONS -compress-algo zlib)
 
-if (APPLE)
-	set(SS_ICON_QRC "ssicon_mac.qrc")
-else()
-	set(SS_ICON_QRC "ssicon.qrc")
+if (NOT APPLE)
+	set(SSICON_QRC ${CMAKE_SOURCE_DIR}/resources/ssicon.qrc)
 endif()
 
 qt_add_resources(STRATOSHARK_QT_QRC
 	${CMAKE_SOURCE_DIR}/resources/about.qrc
 	${CMAKE_SOURCE_DIR}/resources/languages/languages.qrc
 	${CMAKE_SOURCE_DIR}/resources/layout.qrc
-	${CMAKE_SOURCE_DIR}/resources/${SS_ICON_QRC}
+	${SSICON_QRC}
 	${CMAKE_SOURCE_DIR}/resources/stock_icons.qrc
 	${CMAKE_CURRENT_BINARY_DIR}/i18n.qrc
 	${CMAKE_CURRENT_BINARY_DIR}/authors.qrc

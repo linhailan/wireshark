@@ -14,7 +14,7 @@
 
 #include <glib.h>
 
-#include "packet.h"
+#include <epan/packet.h>
 #include "address_types.h"
 #include "to_str.h"
 #include "addr_resolv.h"
@@ -62,7 +62,7 @@ static int num_dissector_addr_type;
 static address_type_t dissector_type_addresses[MAX_DISSECTOR_ADDR_TYPE];
 
 /* Keep track of address_type_t's via their id number */
-static address_type_t* type_list[MAX_ADDR_TYPE_VALUE + 1];
+static const address_type_t* type_list[MAX_ADDR_TYPE_VALUE + 1];
 
 /*
  * If a user _does_ pass in a too-small buffer, this is probably
@@ -80,7 +80,7 @@ static address_type_t* type_list[MAX_ADDR_TYPE_VALUE + 1];
                 } \
         } while (0)
 
-static void address_type_register(int addr_type, address_type_t *at)
+static void address_type_register(int addr_type, const address_type_t *at)
 {
     /* Check input */
     ws_assert(addr_type < MAX_ADDR_TYPE_VALUE);
@@ -140,7 +140,7 @@ int address_type_dissector_register(const char* name, const char* pretty_name,
 
 int address_type_get_by_name(const char* name)
 {
-    address_type_t** addr;
+    const address_type_t** addr;
 
     for (addr = type_list; *addr != NULL; addr++)
     {
@@ -551,9 +551,9 @@ static int vines_addr_to_str(const address* addr, char *buf, int buf_len)
     const uint8_t *addr_data = (const uint8_t *)addr->data;
     char *bufp = buf;
 
-    bufp = dword_to_hex(bufp, pntoh32(&addr_data[0])); /* 8 bytes */
+    bufp = dword_to_hex(bufp, pntohu32(&addr_data[0])); /* 8 bytes */
     *bufp++ = '.'; /* 1 byte */
-    bufp = word_to_hex(bufp, pntoh16(&addr_data[4])); /* 4 bytes */
+    bufp = word_to_hex(bufp, pntohu16(&addr_data[4])); /* 4 bytes */
     *bufp++ = '\0'; /* NULL terminate */
 
     return (int)(bufp - buf);
@@ -635,6 +635,56 @@ static int mctp_len(void)
 }
 
 /******************************************************************************
+ * AT_ILNP_NID and AT_ILNP_L64
+ ******************************************************************************/
+
+static int ilnp_quarters_str_len(const address* addr _U_) {
+    return 20;
+}
+
+static int ilnp_quarters_to_str(const address* addr, char *buf, int buf_len) {
+    uint8_t* buffer = (uint8_t*)addr->data;
+
+    snprintf(buf, buf_len, "%02x%02x+%02x%02x+%02x%02x+%02x%02x",
+        buffer[0], buffer[1], buffer[2], buffer[3],
+        buffer[4], buffer[5], buffer[6], buffer[7]);
+
+    return ilnp_quarters_str_len(addr);
+}
+
+static const char* ilnp_nid_col_filter_str(const address* addr _U_, bool is_src) {
+    return is_src ? "ilnp_nid.src" : "ilnp_nid.dst";
+}
+
+static const char* ilnp_l64_col_filter_str(const address* addr _U_, bool is_src) {
+    return is_src ? "ilnp_l64.src" : "ilnp_l64.dst";
+}
+
+/******************************************************************************
+ * AT_ILNP_ILV
+ ******************************************************************************/
+
+static int ilnp_ilv_str_len(const address* addr _U_) {
+    return 40;
+}
+
+static int ilnp_ilv_to_str(const address* addr, char *buf, int buf_len) {
+    uint8_t* buffer = (uint8_t*)addr->data;
+
+    snprintf(buf, buf_len, "%02x%02x+%02x%02x+%02x%02x+%02x%02x.%02x%02x-%02x%02x-%02x%02x-%02x%02x",
+        buffer[0], buffer[1], buffer[2], buffer[3],
+        buffer[4], buffer[5], buffer[6], buffer[7],
+        buffer[8], buffer[9], buffer[10], buffer[11],
+        buffer[12], buffer[13], buffer[14], buffer[15]);
+
+    return ilnp_ilv_str_len(addr);
+}
+
+static const char* ilnp_ilv_col_filter_str(const address* addr _U_, bool is_src) {
+    return is_src ? "ilnp_ilv.src" : "ilnp_ilv.dst";
+}
+
+/******************************************************************************
  * END OF PROVIDED ADDRESS TYPES
  ******************************************************************************/
 
@@ -643,7 +693,7 @@ static int mctp_len(void)
 
 void address_types_initialize(void)
 {
-    static address_type_t none_address = {
+    static const address_type_t none_address = {
         AT_NONE,            /* addr_type */
         "AT_NONE",          /* name */
         "No address",       /* pretty_name */
@@ -656,7 +706,7 @@ void address_types_initialize(void)
         none_name_res_len, /* addr_name_res_len */
     };
 
-    static address_type_t ether_address = {
+    static const address_type_t ether_address = {
         AT_ETHER,           /* addr_type */
         "AT_ETHER",         /* name */
         "Ethernet address", /* pretty_name */
@@ -669,7 +719,7 @@ void address_types_initialize(void)
         ether_name_resolution_len, /* addr_name_res_len */
     };
 
-    static address_type_t ipv4_address = {
+    static const address_type_t ipv4_address = {
         AT_IPv4,            /* addr_type */
         "AT_IPv4",          /* name */
         "IPv4 address",     /* pretty_name */
@@ -682,7 +732,7 @@ void address_types_initialize(void)
         ipv4_name_res_len, /* addr_name_res_len */
     };
 
-    static address_type_t ipv6_address = {
+    static const address_type_t ipv6_address = {
         AT_IPv6,            /* addr_type */
         "AT_IPv6",          /* name */
         "IPv6 address",     /* pretty_name */
@@ -695,7 +745,7 @@ void address_types_initialize(void)
         ipv6_name_res_len, /* addr_name_res_len */
    };
 
-    static address_type_t ipx_address = {
+    static const address_type_t ipx_address = {
         AT_IPX,             /* addr_type */
         "AT_IPX",           /* name */
         "IPX address",      /* pretty_name */
@@ -708,7 +758,7 @@ void address_types_initialize(void)
         NULL,               /* addr_name_res_len */
     };
 
-    static address_type_t fc_address = {
+    static const address_type_t fc_address = {
         AT_FC,          /* addr_type */
         "AT_FC",        /* name */
         "FC address",   /* pretty_name */
@@ -721,7 +771,7 @@ void address_types_initialize(void)
         NULL,           /* addr_name_res_len */
     };
 
-    static address_type_t fcwwn_address = {
+    static const address_type_t fcwwn_address = {
         AT_FCWWN,       /* addr_type */
         "AT_FCWWN",     /* name */
         "Fibre Channel WWN",    /* pretty_name */
@@ -734,7 +784,7 @@ void address_types_initialize(void)
         fcwwn_name_res_len, /* addr_name_res_len */
     };
 
-    static address_type_t stringz_address = {
+    static const address_type_t stringz_address = {
         AT_STRINGZ,          /* addr_type */
         "AT_STRINGZ",        /* name */
         "String address",   /* pretty_name */
@@ -747,7 +797,7 @@ void address_types_initialize(void)
         NULL,              /* addr_name_res_len */
     };
 
-    static address_type_t eui64_address = {
+    static const address_type_t eui64_address = {
         AT_EUI64,          /* addr_type */
         "AT_EUI64",        /* name */
         "IEEE EUI-64",     /* pretty_name */
@@ -760,7 +810,7 @@ void address_types_initialize(void)
         eui64_name_resolution_len, /* addr_name_res_len */
     };
 
-    static address_type_t ib_address = {
+    static const address_type_t ib_address = {
         AT_IB,           /* addr_type */
         "AT_IB",         /* name */
         "Infiniband GID/LID",   /* pretty_name */
@@ -773,7 +823,7 @@ void address_types_initialize(void)
         NULL,              /* addr_name_res_len */
     };
 
-    static address_type_t ax25_address = {
+    static const address_type_t ax25_address = {
         AT_AX25,          /* addr_type */
         "AT_AX25",        /* name */
         "AX.25 Address",  /* pretty_name */
@@ -785,7 +835,7 @@ void address_types_initialize(void)
         NULL,              /* addr_name_res_str */
         NULL,              /* addr_name_res_len */
     };
-    static address_type_t vines_address = {
+    static const address_type_t vines_address = {
         AT_VINES,          /* addr_type */
         "AT_VINES",        /* name */
         "Banyan Vines Address",  /* pretty_name */
@@ -798,7 +848,7 @@ void address_types_initialize(void)
         NULL,              /* addr_name_res_len */
     };
 
-    static address_type_t numeric_address = {
+    static const address_type_t numeric_address = {
         AT_NUMERIC,          /* addr_type */
         "AT_NUMERIC",        /* name */
         "Simple numeric address",   /* pretty_name */
@@ -810,7 +860,7 @@ void address_types_initialize(void)
         NULL,              /* addr_name_res_str */
         NULL,              /* addr_name_res_len */
     };
-    static address_type_t mctp_address = {
+    static const address_type_t mctp_address = {
         AT_MCTP,           /* addr_type */
         "AT_MCTP" ,        /* name */
         "MCTP Address",    /* pretty_name */
@@ -823,11 +873,48 @@ void address_types_initialize(void)
         NULL,              /* addr_name_res_len */
     };
 
+    static const address_type_t ilnp_nid_address = {
+        AT_ILNP_NID,                /* addr_type */
+        "AT_ILNP_NID",              /* name */
+        "ILNP Node Identifier address",    /* pretty_name */
+        ilnp_quarters_to_str,       /* addr_to_str */
+        ilnp_quarters_str_len,      /* addr_str_len */
+        NULL,                       /* addr_to_byte */
+        ilnp_nid_col_filter_str,    /* addr_col_filter */
+        NULL,                       /* addr_fixed_len */
+        NULL,                       /* addr_name_res_str */
+        NULL,                       /* addr_name_res_len */
+    };
+    static const address_type_t ilnp_l64_address = {
+        AT_ILNP_L64,                /* addr_type */
+        "AT_ILNP_L64",              /* name */
+        "ILNP Locator address",     /* pretty_name */
+        ilnp_quarters_to_str,       /* addr_to_str */
+        ilnp_quarters_str_len,      /* addr_str_len */
+        NULL,                       /* addr_to_byte */
+        ilnp_l64_col_filter_str,    /* addr_col_filter */
+        NULL,                       /* addr_fixed_len */
+        NULL,                       /* addr_name_res_str */
+        NULL,                       /* addr_name_res_len */
+    };
+    static const address_type_t ilnp_ilv_address = {
+        AT_ILNP_ILV,                /* addr_type */
+        "AT_ILNP_ILV",              /* name */
+        "ILNP Identifier-Locator Vector address",    /* pretty_name */
+        ilnp_ilv_to_str,            /* addr_to_str */
+        ilnp_ilv_str_len,           /* addr_str_len */
+        NULL,                       /* addr_to_byte */
+        ilnp_ilv_col_filter_str,    /* addr_col_filter */
+        NULL,                       /* addr_fixed_len */
+        NULL,                       /* addr_name_res_str */
+        NULL,                       /* addr_name_res_len */
+    };
+
     num_dissector_addr_type = 0;
 
     /* Initialize the type array.  This is mostly for handling
        "dissector registered" address type range (for NULL checking) */
-    memset(type_list, 0, (MAX_ADDR_TYPE_VALUE + 1)*sizeof(address_type_t*));
+    memset((void *)type_list, 0, (MAX_ADDR_TYPE_VALUE + 1)*sizeof(address_type_t*));
 
     address_type_register(AT_NONE, &none_address );
     address_type_register(AT_ETHER, &ether_address );
@@ -843,6 +930,9 @@ void address_types_initialize(void)
     address_type_register(AT_VINES, &vines_address );
     address_type_register(AT_NUMERIC, &numeric_address );
     address_type_register(AT_MCTP, &mctp_address );
+    address_type_register(AT_ILNP_NID, &ilnp_nid_address );
+    address_type_register(AT_ILNP_L64, &ilnp_l64_address );
+    address_type_register(AT_ILNP_ILV, &ilnp_ilv_address );
 }
 
 /* Given an address type id, return an address_type_t* */
@@ -853,7 +943,7 @@ void address_types_initialize(void)
 
 static int address_type_get_length(const address* addr)
 {
-    address_type_t *at;
+    const address_type_t *at;
 
     ADDR_TYPE_LOOKUP(addr->type, at);
 
@@ -879,7 +969,7 @@ address_to_str(wmem_allocator_t *scope, const address *addr)
 
 void address_to_str_buf(const address* addr, char *buf, int buf_len)
 {
-    address_type_t *at;
+    const address_type_t *at;
 
     if (!buf || !buf_len)
         return;
@@ -898,7 +988,7 @@ void address_to_str_buf(const address* addr, char *buf, int buf_len)
 
 unsigned address_to_bytes(const address *addr, uint8_t *buf, unsigned buf_len)
 {
-    address_type_t *at;
+    const address_type_t *at;
     unsigned copy_len = 0;
 
     if (!buf || !buf_len)
@@ -926,7 +1016,7 @@ unsigned address_to_bytes(const address *addr, uint8_t *buf, unsigned buf_len)
 const char *
 address_to_name(const address *addr)
 {
-    address_type_t *at;
+    const address_type_t *at;
 
     ADDR_TYPE_LOOKUP(addr->type, at);
 
@@ -979,7 +1069,7 @@ address_to_display(wmem_allocator_t *allocator, const address *addr)
 
 static void address_with_resolution_to_str_buf(const address* addr, char *buf, int buf_len)
 {
-    address_type_t *at;
+    const address_type_t *at;
     int addr_len;
     size_t pos;
 
@@ -1003,7 +1093,7 @@ static void address_with_resolution_to_str_buf(const address* addr, char *buf, i
 #endif
 
     /* Copy the resolved name */
-    g_strlcpy(buf, at->addr_name_res_str(addr), buf_len);
+    (void) g_strlcpy(buf, at->addr_name_res_str(addr), buf_len);
 
     /* Get the length of the copied resolved name */
     pos = strlen(buf);
@@ -1064,7 +1154,7 @@ static void address_with_resolution_to_str_buf(const address* addr, char *buf, i
 
 char* address_with_resolution_to_str(wmem_allocator_t *scope, const address *addr)
 {
-    address_type_t *at;
+    const address_type_t *at;
     int len;
     char *str;
 
@@ -1090,7 +1180,7 @@ char* address_with_resolution_to_str(wmem_allocator_t *scope, const address *add
 
 const char* address_type_column_filter_string(const address* addr, bool src)
 {
-    address_type_t *at;
+    const address_type_t *at;
 
     ADDR_TYPE_LOOKUP(addr->type, at);
 
@@ -1103,10 +1193,10 @@ const char* address_type_column_filter_string(const address* addr, bool src)
 }
 
 char*
-tvb_address_to_str(wmem_allocator_t *scope, tvbuff_t *tvb, int type, const int offset)
+tvb_address_to_str(wmem_allocator_t *scope, tvbuff_t *tvb, int type, const unsigned offset)
 {
     address addr;
-    address_type_t *at;
+    const address_type_t *at;
 
     ADDR_TYPE_LOOKUP(type, at);
 
@@ -1128,7 +1218,7 @@ tvb_address_to_str(wmem_allocator_t *scope, tvbuff_t *tvb, int type, const int o
     return address_to_str(scope, &addr);
 }
 
-char* tvb_address_var_to_str(wmem_allocator_t *scope, tvbuff_t *tvb, address_type type, const int offset, int length)
+char* tvb_address_var_to_str(wmem_allocator_t *scope, tvbuff_t *tvb, address_type type, const unsigned offset, unsigned length)
 {
     address addr;
 
@@ -1138,10 +1228,10 @@ char* tvb_address_var_to_str(wmem_allocator_t *scope, tvbuff_t *tvb, address_typ
 }
 
 char*
-tvb_address_with_resolution_to_str(wmem_allocator_t *scope, tvbuff_t *tvb, int type, const int offset)
+tvb_address_with_resolution_to_str(wmem_allocator_t *scope, tvbuff_t *tvb, int type, const unsigned offset)
 {
     address addr;
-    address_type_t *at;
+    const address_type_t *at;
 
     ADDR_TYPE_LOOKUP(type, at);
 

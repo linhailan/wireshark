@@ -17,8 +17,6 @@
 #include <epan/packet.h>
 #include <wiretap/wtap.h>
 
-#include <epan/rtp_pt.h>
-
 #include <epan/conversation.h>
 #include <epan/expert.h>
 #include <epan/reassemble.h>
@@ -32,6 +30,7 @@
 #include "packet-l2tp.h"
 #include "packet-udp.h"
 #include "packet-mp2t.h"
+#include "packet-rtp_pt.h"
 
 void proto_register_mp2t(void);
 void proto_reg_handoff_mp2t(void);
@@ -947,8 +946,7 @@ mp2t_process_fragmented_payload(tvbuff_t *tvb, int offset, unsigned remaining_le
 
     /* PES packet don't have pointer fields, others do */
     if (pusi_flag && pid_analysis->pload_type != pid_pload_pes) {
-        pointer = tvb_get_uint8(tvb, offset);
-        pi = proto_tree_add_item(header_tree, hf_mp2t_pointer, tvb, offset, 1, ENC_BIG_ENDIAN);
+        pi = proto_tree_add_item_ret_uint8(header_tree, hf_mp2t_pointer, tvb, offset, 1, ENC_BIG_ENDIAN, &pointer);
         offset++;
         remaining_len--;
         if (pointer > remaining_len) {
@@ -1312,11 +1310,10 @@ dissect_mp2t_adaptation_field(tvbuff_t *tvb, int offset, proto_tree *tree)
     uint8_t     af_flags;
     int         stuffing_len;
 
-    af_length = tvb_get_uint8(tvb, offset);
-    proto_tree_add_item(tree, hf_mp2t_af_length, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint8(tree, hf_mp2t_af_length, tvb, offset, 1, ENC_BIG_ENDIAN, &af_length);
     offset += 1;
     /* fix issues where afc==3 but af_length==0
-     *  Adaptaion field...spec section 2.4.3.5: The value 0 is for inserting a single
+     *  Adaptation field...spec section 2.4.3.5: The value 0 is for inserting a single
      *  stuffing byte in a Transport Stream packet. When the adaptation_field_control
      *  value is '11', the value of the adaptation_field_length shall be in the range 0 to 182.
      */

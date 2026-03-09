@@ -15,6 +15,7 @@
 
 #include <wsutil/utf8_entities.h>
 #include <wsutil/filesystem.h>
+#include <app/application_flavor.h>
 
 #include <ui/qt/main_application.h>
 #include <ui/qt/filter_action.h>
@@ -66,12 +67,18 @@ int TabData::protoId() const
 
 
 TrafficTab::TrafficTab(QWidget * parent) :
-    DetachableTabWidget(parent)
+    DetachableTabWidget(parent),
+    _recentList(nullptr),
+    _recentColumnList(nullptr)
 {
     _createModel = nullptr;
     _createDelegate = nullptr;
     _disableTaps = false;
     _nameResolution = false;
+    _absoluteTime = false;
+    _limitToDisplayFilter = false;
+    _nanoseconds = false;
+    _machineReadable = false;
     setTabBasename(QString());
 }
 
@@ -115,10 +122,15 @@ QTreeView * TrafficTab::createTree(int protoId)
 
     if (_createModel) {
         ATapDataModel * model = _createModel(protoId, "");
+        model->useAbsoluteTime(_absoluteTime);
+        model->limitToDisplayFilter(_limitToDisplayFilter);
+        model->useNanosecondTimestamps(_nanoseconds);
+        model->setResolveNames(_nameResolution);
         model->setParent(tree);
         connect(model, &ATapDataModel::tapListenerChanged, tree, &TrafficTree::tapListenerEnabled);
 
         model->enableTap();
+        model->setMachineReadable(_machineReadable);
 
         if (_createDelegate)
         {
@@ -184,6 +196,10 @@ QTreeView * TrafficTab::createTree(int protoId)
 
 void TrafficTab::useAbsoluteTime(bool absolute)
 {
+    if (absolute == _absoluteTime)
+        return;
+
+    _absoluteTime = absolute;
     for(int idx = 0; idx < count(); idx++)
     {
         ATapDataModel * atdm = dataModelForTabIndex(idx);
@@ -194,6 +210,10 @@ void TrafficTab::useAbsoluteTime(bool absolute)
 
 void TrafficTab::useNanosecondTimestamps(bool nanoseconds)
 {
+    if (nanoseconds == _nanoseconds)
+        return;
+
+    _nanoseconds = nanoseconds;
     for(int idx = 0; idx < count(); idx++)
     {
         ATapDataModel * atdm = dataModelForTabIndex(idx);
@@ -204,11 +224,29 @@ void TrafficTab::useNanosecondTimestamps(bool nanoseconds)
 
 void TrafficTab::limitToDisplayFilter(bool limit)
 {
+    if (limit == _limitToDisplayFilter)
+        return;
+
+    _limitToDisplayFilter = limit;
     for(int idx = 0; idx < count(); idx++)
     {
         ATapDataModel * atdm = dataModelForTabIndex(idx);
         if (atdm)
             atdm->limitToDisplayFilter(limit);
+    }
+}
+
+void TrafficTab::setMachineReadable(bool machine)
+{
+    if (machine == _machineReadable)
+        return;
+
+    _machineReadable = machine;
+    for(int idx = 0; idx < count(); idx++)
+    {
+        ATapDataModel * atdm = dataModelForTabIndex(idx);
+        if (atdm)
+            atdm->setMachineReadable(machine);
     }
 }
 
@@ -305,7 +343,7 @@ void TrafficTab::insertProtoTab(int protoId, bool emitSignals)
 
     /* We reset the correct tab idxs. That operations is costly, but it is only
      * called during this operation and ensures, that other operations do not
-     * need to iterate, but rather can lookup the indeces. */
+     * need to iterate, but rather can lookup the indices. */
     _tabs.clear();
     for (int idx = 0; idx < count(); idx++) {
         TabData tabData = qvariant_cast<TabData>(tabBar()->tabData(idx));
@@ -337,7 +375,7 @@ void TrafficTab::removeProtoTab(int protoId, bool emitSignals)
 
     /* We reset the correct tab idxs. That operations is costly, but it is only
     * called during this operation and ensures, that other operations do not
-    * need to iterate, but rather can lookup the indeces. */
+    * need to iterate, but rather can lookup the indices. */
     _tabs.clear();
     for (int idx = 0; idx < count(); idx++) {
         TabData tabData = qvariant_cast<TabData>(tabBar()->tabData(idx));
@@ -639,11 +677,11 @@ TrafficTab::writeGeoIPMapFile(QFile * fp, bool json_only, TrafficDataFilterProxy
     QTextStream out(fp);
 
     if (!json_only) {
-        QFile ipmap(get_datafile_path("ipmap.html"));
+        QFile ipmap(get_datafile_path("ipmap.html", application_configuration_environment_prefix()));
 
         if (!ipmap.open(QIODevice::ReadOnly)) {
             QMessageBox::warning(this, tr("Map file error"), tr("Could not open base file %1 for reading: %2")
-                .arg(get_datafile_path("ipmap.html"), g_strerror(errno))
+                .arg(get_datafile_path("ipmap.html", application_configuration_environment_prefix()), g_strerror(errno))
             );
             return false;
         }

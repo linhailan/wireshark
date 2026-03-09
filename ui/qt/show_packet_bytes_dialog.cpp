@@ -32,7 +32,7 @@
 
 // To do:
 // - Add show as custom protocol in a Packet Details view
-// - Use ByteViewText to ShowAsHexDump and supplementary view for custom protocol
+// - Use HexDataSourceView to ShowAsHexDump and supplementary view for custom protocol
 // - Handle large data blocks
 
 Q_DECLARE_METATYPE(bytes_show_type)
@@ -41,16 +41,24 @@ Q_DECLARE_METATYPE(bytes_decode_type)
 ShowPacketBytesDialog::ShowPacketBytesDialog(QWidget &parent, CaptureFile &cf) :
     WiresharkDialog(parent, cf),
     ui(new Ui::ShowPacketBytesDialog),
-    finfo_(cf.capFile()->finfo_selected),
     use_regex_find_(false)
 {
     ui->setupUi(this);
     loadGeometry(parent.width() * 2 / 3, parent.height() * 3 / 4);
 
-    QString field_name = QStringLiteral("%1 (%2)").arg(finfo_->hfinfo->name, finfo_->hfinfo->abbrev);
+    // Create a new tvbuff with a copy of the data from the selected packet.
+    // This allows use the data after the selected packet is changed and
+    // after capture file is closed.
+    const field_info *finfo = cf.capFile()->finfo_selected;
+    uint8_t *bytes = (uint8_t *)tvb_memdup(NULL, finfo->ds_tvb, finfo->start, finfo->length);
+
+    tvb_ = tvb_new_real_data(bytes, finfo->length, finfo->length);
+    tvb_set_free_cb(tvb_, g_free);
+
+    QString field_name = QStringLiteral("%1 (%2)").arg(finfo->hfinfo->name, finfo->hfinfo->abbrev);
     setWindowSubtitle (field_name);
 
-    hint_label_ = tr("Frame %1, %2, %Ln byte(s).", "", finfo_->length)
+    hint_label_ = tr("Frame %1, %2, %Ln byte(s).", "", finfo->length)
                      .arg(cf.capFile()->current_frame->num)
                      .arg(field_name);
 
@@ -88,7 +96,9 @@ ShowPacketBytesDialog::ShowPacketBytesDialog(QWidget &parent, CaptureFile &cf) :
     ui->cbShowAs->blockSignals(false);
 
     ui->sbStart->setMinimum(0);
-    ui->sbEnd->setMaximum(finfo_->length - 1);
+    ui->sbEnd->setMaximum(tvb_reported_length(tvb_) - 1);
+
+    ui->tePacketBytes->setShowSelectedEnabled(enableShowSelected());
 
     print_button_ = ui->buttonBox->addButton(tr("Print"), QDialogButtonBox::ActionRole);
     connect(print_button_, SIGNAL(clicked()), this, SLOT(printBytes()));
@@ -101,12 +111,17 @@ ShowPacketBytesDialog::ShowPacketBytesDialog(QWidget &parent, CaptureFile &cf) :
 
     connect(ui->buttonBox, SIGNAL(helpRequested()), this, SLOT(helpButton()));
 
-    setStartAndEnd(0, (finfo_->length - 1));
+    // XXX - This shouldn't be created if finfo->length == 0 (see
+    // wireshark_main_window_slots and have_packet_bytes), but it might
+    // make sense and simplify some calculations to store the length /
+    // byte location past the end
+    setStartAndEnd(0, tvb_reported_length(tvb_) - 1);
     updateFieldBytes(true);
 }
 
 ShowPacketBytesDialog::~ShowPacketBytesDialog()
 {
+    tvb_free(tvb_);
     delete ui;
 }
 
@@ -128,7 +143,7 @@ void ShowPacketBytesDialog::showSelected(int start, int end)
 {
     if (end == -1) {
         // end set to -1 means show all packet bytes
-        setStartAndEnd(0, (finfo_->length - 1));
+        setStartAndEnd(0, tvb_reported_length(tvb_) - 1);
     } else {
         if (recent.gui_show_bytes_show == SHOW_RAW) {
             start /= 2;
@@ -162,6 +177,7 @@ bool ShowPacketBytesDialog::enableShowSelected()
     // "Show Selected" only works when showing all bytes:
     // - DecodeAs must not alter the number of bytes in the buffer
     // - ShowAs must show all bytes in the buffer
+    // - please update tooltip (minus ROT13) if logic changes
 
     return (((recent.gui_show_bytes_decode == DecodeAsNone) ||
              (recent.gui_show_bytes_decode == DecodeAsROT13)) &&
@@ -180,7 +196,7 @@ void ShowPacketBytesDialog::updateHintLabel()
 {
     QString hint = hint_label_;
 
-    if (start_ > 0 || end_ < (finfo_->length - 1)) {
+    if (start_ > 0 || end_ < (int)(tvb_reported_length(tvb_) - 1)) {
         hint.append(" <span style=\"color: red\">" +
                     tr("Using %Ln byte(s).", "", end_ - start_ + 1) +
                     "</span>");
@@ -353,7 +369,10 @@ void ShowPacketBytesDialog::saveAs()
     }
 
     QFile file(file_name);
-    file.open(open_mode);
+    if (!file.open(open_mode)) {
+        // XXX - Warn?
+        return;
+    }
 
     switch (recent.gui_show_bytes_show) {
 
@@ -398,6 +417,7 @@ void ShowPacketBytesDialog::saveAs()
         break;
     }
 
+    // XXX - Check for failure and warn?
     file.close();
 }
 
@@ -564,25 +584,21 @@ void ShowPacketBytesDialog::rot13(QByteArray &ba)
 
 void ShowPacketBytesDialog::updateFieldBytes(bool initialization)
 {
-    int start = finfo_->start + start_;
     int length = end_ - start_ + 1;
     const uint8_t *bytes;
-
-    if (!finfo_->ds_tvb)
-        return;
 
     decode_as_name_.clear();
 
     switch (recent.gui_show_bytes_decode) {
 
     case DecodeAsNone:
-        bytes = tvb_get_ptr(finfo_->ds_tvb, start, -1);
+        bytes = tvb_get_ptr(tvb_, start_, length);
         field_bytes_ = QByteArray((const char *)bytes, length);
         break;
 
     case DecodeAsBASE64:
     {
-        bytes = tvb_get_ptr(finfo_->ds_tvb, start, -1);
+        bytes = tvb_get_ptr(tvb_, start_, length);
         QByteArray ba = QByteArray::fromRawData((const char *)bytes, length);
         if (ba.contains('-') || ba.contains('_')) {
             field_bytes_ = QByteArray::fromBase64(ba, QByteArray::Base64UrlEncoding);
@@ -607,10 +623,10 @@ void ShowPacketBytesDialog::updateFieldBytes(bool initialization)
         tvbuff_t *uncompr_tvb = NULL;
 
         for (auto &tvb_uncompress : tvb_uncompress_list) {
-            uncompr_tvb = tvb_uncompress.function(finfo_->ds_tvb, start, length);
-            if (uncompr_tvb && tvb_reported_length(uncompr_tvb) > 0) {
-                bytes = tvb_get_ptr(uncompr_tvb, 0, -1);
-                field_bytes_ = QByteArray((const char *)bytes, tvb_reported_length(uncompr_tvb));
+            uncompr_tvb = tvb_uncompress.function(tvb_, start_, length);
+            if (uncompr_tvb && tvb_captured_length(uncompr_tvb) > 0) {
+                bytes = tvb_get_ptr(uncompr_tvb, 0, tvb_captured_length(uncompr_tvb));
+                field_bytes_ = QByteArray((const char *)bytes, tvb_captured_length(uncompr_tvb));
                 decode_as_name_ = tr("compressed %1").arg(tvb_uncompress.name);
                 tvb_free(uncompr_tvb);
                 break;
@@ -623,13 +639,13 @@ void ShowPacketBytesDialog::updateFieldBytes(bool initialization)
     }
 
     case DecodeAsHexDigits:
-        bytes = tvb_get_ptr(finfo_->ds_tvb, start, -1);
+        bytes = tvb_get_ptr(tvb_, start_, length);
         field_bytes_ = QByteArray::fromHex(QByteArray::fromRawData((const char *)bytes, length));
         break;
 
     case DecodeAsPercentEncoding:
     {
-        bytes = tvb_get_ptr(finfo_->ds_tvb, start, -1);
+        bytes = tvb_get_ptr(tvb_, start_, length);
 #if GLIB_CHECK_VERSION(2, 66, 0)
         GBytes *ba = g_uri_unescape_bytes((const char*)bytes, length, NULL, NULL);
         if (ba != NULL) {
@@ -648,12 +664,12 @@ void ShowPacketBytesDialog::updateFieldBytes(bool initialization)
     }
 
     case DecodeAsQuotedPrintable:
-        bytes = tvb_get_ptr(finfo_->ds_tvb, start, -1);
+        bytes = tvb_get_ptr(tvb_, start_, length);
         field_bytes_ = decodeQuotedPrintable(bytes, length);
         break;
 
     case DecodeAsROT13:
-        bytes = tvb_get_ptr(finfo_->ds_tvb, start, -1);
+        bytes = tvb_get_ptr(tvb_, start_, length);
         field_bytes_ = QByteArray((const char *)bytes, length);
         rot13(field_bytes_);
         break;
@@ -909,29 +925,6 @@ DIAG_ON(stringop-overread)
     }
 }
 
-void ShowPacketBytesDialog::captureFileClosing()
-{
-    finfo_ = NULL;  // This will invalidate the source backend
-
-    WiresharkDialog::captureFileClosing();
-}
-
-void ShowPacketBytesDialog::captureFileClosed()
-{
-    // We have lost the source backend and must disable all functions
-    // for manipulating decoding and displayed range.
-
-    ui->tePacketBytes->setMenusEnabled(false);
-    ui->lDecodeAs->setEnabled(false);
-    ui->cbDecodeAs->setEnabled(false);
-    ui->lStart->setEnabled(false);
-    ui->sbStart->setEnabled(false);
-    ui->lEnd->setEnabled(false);
-    ui->sbEnd->setEnabled(false);
-
-    WiresharkDialog::captureFileClosed();
-}
-
 void ShowPacketBytesTextEdit::contextMenuEvent(QContextMenuEvent *event)
 {
     QMenu *menu = createStandardContextMenu();
@@ -940,13 +933,17 @@ void ShowPacketBytesTextEdit::contextMenuEvent(QContextMenuEvent *event)
     menu->setAttribute(Qt::WA_DeleteOnClose);
     menu->addSeparator();
 
+    QString displayToolTip = tr("<html>Mouse byte selection is enabled when<p>\"Decode as\" = None<p>AND<p>\"Show as\" = ASCII, ASCII & Control, EBCDIC or Raw</html>");
     action = menu->addAction(tr("Show Selected"));
     action->setEnabled(menus_enabled_ && show_selected_enabled_ && textCursor().hasSelection());
+    action->setToolTip(displayToolTip);
     connect(action, SIGNAL(triggered()), this, SLOT(showSelected()));
 
     action = menu->addAction(tr("Show All"));
     action->setEnabled(menus_enabled_);
     connect(action, SIGNAL(triggered()), this, SLOT(showAll()));
+
+    menu->setToolTipsVisible(true);
 
     menu->popup(event->globalPos());
 }

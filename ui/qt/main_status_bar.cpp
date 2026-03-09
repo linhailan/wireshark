@@ -14,7 +14,6 @@
 #include <epan/expert.h>
 #include <epan/prefs.h>
 
-#include <wsutil/application_flavor.h>
 #include <wsutil/filesystem.h>
 #include <wsutil/utf8_entities.h>
 
@@ -82,13 +81,13 @@ static const int icon_size = 14; // px
 MainStatusBar::MainStatusBar(QWidget *parent) :
     QStatusBar(parent),
     cap_file_(NULL),
-    #ifdef HAVE_LIBPCAP
-    ready_msg_(tr("Ready to load or capture")),
-    #else
-    ready_msg_(tr("Ready to load file")),
-    #endif
     cs_fixed_(false),
-    cs_count_(0)
+    cs_count_(0),
+#ifdef HAVE_LIBPCAP
+    ready_msg_(tr("Ready to load or capture"))
+#else
+    ready_msg_(tr("Ready to load file"))
+#endif
 {
     QSplitter *splitter = new QSplitter(this);
     QWidget *info_progress = new QWidget(this);
@@ -120,6 +119,8 @@ MainStatusBar::MainStatusBar(QWidget *parent) :
     expert_button_ = new QToolButton(this);
     expert_button_->setIconSize(QSize(icon_size, icon_size));
     expert_button_->setStyleSheet(button_ss);
+    expert_button_->setAccessibleName(tr("Expert information"));
+    expert_button_->setAccessibleDescription(tr("Opens the expert information dialog, showing errors, warnings, and other relevant information about the capture."));
     expert_button_->hide();
 
     // We just want a clickable image. Using a QPushButton or QToolButton would require
@@ -129,6 +130,8 @@ MainStatusBar::MainStatusBar(QWidget *parent) :
     comment_button_->setIcon(comment_icon);
     comment_button_->setIconSize(QSize(icon_size, icon_size));
     comment_button_->setStyleSheet(button_ss);
+    comment_button_->setAccessibleName(tr("Capture comment"));
+    comment_button_->setAccessibleDescription(tr("Opens the Capture File Properties dialog to view or edit capture-level comments."));
 
     comment_button_->setToolTip(tr("Open the Capture File Properties dialog"));
     comment_button_->setEnabled(false);
@@ -139,12 +142,19 @@ MainStatusBar::MainStatusBar(QWidget *parent) :
 
     info_status_.setTemporaryContext(STATUS_CTX_TEMPORARY);
     info_status_.setShrinkable(true);
+    info_status_.setAccessibleName(tr("Information"));
+    info_status_.setAccessibleDescription(tr("Displays general information, status messages, and expert severity details."));
 
     info_progress_hb->addWidget(expert_button_);
     info_progress_hb->addWidget(comment_button_);
     info_progress_hb->addWidget(&info_status_);
     info_progress_hb->addWidget(&progress_frame_);
     info_progress_hb->addStretch(10);
+
+    packet_status_.setAccessibleName(tr("Packet statistics"));
+    packet_status_.setAccessibleDescription(tr("Shows the number of captured, displayed, and selected packets."));
+    profile_status_.setAccessibleName(tr("Configuration profile"));
+    profile_status_.setAccessibleDescription(tr("Displays the current configuration profile and allows switching between profiles."));
 
     splitter->addWidget(info_progress);
     splitter->addWidget(&packet_status_);
@@ -174,6 +184,12 @@ MainStatusBar::MainStatusBar(QWidget *parent) :
 
     connect(&progress_frame_, &ProgressFrame::stopLoading, this, &MainStatusBar::stopLoading);
 }
+
+MainStatusBar::~MainStatusBar()
+{
+
+}
+
 
 void MainStatusBar::showExpert() {
     expertUpdate();
@@ -383,23 +399,12 @@ void MainStatusBar::showCaptureStatistics()
         }
         if (cs_count_ > 0) {
             if (prefs.gui_show_selected_packet && rows.count() == 1) {
-                if (application_flavor_is_wireshark()) {
-                    packets_str.append(tr("Selected Packet: %1 %2 ")
-                                       .arg(rows.at(0))
-                                       .arg(UTF8_MIDDLE_DOT));
-                } else {
-                    packets_str.append(tr("Selected Event: %1 %2 ")
-                                           .arg(rows.at(0))
-                                           .arg(UTF8_MIDDLE_DOT));
-                }
+                packets_str.append(tr("Selected Packet: %1 %2 ")
+                                    .arg(rows.at(0))
+                                    .arg(UTF8_MIDDLE_DOT));
             }
-            if (application_flavor_is_wireshark()) {
-                packets_str.append(tr("Packets: %1")
-                                       .arg(cs_count_));
-            } else {
-                packets_str.append(tr("Events: %1")
-                                       .arg(cs_count_));
-            }
+            packets_str.append(tr("Packets: %1").arg(cs_count_));
+
             if (cap_file_->dfilter) {
                 packets_str.append(tr(" %1 Displayed: %2 (%3%)")
                                        .arg(UTF8_MIDDLE_DOT)
@@ -422,7 +427,7 @@ void MainStatusBar::showCaptureStatistics()
                 packets_str.append(tr(" %1 Dropped: %2 (%3%)")
                                    .arg(UTF8_MIDDLE_DOT)
                                    .arg(cap_file_->drops)
-                                   .arg((100.0*cap_file_->drops)/cs_count_, 0, 'f', 1));
+                                   .arg((100.0*cap_file_->drops)/(cs_count_ + cap_file_->drops), 0, 'f', 1));
             }
             if (cap_file_->ignored_count > 0) {
                 packets_str.append(tr(" %1 Ignored: %2 (%3%)")
@@ -447,32 +452,18 @@ void MainStatusBar::showCaptureStatistics()
         }
     } else if (cs_fixed_ && cs_count_ > 0) {
         /* There shouldn't be any rows without a cap_file_ but this is benign */
-        if (application_flavor_is_wireshark()) {
-            if (prefs.gui_show_selected_packet && rows.count() == 1) {
-                packets_str.append(tr("Selected Packet: %1 %2 ")
-                    .arg(rows.at(0))
-                    .arg(UTF8_MIDDLE_DOT));
-            }
-            packets_str.append(tr("Packets: %1")
-                .arg(cs_count_));
-        } else {
-            if (prefs.gui_show_selected_packet && rows.count() == 1) {
-                packets_str.append(tr("Selected Event: %1 %2 ")
-                                       .arg(rows.at(0))
-                                       .arg(UTF8_MIDDLE_DOT));
-            }
-            packets_str.append(tr("Events: %1")
-                                   .arg(cs_count_));
+        if (prefs.gui_show_selected_packet && rows.count() == 1) {
+            packets_str.append(tr("Selected Packet: %1 %2 ")
+                .arg(rows.at(0))
+                .arg(UTF8_MIDDLE_DOT));
         }
+        packets_str.append(tr("Packets: %1")
+            .arg(cs_count_));
     }
 #endif // HAVE_LIBPCAP
 
     if (packets_str.isEmpty()) {
-        if (application_flavor_is_wireshark()) {
-            packets_str = tr("No Packets");
-        } else {
-            packets_str = tr("No Events");
-        }
+        packets_str = tr("No Packets");
     }
 
     popGenericStatus(STATUS_CTX_MAIN);
@@ -607,9 +598,9 @@ void MainStatusBar::showProfileMenu(const QPoint &global_pos, Qt::MouseButton bu
 
 #if defined(HAVE_MINIZIP) || defined(HAVE_MINIZIPNG)
         QMenu * importMenu = new QMenu(tr("Import"), ctx_menu_);
-        action = importMenu->addAction(tr("From Zip File..."), this, SLOT(manageProfile()));
+        action = importMenu->addAction(tr("From Zip File…"), this, SLOT(manageProfile()));
         action->setProperty("dialog_action_", (int)ProfileDialog::ImportZipProfile);
-        action = importMenu->addAction(tr("From Directory..."), this, SLOT(manageProfile()));
+        action = importMenu->addAction(tr("From Directory…"), this, SLOT(manageProfile()));
         action->setProperty("dialog_action_", (int)ProfileDialog::ImportDirProfile);
         ctx_menu_->addMenu(importMenu);
 
@@ -618,11 +609,11 @@ void MainStatusBar::showProfileMenu(const QPoint &global_pos, Qt::MouseButton bu
             QMenu * exportMenu = new QMenu(tr("Export"), ctx_menu_);
             if (enable_edit)
             {
-                action = exportMenu->addAction(tr("Selected Personal Profile..."), this, SLOT(manageProfile()));
+                action = exportMenu->addAction(tr("Selected Personal Profile…"), this, SLOT(manageProfile()));
                 action->setProperty("dialog_action_", (int)ProfileDialog::ExportSingleProfile);
                 action->setEnabled(enable_edit);
             }
-            action = exportMenu->addAction(tr("All Personal Profiles..."), this, SLOT(manageProfile()));
+            action = exportMenu->addAction(tr("All Personal Profiles…"), this, SLOT(manageProfile()));
             action->setProperty("dialog_action_", (int)ProfileDialog::ExportAllProfiles);
             ctx_menu_->addMenu(exportMenu);
         }

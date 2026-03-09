@@ -345,9 +345,9 @@ add_cstring(ptvcursor_t* ptv, const int* hf) {
 
 static void
 add_string(ptvcursor_t* ptv, const int* hf) {
-    int32_t len = 0;
+    uint32_t len = 0;
     ptvcursor_add_ret_uint(ptv, hf_wow_string_length, 1, ENC_NA, &len);
-    ptvcursor_add(ptv, *hf, len, ENC_UTF_8);
+    ptvcursor_add(ptv, *hf, (int)len, ENC_UTF_8);
 }
 
 static unsigned
@@ -887,7 +887,7 @@ dissect_wow_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data 
 	proto_item* ti = proto_tree_add_item(tree, proto_wow, tvb, 0, -1, ENC_NA);
 	proto_tree* wow_tree = proto_item_add_subtree(ti, ett_wow);
 
-	ptvcursor_t* ptv = ptvcursor_new(wmem_packet_scope(), wow_tree, tvb, offset);
+	ptvcursor_t* ptv = ptvcursor_new(pinfo->pool, wow_tree, tvb, offset);
 
 	ptvcursor_add(ptv, hf_wow_command, 1, ENC_LITTLE_ENDIAN);
 

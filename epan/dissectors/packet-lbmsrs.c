@@ -11,7 +11,7 @@
 *
 * Special thanks to the team at https://github.com/rsocket/rsocket-wireshark
 * for getting us started on the right path for this Ultra Messaging rsocket dissector.
-* Rsocket Protocol Description: https://rsocket.io/docs/Protocol.html
+* Rsocket Protocol Description: https://rsocket.io/about/protocol
 */
 
 #include "config.h"
@@ -954,8 +954,8 @@ static bool lbmsrs_match_packet(packet_info * pinfo, const lbmsrs_tag_entry_t * 
         (pinfo->src.type != AT_IPv4) || (pinfo->src.len != 4))
         return false;
 
-    uint32_t dest_addr_h = pntoh32(pinfo->dst.data);
-    uint32_t src_addr_h = pntoh32(pinfo->src.data);
+    uint32_t dest_addr_h = pntohu32(pinfo->dst.data);
+    uint32_t src_addr_h = pntohu32(pinfo->src.data);
 
     uint32_t ip_address_val_h = 0;
     if (NULL != entry->ip_address)
@@ -1255,7 +1255,7 @@ static unsigned dissect_rsocket_frame(uint64_t rsocket_frame_type,proto_tree* rs
                 break;
             }
 
-            proto_tree_add_item(rsocket_frame_tree, hf_lbmsrs_rsocket_mdata_mime_type, tvb, offset,mdata_mime_length, ENC_ASCII | ENC_NA);
+            proto_tree_add_item(rsocket_frame_tree, hf_lbmsrs_rsocket_mdata_mime_type, tvb, offset,mdata_mime_length, ENC_ASCII);
             offset += mdata_mime_length;
 
             if ((total_payload_len - offset) < 1)
@@ -1273,7 +1273,7 @@ static unsigned dissect_rsocket_frame(uint64_t rsocket_frame_type,proto_tree* rs
                 break;
             }
 
-            proto_tree_add_item(rsocket_frame_tree, hf_lbmsrs_rsocket_data_mime_type, tvb, offset,data_mime_length, ENC_ASCII | ENC_NA);
+            proto_tree_add_item(rsocket_frame_tree, hf_lbmsrs_rsocket_data_mime_type, tvb, offset,data_mime_length, ENC_ASCII);
             offset += data_mime_length;
             break;
         }
@@ -1446,6 +1446,11 @@ static unsigned dissect_lbmsrs_sir_ser(tvbuff_t * tvb, packet_info * pinfo, prot
         *can_dissect_further = false;
         return (offset - start_offset);
     }
+    /* This protocol uses a belt-and-suspenders approach of having a leading
+     * length field which includes a trailing null which is also present.
+     * Cf packet-ajp13.c
+     * However, there are also some exceptions (mdata_mime_type) where sample
+     * files show that no trailing NULL is present. */
     uint8_t topic_len = tvb_get_uint8(tvb, offset);
     proto_tree_add_item(sir_tree, hf_lbmsrs_sir_topic_len, tvb, offset, L_LBM_SRS_SRC_INFO_INFO_T_TOPIC_LEN, ENC_BIG_ENDIAN);
     offset += L_LBM_SRS_SRC_INFO_INFO_T_TOPIC_LEN;
@@ -1456,9 +1461,8 @@ static unsigned dissect_lbmsrs_sir_ser(tvbuff_t * tvb, packet_info * pinfo, prot
         *can_dissect_further = false;
         return (offset - start_offset);
     }
-    int len;
-    char* name = tvb_get_stringz_enc(pinfo->pool, tvb, offset, &len, ENC_ASCII);
-    proto_tree_add_item(sir_tree, hf_lbmsrs_sir_topic, tvb, offset, topic_len, ENC_ASCII | ENC_NA);
+    const char* name;
+    proto_tree_add_item_ret_string(sir_tree, hf_lbmsrs_sir_topic, tvb, offset, topic_len, ENC_ASCII, pinfo->pool, (const uint8_t**)&name);
     offset += topic_len;
 
     if ((total_payload_len - offset) < L_LBM_SRS_SRC_INFO_INFO_T_SOURCE_LEN)
@@ -1478,7 +1482,7 @@ static unsigned dissect_lbmsrs_sir_ser(tvbuff_t * tvb, packet_info * pinfo, prot
         return (offset - start_offset);
     }
 
-    proto_tree_add_item(sir_tree, hf_lbmsrs_sir_source, tvb, offset, source_len, ENC_ASCII | ENC_NA);
+    proto_tree_add_item(sir_tree, hf_lbmsrs_sir_source, tvb, offset, source_len, ENC_ASCII);
     offset += source_len;
 
     if ((total_payload_len - offset) < L_LBM_SRS_SRC_INFO_INFO_T_HOST_ID)
@@ -1699,9 +1703,8 @@ static unsigned dissect_lbmsrs_sdr(tvbuff_t * tvb, packet_info * pinfo, proto_tr
         *can_dissect_further = false;
         return (offset - start_offset);
     }
-    int len;
-    char* name = tvb_get_stringz_enc(pinfo->pool, tvb, offset, &len, ENC_ASCII);
-    proto_tree_add_item(sdr_tree, hf_lbmsrs_sdr_topic, tvb, offset, topic_len, ENC_ASCII | ENC_NA);
+    const char* name;
+    proto_tree_add_item_ret_string(sdr_tree, hf_lbmsrs_sdr_topic, tvb, offset, topic_len, ENC_ASCII, pinfo->pool, (const uint8_t**)&name);
     offset += topic_len;
 
     proto_item_set_text(batch_item, "SDR:Topic:%s", name);
@@ -1751,9 +1754,8 @@ static unsigned dissect_lbmsrs_rir(tvbuff_t * tvb, packet_info * pinfo, proto_tr
         *can_dissect_further = false;
         return (offset - start_offset);
     }
-    int len;
-    char* name = tvb_get_stringz_enc(pinfo->pool, tvb, offset, &len, ENC_ASCII);
-    proto_tree_add_item(rir_tree, hf_lbmsrs_rir_topic, tvb, offset, topic_len, ENC_ASCII | ENC_NA);
+    const char* name;
+    proto_tree_add_item_ret_string(rir_tree, hf_lbmsrs_rir_topic, tvb, offset, topic_len, ENC_ASCII, pinfo->pool, (const uint8_t**)&name);
     offset += topic_len;
 
     if ((total_payload_len - offset) < L_LBM_SRS_RCV_INFO_INFO_T_DOMAIN_ID)
@@ -1857,9 +1859,8 @@ static unsigned dissect_lbmsrs_rer(tvbuff_t * tvb, packet_info * pinfo, proto_tr
         *can_dissect_further = false;
         return (offset - start_offset);
     }
-    int len;
-    char* name = tvb_get_stringz_enc(pinfo->pool, tvb, offset, &len, ENC_ASCII);
-    proto_tree_add_item(rer_tree, hf_lbmsrs_rer_topic, tvb, offset, topic_len, ENC_ASCII | ENC_NA);
+    const char* name;
+    proto_tree_add_item_ret_string(rer_tree, hf_lbmsrs_rer_topic, tvb, offset, topic_len, ENC_ASCII, pinfo->pool, (const uint8_t**)&name);
     offset += topic_len;
 
     if ((total_payload_len - offset) < L_LBM_SRS_RCV_END_INFO_T_DOMAIN_ID)
@@ -1964,9 +1965,8 @@ static unsigned dissect_lbmsrs_rdr(tvbuff_t * tvb, packet_info * pinfo, proto_tr
         *can_dissect_further = false;
         return (offset - start_offset);
     }
-    int len;
-    char* name = tvb_get_stringz_enc(pinfo->pool, tvb, offset, &len, ENC_ASCII);
-    proto_tree_add_item(rdr_tree, hf_lbmsrs_rdr_topic, tvb, offset, topic_len, ENC_ASCII | ENC_NA);
+    const char* name;
+    proto_tree_add_item_ret_string(rdr_tree, hf_lbmsrs_rdr_topic, tvb, offset, topic_len, ENC_ASCII, pinfo->pool, (const uint8_t**)&name);
     offset += topic_len;
 
     if ((total_payload_len - offset) < L_LBM_SRS_RCV_DELETE_INFO_T_DOMAIN_ID)
@@ -2071,9 +2071,8 @@ static unsigned dissect_lbmsrs_wir(tvbuff_t * tvb, packet_info * pinfo, proto_tr
         *can_dissect_further = false;
         return (offset - start_offset);
     }
-    int len;
-    char* name = tvb_get_stringz_enc(pinfo->pool, tvb, offset, &len, ENC_ASCII);
-    proto_tree_add_item(wir_tree, hf_lbmsrs_wir_pattern, tvb, offset, pattern_len, ENC_ASCII | ENC_NA);
+    const char* name;
+    proto_tree_add_item_ret_string(wir_tree, hf_lbmsrs_wir_pattern, tvb, offset, pattern_len, ENC_ASCII, pinfo->pool, (const uint8_t**)&name);
     offset += pattern_len;
 
     if ((total_payload_len - offset) < L_LBM_SRS_WRCV_INFO_INFO_T_DOMAIN_ID)
@@ -2178,9 +2177,8 @@ static unsigned dissect_lbmsrs_wdr(tvbuff_t * tvb, packet_info * pinfo, proto_tr
         *can_dissect_further = false;
         return (offset - start_offset);
     }
-    int len;
-    char* name = tvb_get_stringz_enc(pinfo->pool, tvb, offset, &len, ENC_ASCII);
-    proto_tree_add_item(wdr_tree, hf_lbmsrs_wdr_pattern, tvb, offset, pattern_len, ENC_ASCII | ENC_NA);
+    const char* name;
+    proto_tree_add_item_ret_string(wdr_tree, hf_lbmsrs_wdr_pattern, tvb, offset, pattern_len, ENC_ASCII, pinfo->pool, (const uint8_t**)&name);
     offset += pattern_len;
 
     if ((total_payload_len - offset) < L_LBM_SRS_WRCV_DELETE_INFO_T_DOMAIN_ID)
@@ -2285,9 +2283,8 @@ static unsigned dissect_lbmsrs_wer(tvbuff_t * tvb, packet_info * pinfo, proto_tr
         *can_dissect_further = false;
         return (offset - start_offset);
     }
-    int len;
-    char* name = tvb_get_stringz_enc(pinfo->pool, tvb, offset, &len, ENC_ASCII);
-    proto_tree_add_item(wer_tree, hf_lbmsrs_wer_pattern, tvb, offset, pattern_len, ENC_ASCII | ENC_NA);
+    const char* name;
+    proto_tree_add_item_ret_string(wer_tree, hf_lbmsrs_wer_pattern, tvb, offset, pattern_len, ENC_ASCII, pinfo->pool, (const uint8_t**)&name);
     offset += pattern_len;
 
     if ((total_payload_len - offset) < L_LBM_SRS_WRCV_END_INFO_T_DOMAIN_ID)
@@ -2392,9 +2389,8 @@ static unsigned dissect_lbmsrs_sli(tvbuff_t * tvb, packet_info * pinfo,  proto_t
         *can_dissect_further = false;
         return (offset - start_offset);
     }
-    int len;
-    char* name = tvb_get_stringz_enc(pinfo->pool, tvb, offset, &len, ENC_ASCII);
-    proto_tree_add_item(sli_tree, hf_lbmsrs_sli_topic, tvb, offset, topic_len, ENC_ASCII | ENC_NA);
+    const char* name;
+    proto_tree_add_item_ret_string(sli_tree, hf_lbmsrs_sli_topic, tvb, offset, topic_len, ENC_ASCII, pinfo->pool, (const uint8_t**)&name);
     offset += topic_len;
 
     if ((total_payload_len - offset) < L_LBM_SRS_SRC_LEAVE_INFO_T_SOURCE_LEN)
@@ -2413,7 +2409,7 @@ static unsigned dissect_lbmsrs_sli(tvbuff_t * tvb, packet_info * pinfo,  proto_t
         *can_dissect_further = false;
         return (offset - start_offset);
     }
-    proto_tree_add_item(sli_tree, hf_lbmsrs_sli_source, tvb, offset, source_len, ENC_ASCII | ENC_NA);
+    proto_tree_add_item(sli_tree, hf_lbmsrs_sli_source, tvb, offset, source_len, ENC_ASCII);
     offset += source_len;
 
     if ((total_payload_len - offset) < L_LBM_SRS_SRC_LEAVE_INFO_T_CONTEXT_INSTANCE)
@@ -2839,7 +2835,7 @@ static unsigned dissect_lbmsrs_cnq(tvbuff_t * tvb, proto_tree * tree, unsigned o
         return 0;
     }
 
-    proto_tree_add_item(cnq_tree, hf_lbmsrs_cnq_name, tvb, offset, name_len, ENC_ASCII | ENC_NA);
+    proto_tree_add_item(cnq_tree, hf_lbmsrs_cnq_name, tvb, offset, name_len, ENC_ASCII);
     offset += name_len;
 
     if ((total_payload_len - offset) < L_LBM_SRS_CONTEXT_NAME_QUERY_T_DOMAIN_ID)
@@ -2936,7 +2932,7 @@ static unsigned dissect_lbmsrs_cni(tvbuff_t * tvb, proto_tree * tree, unsigned o
         return 0;
     }
 
-    proto_tree_add_item(cni_tree, hf_lbmsrs_cni_name, tvb, offset, name_len, ENC_ASCII | ENC_NA);
+    proto_tree_add_item(cni_tree, hf_lbmsrs_cni_name, tvb, offset, name_len, ENC_ASCII);
     offset += name_len;
 
     if ((total_payload_len - offset) < L_LBM_SRS_CONTEXT_NAME_INFO_T_DOMAIN_ID)
@@ -3061,7 +3057,7 @@ static unsigned dissect_lbmsrs_cne(tvbuff_t * tvb, proto_tree * tree, unsigned o
         return 0;
     }
 
-    proto_tree_add_item(cne_tree, hf_lbmsrs_cne_name, tvb, offset, name_len, ENC_ASCII | ENC_NA);
+    proto_tree_add_item(cne_tree, hf_lbmsrs_cne_name, tvb, offset, name_len, ENC_ASCII);
     offset += name_len;
 
     if ((total_payload_len - offset) < L_LBM_SRS_CONTEXT_NAME_END_T_DOMAIN_ID)
@@ -3158,7 +3154,7 @@ static unsigned dissect_lbmsrs_cne(tvbuff_t * tvb, proto_tree * tree, unsigned o
 
 static void update_counts(struct epan_column_info* cinfo,proto_item* item)
 {
-    gchar counts[1024] = "[ ";
+    char counts[1024] = "[ ";
     size_t i;
 
     if (cnt_sir > 0)
@@ -3674,7 +3670,7 @@ static int dissect_lbmsrs_pdus(tvbuff_t * tvb, packet_info * pinfo, proto_tree *
         {
             return (offset - rsocket_frame_len);
         }
-        proto_tree_add_item(rsocket_frame_tree, hf_lbmsrs_rsocket_mdata, tvb, offset, rsocket_metadata_len,ENC_ASCII | ENC_NA);
+        proto_tree_add_item(rsocket_frame_tree, hf_lbmsrs_rsocket_mdata, tvb, offset, rsocket_metadata_len, ENC_ASCII);
         offset += rsocket_metadata_len;
     }
 
@@ -3877,11 +3873,11 @@ void proto_register_lbmsrs(void)
         { &hf_lbmsrs_sir_topic_len,
         { "Topic Length", "lbmsrs.sir.topic_len", FT_UINT8, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_sir_topic,
-        { "Topic", "lbmsrs.sir.topic", FT_STRING, BASE_NONE,NULL, 0x0, NULL, HFILL } },
+        { "Topic", "lbmsrs.sir.topic", FT_STRINGZ, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_sir_source_len,
         { "Source Length", "lbmsrs.sir.source_len", FT_UINT8, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_sir_source,
-        { "Source", "lbmsrs.sir.source", FT_STRING, BASE_NONE,NULL, 0x0, NULL, HFILL } },
+        { "Source", "lbmsrs.sir.source", FT_STRINGZ, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_sir_host_id,
         { "Host ID", "lbmsrs.sir.host_id", FT_UINT32, BASE_DEC_HEX,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_sir_topic_idx,
@@ -3926,7 +3922,7 @@ void proto_register_lbmsrs(void)
         { &hf_lbmsrs_sdr_topic_len,
         { "Topic Length", "lbmsrs.sdr.topic_len", FT_UINT8, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_sdr_topic,
-        { "Topic", "lbmsrs.sdr.topic", FT_STRING, BASE_NONE,NULL, 0x0, NULL, HFILL } },
+        { "Topic", "lbmsrs.sdr.topic", FT_STRINGZ, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         /*SRS Source Delete items end*/
 
         /*SRS Receiver Info items start*/
@@ -3935,7 +3931,7 @@ void proto_register_lbmsrs(void)
         { &hf_lbmsrs_rir_topic_len,
         { "Topic Length", "lbmsrs.rir.topic_len", FT_UINT8, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_rir_topic,
-        { "Topic", "lbmsrs.rir.topic", FT_STRING, BASE_NONE,NULL, 0x0, NULL, HFILL } },
+        { "Topic", "lbmsrs.rir.topic", FT_STRINGZ, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_rir_domain_id,
         { "Domain ID", "lbmsrs.rir.domain_id", FT_UINT32, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_rir_context_instance,
@@ -3956,7 +3952,7 @@ void proto_register_lbmsrs(void)
         { &hf_lbmsrs_rdr_topic_len,
         { "Topic Length", "lbmsrs.rdr.topic_len", FT_UINT8, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_rdr_topic,
-        { "Topic", "lbmsrs.rdr.topic", FT_STRING, BASE_NONE,NULL, 0x0, NULL, HFILL } },
+        { "Topic", "lbmsrs.rdr.topic", FT_STRINGZ, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_rdr_domain_id,
         { "Domain ID", "lbmsrs.rdr.domain_id", FT_UINT32, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_rdr_context_instance,
@@ -3977,7 +3973,7 @@ void proto_register_lbmsrs(void)
         { &hf_lbmsrs_rer_topic_len,
         { "Topic Length", "lbmsrs.rer.topic_len", FT_UINT8, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_rer_topic,
-        { "Topic", "lbmsrs.rer.topic", FT_STRING, BASE_NONE,NULL, 0x0, NULL, HFILL } },
+        { "Topic", "lbmsrs.rer.topic", FT_STRINGZ, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_rer_domain_id,
         { "Domain ID", "lbmsrs.rer.domain_id", FT_UINT32, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_rer_context_instance,
@@ -3999,7 +3995,7 @@ void proto_register_lbmsrs(void)
         { &hf_lbmsrs_wir_pattern_len,
         { "Topic Length", "lbmsrs.wir.pattern_len", FT_UINT8, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_wir_pattern,
-        { "Topic", "lbmsrs.wir.pattern", FT_STRING, BASE_NONE,NULL, 0x0, NULL, HFILL } },
+        { "Topic", "lbmsrs.wir.pattern", FT_STRINGZ, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_wir_domain_id,
         { "Domain ID", "lbmsrs.wir.domain_id", FT_UINT32, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_wir_context_instance,
@@ -4020,7 +4016,7 @@ void proto_register_lbmsrs(void)
         { &hf_lbmsrs_wdr_pattern_len,
         { "Topic Length", "lbmsrs.wdr.pattern_len", FT_UINT8, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_wdr_pattern,
-        { "Topic", "lbmsrs.wdr.pattern", FT_STRING, BASE_NONE,NULL, 0x0, NULL, HFILL } },
+        { "Topic", "lbmsrs.wdr.pattern", FT_STRINGZ, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_wdr_domain_id,
         { "Domain ID", "lbmsrs.wdr.domain_id", FT_UINT32, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_wdr_context_instance,
@@ -4041,7 +4037,7 @@ void proto_register_lbmsrs(void)
         { &hf_lbmsrs_wer_pattern_len,
         { "Topic Length", "lbmsrs.wer.pattern_len", FT_UINT8, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_wer_pattern,
-        { "Topic", "lbmsrs.wer.pattern", FT_STRING, BASE_NONE,NULL, 0x0, NULL, HFILL } },
+        { "Topic", "lbmsrs.wer.pattern", FT_STRINGZ, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_wer_domain_id,
         { "Domain ID", "lbmsrs.wer.domain_id", FT_UINT32, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_wer_context_instance,
@@ -4064,11 +4060,11 @@ void proto_register_lbmsrs(void)
         { &hf_lbmsrs_sli_topic_len,
         { "Topic Length", "lbmsrs.sli.topic_len", FT_UINT8, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_sli_topic,
-        { "Topic", "lbmsrs.sli.topic", FT_STRING, BASE_NONE,NULL, 0x0, NULL, HFILL } },
+        { "Topic", "lbmsrs.sli.topic", FT_STRINGZ, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_sli_source_len,
         { "Source Length", "lbmsrs.sli.source_len", FT_UINT8, BASE_DEC,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_sli_source,
-        { "Source", "lbmsrs.sli.source", FT_STRING, BASE_NONE,NULL, 0x0, NULL, HFILL } },
+        { "Source", "lbmsrs.sli.source", FT_STRINGZ, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_sli_context_instance,
         { "Context Instance", "lbmsrs.sli.context_instance", FT_BYTES, BASE_NONE,NULL, 0x0, NULL, HFILL } },
         { &hf_lbmsrs_sli_context_type,

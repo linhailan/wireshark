@@ -270,7 +270,7 @@ dissect_cpha(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
   opcode  = tvb_get_ntohs(tvb, 6);
 
   col_add_fstr(pinfo->cinfo, COL_INFO, "CPHAv%d: %s",
-      ha_version, val_to_str(opcode, opcode_type_vals, "Unknown %d"));
+      ha_version, val_to_str(pinfo->pool, opcode, opcode_type_vals, "Unknown %d"));
 
   if (tree) {
     ti = proto_tree_add_item(tree, proto_cphap, tvb, offset, -1, ENC_NA);
@@ -307,7 +307,7 @@ dissect_cpha(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
         offset += 2;
     }
     nti = proto_tree_add_item(cpha_tree, hf_payload, tvb, offset, -1, ENC_NA);
-    proto_item_append_text(nti, " - %s", val_to_str(opcode, opcode_type_vals, "Unknown %d"));
+    proto_item_append_text(nti, " - %s", val_to_str(pinfo->pool, opcode, opcode_type_vals, "Unknown %d"));
     ntree = proto_item_add_subtree(nti, ett_cphap);
 
     switch(opcode) {
@@ -338,12 +338,10 @@ static int dissect_my_state(tvbuff_t * tvb, int offset, proto_tree * tree) {
   proto_tree *  ntree = NULL;
   uint16_t      report_code, id_num;
 
-  proto_tree_add_item(tree, hf_id_num, tvb, offset, 2, ENC_BIG_ENDIAN);
-  id_num = tvb_get_ntohs(tvb, offset);
+  proto_tree_add_item_ret_uint16(tree, hf_id_num, tvb, offset, 2, ENC_BIG_ENDIAN, &id_num);
   offset += 2;
 
-  proto_tree_add_item(tree, hf_report_code, tvb, offset, 2, ENC_BIG_ENDIAN);
-  report_code = tvb_get_ntohs(tvb, offset);
+  proto_tree_add_item_ret_uint16(tree, hf_report_code, tvb, offset, 2, ENC_BIG_ENDIAN, &report_code);
   offset += 2;
 
   proto_tree_add_item(tree, hf_ha_mode, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -428,7 +426,7 @@ static int dissect_conf_reply(tvbuff_t * tvb, int offset, proto_tree * tree) {
   proto_tree_add_item(tree, hf_is_if_trusted, tvb, offset, 2, ENC_BIG_ENDIAN);
   offset += 2;
 
-  proto_tree_add_item(tree, hf_ip, tvb, offset, 4, ENC_NA);
+  proto_tree_add_item(tree, hf_ip, tvb, offset, 4, ENC_BIG_ENDIAN);
   offset += 4;
 
   return offset;

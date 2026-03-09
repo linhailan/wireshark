@@ -72,16 +72,18 @@ col_format_to_string(const int fmt) {
     "%L",                                       /* 34) COL_PACKET_LENGTH */
     "%p",                                       /* 35) COL_PROTOCOL */
     "%Rt",                                      /* 36) COL_REL_TIME */
-    "%s",                                       /* 37) COL_DEF_SRC */
-    "%S",                                       /* 38) COL_DEF_SRC_PORT */
-    "%rs",                                      /* 39) COL_RES_SRC */
-    "%us",                                      /* 40) COL_UNRES_SRC */
-    "%rS",                                      /* 41) COL_RES_SRC_PORT */
-    "%uS",                                      /* 42) COL_UNRES_SRC_PORT */
-    "%Yut",                                     /* 43) COL_UTC_YMD_TIME */
-    "%YDOYut",                                  /* 44) COL_UTC_YDOY_TIME */
-    "%Aut",                                     /* 45) COL_UTC_TIME */
-    "%t",                                       /* 46) COL_CLS_TIME */
+    "%Rct",                                     /* 37) COL_REL_CAP_TIME */
+    "%s",                                       /* 38) COL_DEF_SRC */
+    "%S",                                       /* 39) COL_DEF_SRC_PORT */
+    "%rs",                                      /* 40) COL_RES_SRC */
+    "%us",                                      /* 41) COL_UNRES_SRC */
+    "%rS",                                      /* 42) COL_RES_SRC_PORT */
+    "%uS",                                      /* 43) COL_UNRES_SRC_PORT */
+    "%Yut",                                     /* 44) COL_UTC_YMD_TIME */
+    "%YDOYut",                                  /* 45) COL_UTC_YDOY_TIME */
+    "%Aut",                                     /* 46) COL_UTC_TIME */
+    "%t",                                       /* 47) COL_CLS_TIME */
+    "%U",                                       /* 48) COL_USER_NAME */
   };
 
  /* Note the formats in migrated_columns[] below have been used in deprecated
@@ -142,6 +144,7 @@ col_format_desc(const int fmt_num) {
     { COL_PACKET_LENGTH, "Packet length (bytes)" },
     { COL_PROTOCOL, "Protocol" },
     { COL_REL_TIME, "Relative time" },
+    { COL_REL_CAP_TIME, "Relative to capture start time" },
     { COL_DEF_SRC, "Source address" },
     { COL_DEF_SRC_PORT, "Source port" },
     { COL_RES_SRC, "Src addr (resolved)" },
@@ -152,6 +155,7 @@ col_format_desc(const int fmt_num) {
     { COL_UTC_YMD_TIME, "UTC date, as YYYY-MM-DD, and time" },
     { COL_UTC_YDOY_TIME, "UTC date, as YYYY/DOY, and time" },
     { COL_UTC_TIME, "UTC time" },
+    { COL_USER_NAME, "User name" },
 
     { 0, NULL }
   };
@@ -224,6 +228,7 @@ col_format_abbrev(const int fmt_num) {
     { COL_UTC_YMD_TIME, COLUMN_FIELD_FILTER"utc_ymc_time" },
     { COL_UTC_YDOY_TIME, COLUMN_FIELD_FILTER"utc_ydoy_time" },
     { COL_UTC_TIME, COLUMN_FIELD_FILTER"utc_time" },
+    { COL_USER_NAME, COLUMN_FIELD_FILTER"user_name" },
 
     { 0, NULL }
   };
@@ -238,8 +243,7 @@ struct deprecated_columns {
     const char *col_expr;
 };
 
-static struct deprecated_columns migrated_columns[] = {
-    { /* COL_COS_VALUE */ "%U", "vlan.priority" },
+static const struct deprecated_columns migrated_columns[] = {
     { /* COL_CIRCUIT_ID */ "%c", "iax2.call" },
     { /* COL_BSSGP_TLLI */ "%l", "bssgp.tlli" },
     { /* COL_HPUX_SUBSYS */ "%H", "nettl.subsys" },
@@ -532,7 +536,7 @@ get_column_format_matches(bool *fmt_list, const int format) {
  * Strings for YYYY-MM-DD HH:MM:SS.SSSS dates and times.
  * (Yes, we know, this has a Y10K problem.)
  */
-static const char *ts_ymd[NUM_WS_TSPREC_VALS] = {
+static const char * const ts_ymd[NUM_WS_TSPREC_VALS] = {
     "0000-00-00 00:00:00",
     "0000-00-00 00:00:00.0",
     "0000-00-00 00:00:00.00",
@@ -545,7 +549,7 @@ static const char *ts_ymd[NUM_WS_TSPREC_VALS] = {
     "0000-00-00 00:00:00.000000000",
 };
 
-static const char *ts_ymd_utc[NUM_WS_TSPREC_VALS] = {
+static const char * const ts_ymd_utc[NUM_WS_TSPREC_VALS] = {
     "0000-00-00 00:00:00Z",
     "0000-00-00 00:00:00.0Z",
     "0000-00-00 00:00:00.00Z",
@@ -562,7 +566,7 @@ static const char *ts_ymd_utc[NUM_WS_TSPREC_VALS] = {
  * Strings for YYYY/DOY HH:MM:SS.SSSS dates and times.
  * (Yes, we know, this also has a Y10K problem.)
  */
-static const char *ts_ydoy[NUM_WS_TSPREC_VALS] = {
+static const char * const ts_ydoy[NUM_WS_TSPREC_VALS] = {
     "0000/000 00:00:00",
     "0000/000 00:00:00.0",
     "0000/000 00:00:00.00",
@@ -575,7 +579,7 @@ static const char *ts_ydoy[NUM_WS_TSPREC_VALS] = {
     "0000/000 00:00:00.000000000",
 };
 
-static const char *ts_ydoy_utc[NUM_WS_TSPREC_VALS] = {
+static const char * const ts_ydoy_utc[NUM_WS_TSPREC_VALS] = {
     "0000/000 00:00:00Z",
     "0000/000 00:00:00.0Z",
     "0000/000 00:00:00.00Z",
@@ -591,7 +595,7 @@ static const char *ts_ydoy_utc[NUM_WS_TSPREC_VALS] = {
 /*
  * Strings for HH:MM:SS.SSSS absolute times without dates.
  */
-static const char *ts_abstime[NUM_WS_TSPREC_VALS] = {
+static const char * const ts_abstime[NUM_WS_TSPREC_VALS] = {
     "00:00:00",
     "00:00:00.0",
     "00:00:00.00",
@@ -604,7 +608,7 @@ static const char *ts_abstime[NUM_WS_TSPREC_VALS] = {
     "00:00:00.000000000",
 };
 
-static const char *ts_abstime_utc[NUM_WS_TSPREC_VALS] = {
+static const char * const ts_abstime_utc[NUM_WS_TSPREC_VALS] = {
     "00:00:00Z",
     "00:00:00.0Z",
     "00:00:00.00Z",
@@ -621,7 +625,7 @@ static const char *ts_abstime_utc[NUM_WS_TSPREC_VALS] = {
  * Strings for SSSS.S relative and delta times.
  * (Yes, this has s 10,000-seconds problem.)
  */
-static const char *ts_rel_delta_time[NUM_WS_TSPREC_VALS] = {
+static const char * const ts_rel_delta_time[NUM_WS_TSPREC_VALS] = {
     "0000",
     "0000.0",
     "0000.00",
@@ -637,7 +641,7 @@ static const char *ts_rel_delta_time[NUM_WS_TSPREC_VALS] = {
 /*
  * Strings for UN*X/POSIX Epoch times.
  */
-static const char *ts_epoch_time[NUM_WS_TSPREC_VALS] = {
+static const char * const ts_epoch_time[NUM_WS_TSPREC_VALS] = {
     "0000000000000000000",
     "0000000000000000000.0",
     "0000000000000000000.00",
@@ -729,7 +733,8 @@ get_timestamp_column_longest_string(const int type, const int precision)
         else
             ws_assert_not_reached();
         break;
-    case(TS_RELATIVE):  /* fallthrough */
+    case(TS_RELATIVE):      /* fallthrough */
+    case(TS_RELATIVE_CAP):
     case(TS_DELTA):
     case(TS_DELTA_DIS):
         if(precision == TS_PREC_AUTO) {
@@ -802,6 +807,8 @@ get_column_longest_string(const int format)
       return get_timestamp_column_longest_string(TS_UTC, timestamp_get_precision());
     case COL_REL_TIME:
       return get_timestamp_column_longest_string(TS_RELATIVE, timestamp_get_precision());
+    case COL_REL_CAP_TIME:
+      return get_timestamp_column_longest_string(TS_RELATIVE_CAP, timestamp_get_precision());
     case COL_DELTA_TIME:
       return get_timestamp_column_longest_string(TS_DELTA, timestamp_get_precision());
     case COL_DELTA_TIME_DIS:
@@ -850,6 +857,8 @@ get_column_longest_string(const int format)
       return "ERROR";
     case COL_FREQ_CHAN:
       return "9999 MHz [A 999]";
+    case COL_USER_NAME:
+      return "example_user";
     case COL_CUSTOM:
       return "0000000000";  /* not the longest, but the longest is too long */
     default: /* COL_INFO */
@@ -1133,7 +1142,7 @@ const char*
 get_column_text(column_info *cinfo, const int col)
 {
   ws_assert(cinfo);
-  ws_assert(col < cinfo->num_cols);
+  ws_assert((unsigned)col < cinfo->num_cols);
 
   if ((get_column_display_format(col) == COLUMN_DISPLAY_VALUES) && cinfo->col_expr.col_expr_val[col]) {
       /* Use the unresolved value in col_expr_val */
@@ -1146,7 +1155,7 @@ get_column_text(column_info *cinfo, const int col)
 void
 col_finalize(column_info *cinfo)
 {
-  int i;
+  unsigned i;
   col_item_t* col_item;
   dfilter_t *dfilter;
 
@@ -1224,7 +1233,7 @@ col_finalize(column_info *cinfo)
 void
 build_column_format_array(column_info *cinfo, const int num_cols, const bool reset_fences)
 {
-  int i;
+  unsigned i;
   col_item_t* col_item;
 
   /* Build the column format array */
@@ -1286,7 +1295,7 @@ column_register_fields(void)
       if (col_format_abbrev(cfmt->fmt) && !used_fmts[cfmt->fmt]) {
         used_fmts[cfmt->fmt] = true;
         hf_id = g_new(int, 1);
-        *hf_id = -1;
+        *hf_id = 0;
         new_hf.p_id = hf_id;
         new_hf.hfinfo.name = g_strdup(col_format_desc(cfmt->fmt));
         new_hf.hfinfo.abbrev = g_strdup(col_format_abbrev(cfmt->fmt));

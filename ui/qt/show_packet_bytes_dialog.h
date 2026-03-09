@@ -17,7 +17,7 @@
 #include <unistd.h>
 #endif
 
-#include "file.h"
+#include <epan/tvbuff.h>
 #include "wireshark_dialog.h"
 
 #include <QLineEdit>
@@ -32,7 +32,7 @@ class ShowPacketBytesTextEdit;
 
 struct uncompress_list_t {
     QString name;
-    tvbuff_t *(*function)(tvbuff_t *, int, int);
+    tvbuff_t *(*function)(tvbuff_t *, unsigned, unsigned);
 };
 
 class ShowPacketBytesDialog : public WiresharkDialog
@@ -48,8 +48,6 @@ public:
 protected:
     bool eventFilter(QObject *obj, QEvent *event);
     void keyPressEvent(QKeyEvent *event);
-    void captureFileClosing();
-    void captureFileClosed();
 
 private slots:
     void on_sbStart_valueChanged(int value);
@@ -82,7 +80,7 @@ private:
 
     Ui::ShowPacketBytesDialog  *ui;
 
-    const field_info  *finfo_;
+    tvbuff_t   *tvb_;
     QByteArray  field_bytes_;
     QString     hint_label_;
     QString     decode_as_name_;

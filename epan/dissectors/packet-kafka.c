@@ -20,6 +20,7 @@
 #include <epan/prefs.h>
 
 #include <wsutil/array.h>
+#include <wsutil/str_util.h>
 
 
 #ifdef HAVE_SNAPPY
@@ -28,7 +29,10 @@
 #ifdef HAVE_LZ4FRAME_H
 #include <lz4.h>
 #include <lz4frame.h>
-#endif
+#ifdef HAVE_XXHASH
+#include <xxhash.h>
+#endif /* HAVE_XXHASH */
+#endif /* HAVE_LZ4FRAME_H */
 
 #include "packet-tcp.h"
 #include "packet-tls.h"
@@ -212,6 +216,14 @@ static int hf_kafka_group_id;
 static int hf_kafka_member_epoch;
 static int hf_kafka_endpoint_type;
 static int hf_kafka_last_fetched_epoch;
+static int hf_kafka_filter_entity_type;
+static int hf_kafka_filter_entity_name;
+static int hf_kafka_filter_match_type;
+static int hf_kafka_filter_match;
+static int hf_kafka_filter_strict;
+static int hf_kafka_quota_config_key;
+static int hf_kafka_quota_config_value;
+static int hf_kafka_quota_remove;
 
 static int ett_kafka;
 static int ett_kafka_batch;
@@ -268,6 +280,8 @@ static int ett_kafka_renewers;
 static int ett_kafka_renewer;
 static int ett_kafka_owners;
 static int ett_kafka_owner;
+static int ett_kafka_quota_entries;
+static int ett_kafka_quota_filter_components;
 static int ett_kafka_tokens;
 static int ett_kafka_token;
 /* in Kafka 2.5 these structures have been added, but not yet used */
@@ -392,11 +406,11 @@ typedef struct _kafka_api_info_t {
  */
 static const kafka_api_info_t kafka_apis[] = {
     { KAFKA_PRODUCE,                       "Produce",
-      0, 11, 9 },
+      0, 12, 9 },
     { KAFKA_FETCH,                         "Fetch",
-      0, 16, 12 },
+      0, 17, 12 },
     { KAFKA_OFFSETS,                       "Offsets",
-      0, 8, 6 },
+      0, 9, 6 },
     { KAFKA_METADATA,                      "Metadata",
       0, 12, 9 },
     { KAFKA_LEADER_AND_ISR,                "LeaderAndIsr",
@@ -408,7 +422,7 @@ static const kafka_api_info_t kafka_apis[] = {
     { KAFKA_CONTROLLED_SHUTDOWN,           "ControlledShutdown",
       0, 3, 3 },
     { KAFKA_OFFSET_COMMIT,                 "OffsetCommit",
-      0, 8, 8 },
+      0, 9, 8 },
     { KAFKA_OFFSET_FETCH,                  "OffsetFetch",
       0, 9, 6 },
     { KAFKA_FIND_COORDINATOR,              "FindCoordinator",
@@ -422,13 +436,13 @@ static const kafka_api_info_t kafka_apis[] = {
     { KAFKA_SYNC_GROUP,                    "SyncGroup",
       0, 5, 4 },
     { KAFKA_DESCRIBE_GROUPS,               "DescribeGroups",
-      0, 5, 5 },
+      0, 6, 5 },
     { KAFKA_LIST_GROUPS,                   "ListGroups",
       0, 3, 3 },
     { KAFKA_SASL_HANDSHAKE,                "SaslHandshake",
       0, 1, -1 },
     { KAFKA_API_VERSIONS,                  "ApiVersions",
-      0, 3, 3 },
+      0, 4, 3 },
     { KAFKA_CREATE_TOPICS,                 "CreateTopics",
       0, 7, 5 },
     { KAFKA_DELETE_TOPICS,                 "DeleteTopics",
@@ -440,15 +454,15 @@ static const kafka_api_info_t kafka_apis[] = {
     { KAFKA_OFFSET_FOR_LEADER_EPOCH,       "OffsetForLeaderEpoch",
       0, 3, -1 },
     { KAFKA_ADD_PARTITIONS_TO_TXN,         "AddPartitionsToTxn",
-      0, 1, -1 },
+      0, 2, -1 },
     { KAFKA_ADD_OFFSETS_TO_TXN,            "AddOffsetsToTxn",
-      0, 1, -1 },
+      0, 2, -1 },
     { KAFKA_END_TXN,                       "EndTxn",
-      0, 1, -1 },
+      0, 2, -1 },
     { KAFKA_WRITE_TXN_MARKERS,             "WriteTxnMarkers",
       0, 0, -1 },
     { KAFKA_TXN_OFFSET_COMMIT,             "TxnOffsetCommit",
-      0, 3, 3 },
+      0, 5, 3 },
     { KAFKA_DESCRIBE_ACLS,                 "DescribeAcls",
       0, 2, 2 },
     { KAFKA_CREATE_ACLS,                   "CreateAcls",
@@ -466,7 +480,7 @@ static const kafka_api_info_t kafka_apis[] = {
     { KAFKA_SASL_AUTHENTICATE,             "SaslAuthenticate",
       0, 2, 2 },
     { KAFKA_CREATE_PARTITIONS,             "CreatePartitions",
-      0, 2, 2 },
+      0, 3, 2 },
     { KAFKA_CREATE_DELEGATION_TOKEN,       "CreateDelegationToken",
       0, 2, 2 },
     { KAFKA_RENEW_DELEGATION_TOKEN,        "RenewDelegationToken",
@@ -487,6 +501,10 @@ static const kafka_api_info_t kafka_apis[] = {
       0, 0, 0 },
     { KAFKA_OFFSET_DELETE,                 "OffsetDelete",
       0, 0, -1 },
+    { KAFKA_DESCRIBE_CLIENT_QUOTAS,        "DescribeClientQuotas",
+      0, 1, 1 },
+    { KAFKA_ALTER_CLIENT_QUOTAS,           "AlterClientQuotas",
+      0, 1, 1 },
     { KAFKA_DESCRIBE_CLUSTER,              "DescribeCluster",
       0, 1, 0 },
     { KAFKA_ALLOCATE_PRODUCER_IDS,         "AllocateProducerIds",
@@ -777,6 +795,13 @@ static const value_string election_types[] = {
     { 0, NULL }
 };
 
+static const value_string filter_match_types[] = {
+    { 0, "Exact Name" },
+    { 1, "Default Name" },
+    { 2, "Any Specified Name" },
+    { 0, NULL }
+};
+
 /* Whether to show the lengths of string and byte fields in the protocol tree.
  * It can be useful to see these, but they do clutter up the display, so disable
  * by default */
@@ -806,9 +831,9 @@ dissect_kafka_regular_message_set(tvbuff_t *tvb, packet_info *pinfo, proto_tree 
 
 /* HELPERS */
 
-#ifdef HAVE_LZ4FRAME_H
+#if defined(HAVE_LZ4FRAME_H) && !defined(HAVE_XXHASH)
 /* Local copy of XXH32() algorithm as found in https://github.com/lz4/lz4/blob/v1.7.5/lib/xxhash.c
-   as some packagers are not providing xxhash.h in liblz4 */
+   as most packagers provide xxhash.h separately from liblz4, and it may not be installed */
 typedef struct {
     uint32_t total_len_32;
     uint32_t large_len;
@@ -911,7 +936,7 @@ static uint32_t XXH32_endian(const void* input, size_t len, uint32_t seed, XXH_e
     return h32;
 }
 
-static unsigned XXH32(const void* input, size_t len, unsigned seed)
+static uint32_t XXH32(const void* input, size_t len, uint32_t seed)
 {
     XXH_endianess endian_detected = (XXH_endianess)XXH_CPU_LITTLE_ENDIAN;
     if (endian_detected==XXH_littleEndian)
@@ -919,18 +944,18 @@ static unsigned XXH32(const void* input, size_t len, unsigned seed)
     else
         return XXH32_endian(input, len, seed, XXH_bigEndian);
 }
-#endif /* HAVE_LZ4FRAME_H */
+#endif /* defined(HAVE_LZ4FRAME_H) && !defined(HAVE_XXHASH) */
 
 static const char *
-kafka_error_to_str(kafka_error_t error)
+kafka_error_to_str(wmem_allocator_t* scope, kafka_error_t error)
 {
-    return val_to_str(error, kafka_errors, "Unknown %d");
+    return val_to_str(scope, error, kafka_errors, "Unknown %d");
 }
 
 static const char *
-kafka_api_key_to_str(kafka_api_key_t api_key)
+kafka_api_key_to_str(wmem_allocator_t* scope, kafka_api_key_t api_key)
 {
-    return val_to_str(api_key, kafka_api_names, "Unknown %d");
+    return val_to_str(scope, api_key, kafka_api_names, "Unknown %d");
 }
 
 static const kafka_api_info_t *
@@ -986,7 +1011,7 @@ kafka_check_supported_api_key(packet_info *pinfo, proto_item *ti, kafka_query_re
     if (kafka_get_api_info(matcher->api_key) == NULL) {
         col_append_str(pinfo->cinfo, COL_INFO, " [Unknown API key]");
         expert_add_info_format(pinfo, ti, &ei_kafka_unknown_api_key,
-                               "%s API key", kafka_api_key_to_str(matcher->api_key));
+                               "%s API key", kafka_api_key_to_str(pinfo->pool, matcher->api_key));
     }
 }
 
@@ -1002,13 +1027,13 @@ kafka_check_supported_api_version(packet_info *pinfo, proto_item *ti, kafka_quer
         if (api_info->min_version == -1) {
             expert_add_info_format(pinfo, ti, &ei_kafka_unsupported_api_version,
                                    "Unsupported %s version.",
-                                   kafka_api_key_to_str(matcher->api_key));
+                                   kafka_api_key_to_str(pinfo->pool, matcher->api_key));
             dissect_version = api_info->min_version;
         }
         else if (api_info->min_version == api_info->max_version) {
             expert_add_info_format(pinfo, ti, &ei_kafka_unsupported_api_version,
                                    "Unsupported %s version. Supports v%d.",
-                                   kafka_api_key_to_str(matcher->api_key), api_info->min_version);
+                                   kafka_api_key_to_str(pinfo->pool, matcher->api_key), api_info->min_version);
             dissect_version = api_info->min_version;
             expert_add_info_format(pinfo, ti, &ei_kafka_assumed_api_version,
                                    "Dissecting assuming v%d.",
@@ -1016,7 +1041,7 @@ kafka_check_supported_api_version(packet_info *pinfo, proto_item *ti, kafka_quer
         } else {
             expert_add_info_format(pinfo, ti, &ei_kafka_unsupported_api_version,
                                    "Unsupported %s version. Supports v%d-%d.",
-                                   kafka_api_key_to_str(matcher->api_key),
+                                   kafka_api_key_to_str(pinfo->pool, matcher->api_key),
                                    api_info->min_version, api_info->max_version);
             if (matcher->api_version < 0 || matcher->api_version > api_info->max_version) {
                 dissect_version = api_info->max_version;
@@ -1041,8 +1066,13 @@ dissect_kafka_array_elements(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo
     int i;
     int next_offset;
 
+    if (count < 0) {
+        // count -1 means a NULL array
+        return offset;
+    }
+
     // sanity check - we expect at least 1 byte per array item
-    if (tvb_reported_length_remaining(tvb, offset) < count) {
+    if (tvb_reported_length_remaining(tvb, offset) < (unsigned)count) {
         expert_add_info(pinfo, proto_tree_get_parent(tree), &ei_kafka_bad_array_length);
         return offset;
     }
@@ -1073,7 +1103,7 @@ dissect_kafka_regular_array(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
 {
     int32_t count;
 
-    count = (int32_t) tvb_get_ntohl(tvb, offset);
+    count = tvb_get_ntohil(tvb, offset);
     offset += 4;
 
     if (count < -1) { // -1 means null array
@@ -1099,7 +1129,7 @@ dissect_kafka_compact_array(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
                         int(*func)(tvbuff_t*, packet_info*, proto_tree*, int, kafka_api_version_t),
                         int *p_count)
 {
-    int64_t count;
+    uint64_t count;
     int32_t len;
 
     len = tvb_get_varint(tvb, offset, FT_VARINT_MAX_LEN, &count, ENC_VARINT_PROTOBUF);
@@ -1107,7 +1137,7 @@ dissect_kafka_compact_array(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
         expert_add_info(pinfo, proto_tree_get_parent(tree), &ei_kafka_bad_varint);
         return tvb_captured_length(tvb);
     }
-    if(count > 0x7ffffffL) {
+    if(count > (uint64_t)INT64_MAX) {
         expert_add_info(pinfo, proto_tree_get_parent(tree), &ei_kafka_bad_array_length);
         return offset + len;
     }
@@ -1117,9 +1147,9 @@ dissect_kafka_compact_array(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
      * Compact arrays store count+1
      * https://cwiki.apache.org/confluence/display/KAFKA/KIP-482%3A+The+Kafka+Protocol+should+Support+Optional+Tagged+Fields
      */
-    offset = dissect_kafka_array_elements(tree, tvb, pinfo, offset, api_version, func, (int)count - 1);
+    offset = dissect_kafka_array_elements(tree, tvb, pinfo, offset, api_version, func, (int)(count - 1));
 
-    if (p_count != NULL) *p_count = (int)count - 1;
+    if (p_count != NULL) *p_count = (int)(count - 1);
 
     return offset;
 }
@@ -1153,7 +1183,7 @@ dissect_kafka_varint(proto_tree *tree, int hf_item, tvbuff_t *tvb, packet_info *
     unsigned len;
     proto_item *pi;
 
-    len = tvb_get_varint(tvb, offset, FT_VARINT_MAX_LEN, &value, ENC_VARINT_ZIGZAG);
+    len = tvb_get_varint(tvb, offset, FT_VARINT_MAX_LEN, (uint64_t*)&value, ENC_VARINT_ZIGZAG);
     pi = proto_tree_add_int64(tree, hf_item, tvb, offset, len, value);
 
     if (len == 0) {
@@ -1193,11 +1223,11 @@ dissect_kafka_varuint(proto_tree *tree, int hf_item, tvbuff_t *tvb, packet_info 
  * The function wraps the tvb_get_string_enc that if given string is NULL, which is represented as negative length,
  * a substitute string is returned instead of failing.
  */
-static int8_t*
+static char*
 kafka_tvb_get_string(wmem_allocator_t *pool, tvbuff_t *tvb, int offset, int length)
 {
     if (length>=0) {
-        return tvb_get_string_enc(pool, tvb, offset, length, ENC_UTF_8);
+        return (char*)tvb_get_string_enc(pool, tvb, offset, length, ENC_UTF_8);
     } else {
         return "[ Null ]";
     }
@@ -1309,12 +1339,12 @@ dissect_kafka_regular_bytes(proto_tree *tree, int hf_item, tvbuff_t *tvb, packet
     int32_t length;
     proto_item *pi;
 
-    length = (int32_t) tvb_get_ntohl(tvb, offset);
+    length = tvb_get_ntohil(tvb, offset);
     if (length < -1) {
         pi = proto_tree_add_item(tree, hf_item, tvb, offset, 0, ENC_NA);
         expert_add_info(pinfo, pi, &ei_kafka_bad_string_length);
         if (p_offset) {
-            *p_offset = 4;
+            *p_offset = offset + 4;
         }
         if (p_length) {
             *p_length = 0;
@@ -1325,8 +1355,12 @@ dissect_kafka_regular_bytes(proto_tree *tree, int hf_item, tvbuff_t *tvb, packet
     if (length == -1) {
         proto_tree_add_bytes_with_length(tree, hf_item, tvb, offset, 4, NULL, 0);
     } else {
+        const uint8_t *buffer = tvb_get_ptr(tvb, offset + 4, length);
+        /* The above call will throw an exception if length + 4 would overflow.
+         * Do not eliminate the temporary variable. (We already know offset + 4
+         * does not overflow because of the tvb_get_ntohil call.) */
         proto_tree_add_bytes_with_length(tree, hf_item, tvb, offset, length + 4,
-                                         tvb_get_ptr(tvb, offset + 4, length), length);
+                                         buffer, length);
     }
 
     if (p_offset != NULL) *p_offset = offset + 4;
@@ -1347,15 +1381,17 @@ dissect_kafka_compact_bytes(proto_tree *tree, int hf_item, tvbuff_t *tvb, packet
 {
     unsigned len;
     uint64_t length;
+    int signed_length;
     proto_item *pi;
 
-    len = tvb_get_varint(tvb, offset, FT_VARINT_MAX_LEN, &length, ENC_VARINT_PROTOBUF);
+    /* KIP-482 says this can be up to 5 bytes, not FT_VARINT_MAX_LEN (10) */
+    len = tvb_get_varint(tvb, offset, 5, &length, ENC_VARINT_PROTOBUF);
 
-    if (len == 0) {
+    if (len == 0 || length > 1U + (unsigned)INT_MAX) {
         pi = proto_tree_add_item(tree, hf_item, tvb, offset, 0, ENC_NA);
         expert_add_info(pinfo, pi, &ei_kafka_bad_varint);
         if (p_offset) {
-            *p_offset = 0;
+            *p_offset = tvb_captured_length(tvb);
         }
         if (p_length) {
             *p_length = 0;
@@ -1363,21 +1399,21 @@ dissect_kafka_compact_bytes(proto_tree *tree, int hf_item, tvbuff_t *tvb, packet
         return tvb_captured_length(tvb);
     }
 
-    if (length == 0) {
-        proto_tree_add_bytes_with_length(tree, hf_item, tvb, offset, len, NULL, 0);
-    } else {
-        proto_tree_add_bytes_with_length(tree, hf_item, tvb, offset, len + (int)length - 1,
-                                         tvb_get_ptr(tvb, offset + len, (int)length - 1),
-                                         (int)length - 1);
-    }
+    signed_length = length ? (int)(length - 1) : 0;
+    const uint8_t *buffer = tvb_get_ptr(tvb, offset + len, signed_length);
+    /* The above call will throw an exception if len + signed_length overflows.
+     * Do not eliminate the temporary variable. (We know offset + len does
+     * not overflow because of the tvb_get_varint call.) */
+    proto_tree_add_bytes_with_length(tree, hf_item, tvb, offset, len + signed_length,
+                                     buffer, signed_length);
 
     if (p_offset != NULL) *p_offset = offset + len;
-    if (p_length != NULL) *p_length = (int)length - 1;
+    if (p_length != NULL) *p_length = signed_length;
 
     if (length == 0) {
         offset += len;
     } else {
-        offset += len + (int)length - 1;
+        offset += len + signed_length;
     }
 
     return offset;
@@ -1428,7 +1464,7 @@ dissect_kafka_offset_delta(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tr
     unsigned   len;
     proto_item *pi;
 
-    len = tvb_get_varint(tvb, offset, FT_VARINT_MAX_LEN, &val, ENC_VARINT_ZIGZAG);
+    len = tvb_get_varint(tvb, offset, FT_VARINT_MAX_LEN, (uint64_t*)&val, ENC_VARINT_ZIGZAG);
 
     pi = proto_tree_add_int64(tree, hf_item, tvb, offset, len, base_offset+val);
     if (len == 0) {
@@ -1440,11 +1476,27 @@ dissect_kafka_offset_delta(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tr
 }
 
 static int
+dissect_kafka_uint8(proto_tree *tree, int hf_item, tvbuff_t *tvb, packet_info *pinfo _U_, int offset, uint8_t *p_value)
+{
+    if (p_value != NULL) *p_value = tvb_get_uint8(tvb, offset);
+    proto_tree_add_item(tree, hf_item, tvb, offset, 1, ENC_NA);
+    return offset+1;
+}
+
+static int
 dissect_kafka_int8(proto_tree *tree, int hf_item, tvbuff_t *tvb, packet_info *pinfo _U_, int offset, int8_t *p_value)
 {
     if (p_value != NULL) *p_value = tvb_get_int8(tvb, offset);
     proto_tree_add_item(tree, hf_item, tvb, offset, 1, ENC_NA);
     return offset+1;
+}
+
+static int
+dissect_kafka_uint16(proto_tree *tree, int hf_item, tvbuff_t *tvb, packet_info *pinfo _U_, int offset, uint16_t *p_value)
+{
+    if (p_value != NULL) *p_value = tvb_get_uint16(tvb, offset, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_item, tvb, offset, 2, ENC_BIG_ENDIAN);
+    return offset+2;
 }
 
 static int
@@ -1456,6 +1508,14 @@ dissect_kafka_int16(proto_tree *tree, int hf_item, tvbuff_t *tvb, packet_info *p
 }
 
 static int
+dissect_kafka_uint32(proto_tree *tree, int hf_item, tvbuff_t *tvb, packet_info *pinfo _U_, int offset, uint32_t *p_value)
+{
+    if (p_value != NULL) *p_value = tvb_get_int32(tvb, offset, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_item, tvb, offset, 4, ENC_BIG_ENDIAN);
+    return offset+4;
+}
+
+static int
 dissect_kafka_int32(proto_tree *tree, int hf_item, tvbuff_t *tvb, packet_info *pinfo _U_, int offset, int32_t *p_value)
 {
     if (p_value != NULL) *p_value = tvb_get_int32(tvb, offset, ENC_BIG_ENDIAN);
@@ -1464,9 +1524,25 @@ dissect_kafka_int32(proto_tree *tree, int hf_item, tvbuff_t *tvb, packet_info *p
 }
 
 static int
+dissect_kafka_uint64(proto_tree *tree, int hf_item, tvbuff_t *tvb, packet_info *pinfo _U_, int offset, uint64_t *p_value)
+{
+    if (p_value != NULL) *p_value = tvb_get_uint64(tvb, offset, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_item, tvb, offset, 8, ENC_BIG_ENDIAN);
+    return offset+8;
+}
+
+static int
 dissect_kafka_int64(proto_tree *tree, int hf_item, tvbuff_t *tvb, packet_info *pinfo _U_, int offset, int64_t *p_value)
 {
     if (p_value != NULL) *p_value = tvb_get_int64(tvb, offset, ENC_BIG_ENDIAN);
+    proto_tree_add_item(tree, hf_item, tvb, offset, 8, ENC_BIG_ENDIAN);
+    return offset+8;
+}
+
+static int
+dissect_kafka_float64(proto_tree *tree, int hf_item, tvbuff_t *tvb, packet_info *pinfo _U_, int offset, double *p_value)
+{
+    if (p_value != NULL) *p_value = tvb_get_ieee_double(tvb, offset, ENC_BIG_ENDIAN);
     proto_tree_add_item(tree, hf_item, tvb, offset, 8, ENC_BIG_ENDIAN);
     return offset+8;
 }
@@ -1520,7 +1596,7 @@ dissect_kafka_string_new(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, in
 
     if (p_display_string != NULL)
         *p_display_string = "<INVALID>";
-    len = tvb_get_varint(tvb, offset, 5, &val, ENC_VARINT_ZIGZAG);
+    len = tvb_get_varint(tvb, offset, 5, (uint64_t*)&val, ENC_VARINT_ZIGZAG);
 
     if (len == 0) {
         pi = proto_tree_add_string_format_value(tree, hf_item, tvb, offset+len, 0, NULL, "<INVALID>");
@@ -1578,7 +1654,7 @@ dissect_kafka_bytes_new(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
 
     *p_invalid = false;
 
-    len = tvb_get_varint(tvb, offset, 5, &val, ENC_VARINT_ZIGZAG);
+    len = tvb_get_varint(tvb, offset, 5, (uint64_t*)&val, ENC_VARINT_ZIGZAG);
 
     if (len == 0) {
         pi = proto_tree_add_bytes_format_value(tree, hf_item, tvb, offset+len, 0, NULL, "<INVALID>");
@@ -1654,7 +1730,7 @@ dissect_kafka_record_headers(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *
 
     subtree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_kafka_record_headers, &record_headers_ti, "Headers");
 
-    len = tvb_get_varint(tvb, offset, 5, &count, ENC_VARINT_ZIGZAG);
+    len = tvb_get_varint(tvb, offset, 5, (uint64_t*)&count, ENC_VARINT_ZIGZAG);
     if (len == 0) {
         expert_add_info(pinfo, record_headers_ti, &ei_kafka_bad_varint);
         return tvb_captured_length(tvb);
@@ -1678,7 +1754,7 @@ dissect_kafka_record(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, in
     proto_item *record_ti;
     proto_tree *subtree;
 
-    int64_t    size;
+    int64_t   size;
     unsigned   len;
 
     int offset, end_offset;
@@ -1688,7 +1764,7 @@ dissect_kafka_record(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, in
 
     subtree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_kafka_record, &record_ti, "Record");
 
-    len = tvb_get_varint(tvb, offset, 5, &size, ENC_VARINT_ZIGZAG);
+    len = tvb_get_varint(tvb, offset, 5, (uint64_t*)&size, ENC_VARINT_ZIGZAG);
     if (len == 0) {
         expert_add_info(pinfo, record_ti, &ei_kafka_bad_varint);
         return tvb_captured_length(tvb);
@@ -1763,6 +1839,9 @@ decompress_lz4(tvbuff_t *tvb, packet_info *pinfo, int offset, uint32_t length, t
     /* Prepare compressed data buffer */
     uint8_t *data = (uint8_t*)tvb_memdup(pinfo->pool, tvb, offset, length);
     /* Override header checksum to workaround buggy Kafka implementations */
+    /* XXX - We shouldn't need to do this if the magic byte (msg version) is > 0
+     * https://github.com/apache/kafka/commit/8fe2552239863f3a01d01708d55edf3c7082ff92
+     */
     if (length > 7) {
         uint32_t hdr_end = 6;
         if (data[4] & 0x08) {
@@ -1832,7 +1911,7 @@ decompress_lz4(tvbuff_t *tvb, packet_info *pinfo, int offset, uint32_t length, t
             composite_tvb = tvb_new_composite();
         }
         tvb_composite_append(composite_tvb,
-                             tvb_new_child_real_data(tvb, (uint8_t*)decompressed_buffer, (unsigned)out_size, (int)out_size));
+                             tvb_new_child_real_data(tvb, (uint8_t*)decompressed_buffer, (unsigned)out_size, (unsigned)out_size));
         src_offset += src_size; // bump up the offset for the next iteration
         DISSECTOR_ASSERT_HINT(count < MAX_LOOP_ITERATIONS, "MAX_LOOP_ITERATIONS exceeded");
     } while (rc > 0 && count++ < MAX_LOOP_ITERATIONS);
@@ -1909,6 +1988,7 @@ decompress_snappy(tvbuff_t *tvb, packet_info *pinfo, int offset, uint32_t length
             count++;
             DISSECTOR_ASSERT_HINT(count < MAX_LOOP_ITERATIONS, "MAX_LOOP_ITERATIONS exceeded");
         }
+        ret = composite_tvb != NULL;
 
     } else {
 
@@ -1918,9 +1998,9 @@ decompress_snappy(tvbuff_t *tvb, packet_info *pinfo, int offset, uint32_t length
             goto end;
         }
         *decompressed_offset = 0;
+        ret = true;
 
     }
-    ret = true;
 end:
     if (composite_tvb) {
         tvb_composite_finalize(composite_tvb);
@@ -2042,7 +2122,7 @@ dissect_kafka_message_old(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, i
     offset = dissect_kafka_int8(subtree, hf_kafka_message_magic, tvb, pinfo, offset, &magic_byte);
 
     /* Don't advance "offset" here: The following message timestamp type field is in the same byte as the codec. */
-    (void)dissect_kafka_int8(subtree, hf_kafka_message_codec, tvb, pinfo, offset, &codec);
+    (void)dissect_kafka_uint8(subtree, hf_kafka_message_codec, tvb, pinfo, offset, &codec);
     codec &= KAFKA_MESSAGE_CODEC_MASK;
 
     offset = dissect_kafka_int8(subtree, hf_kafka_message_timestamp_type, tvb, pinfo, offset, NULL);
@@ -2066,7 +2146,7 @@ dissect_kafka_message_old(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, i
      * is no such duality.
      */
     if (codec == 0) {
-        bytes_offset = dissect_kafka_regular_bytes(subtree, hf_kafka_message_value, tvb, pinfo, offset, NULL, &length);
+        bytes_offset = dissect_kafka_regular_bytes(subtree, hf_kafka_message_value, tvb, pinfo, offset, NULL, NULL);
         if (bytes_offset > offset) {
             offset = bytes_offset;
         } else {
@@ -2130,7 +2210,7 @@ dissect_kafka_message_new(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, i
 
     subtree = proto_tree_add_subtree(tree, tvb, start_offset, message_size + 12, ett_kafka_batch, &batch_ti, "Record Batch");
 
-    offset = dissect_kafka_int64(subtree, hf_kafka_offset, tvb, pinfo, offset, &base_offset);
+    offset = dissect_kafka_uint64(subtree, hf_kafka_offset, tvb, pinfo, offset, &base_offset);
 
     offset = dissect_kafka_int32(subtree, hf_kafka_message_size, tvb, pinfo, offset, NULL);
 
@@ -2147,7 +2227,7 @@ dissect_kafka_message_new(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, i
 
     offset = dissect_kafka_int32(subtree, hf_kafka_batch_crc, tvb, pinfo, offset, NULL);
 
-    dissect_kafka_int16(subtree, hf_kafka_batch_codec, tvb, pinfo, offset, &codec);
+    dissect_kafka_uint16(subtree, hf_kafka_batch_codec, tvb, pinfo, offset, &codec);
     codec &= KAFKA_MESSAGE_CODEC_MASK;
     dissect_kafka_int16(subtree, hf_kafka_batch_timestamp_type, tvb, pinfo, offset, NULL);
     dissect_kafka_int16(subtree, hf_kafka_batch_transactional, tvb, pinfo, offset, NULL);
@@ -2157,7 +2237,7 @@ dissect_kafka_message_new(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, i
 
     offset = dissect_kafka_int32(subtree, hf_kafka_batch_last_offset_delta, tvb, pinfo, offset, NULL);
 
-    offset = dissect_kafka_int64(subtree, hf_kafka_batch_first_timestamp, tvb, pinfo, offset, &first_timestamp);
+    offset = dissect_kafka_uint64(subtree, hf_kafka_batch_first_timestamp, tvb, pinfo, offset, &first_timestamp);
     offset = dissect_kafka_int64(subtree, hf_kafka_batch_last_timestamp, tvb, pinfo, offset, NULL);
 
     offset = dissect_kafka_int64(subtree, hf_kafka_producer_id, tvb, pinfo, offset, NULL);
@@ -2165,7 +2245,7 @@ dissect_kafka_message_new(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, i
 
     offset = dissect_kafka_int32(subtree, hf_kafka_batch_base_sequence, tvb, pinfo, offset, NULL);
 
-    offset = dissect_kafka_int32(subtree, hf_kafka_batch_size, tvb, pinfo, offset, &count);
+    offset = dissect_kafka_uint32(subtree, hf_kafka_batch_size, tvb, pinfo, offset, &count);
 
     length = start_offset + 8 /*base offset*/ + 4 /*message size*/ + message_size - offset;
 
@@ -2341,7 +2421,7 @@ static int
 dissect_kafka_tagged_fields(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset,
                                kafka_api_version_t api_version _U_)
 {
-    int64_t count;
+    uint64_t count;
     unsigned len;
     proto_item *subti;
     proto_tree *subtree;
@@ -2580,7 +2660,7 @@ dissect_kafka_error_ret(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
     /* Show error in Info column */
     if (error != 0) {
         col_append_fstr(pinfo->cinfo, COL_INFO,
-                        " [%s] ", kafka_error_to_str(error));
+                        " [%s] ", kafka_error_to_str(pinfo->pool, error));
     }
 
     if (ret) {
@@ -2807,20 +2887,18 @@ dissect_kafka_metadata_broker(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 {
     proto_item *ti;
     proto_tree *subtree;
-    uint32_t    nodeid;
+    int32_t     nodeid;
     int         host_start, host_len;
-    uint32_t    broker_port;
+    int32_t     broker_port;
 
     subtree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_kafka_broker, &ti, "Broker");
 
-    nodeid = tvb_get_ntohl(tvb, offset);
-    proto_tree_add_item(subtree, hf_kafka_broker_nodeid, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_int(subtree, hf_kafka_broker_nodeid, tvb, offset, 4, ENC_BIG_ENDIAN, &nodeid);
     offset += 4;
 
     offset = dissect_kafka_string(subtree, hf_kafka_broker_host, tvb, pinfo, offset, api_version >= 9, &host_start, &host_len);
 
-    broker_port = tvb_get_ntohl(tvb, offset);
-    proto_tree_add_item(subtree, hf_kafka_broker_port, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_int(subtree, hf_kafka_broker_port, tvb, offset, 4, ENC_BIG_ENDIAN, &broker_port);
     offset += 4;
 
     if (api_version >= 1) {
@@ -2831,7 +2909,7 @@ dissect_kafka_metadata_broker(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
         offset = dissect_kafka_tagged_fields(tvb, pinfo, subtree, offset, 0);
     }
 
-    proto_item_append_text(ti, " (node %u: %s:%u)",
+    proto_item_append_text(ti, " (node %d: %s:%d)",
                            nodeid,
                            tvb_get_string_enc(pinfo->pool, tvb,
                            host_start, host_len, ENC_UTF_8),
@@ -3161,23 +3239,21 @@ dissect_kafka_leader_and_isr_request_live_leader(tvbuff_t *tvb, packet_info *pin
 {
     proto_item *subti;
     proto_tree *subtree;
-    int32_t nodeid;
+    int32_t     nodeid;
     int host_start, host_len;
     int32_t broker_port;
 
     subtree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_kafka_broker, &subti, "Live Leader");
 
     /* id */
-    nodeid = tvb_get_ntohl(tvb, offset);
-    proto_tree_add_item(subtree, hf_kafka_broker_nodeid, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_int(subtree, hf_kafka_broker_nodeid, tvb, offset, 4, ENC_BIG_ENDIAN, &nodeid);
     offset += 4;
 
     /* host */
     offset = dissect_kafka_string(subtree, hf_kafka_broker_host, tvb, pinfo, offset,api_version >= 4,  &host_start, &host_len);
 
     /* port */
-    broker_port = tvb_get_ntohl(tvb, offset);
-    proto_tree_add_item(subtree, hf_kafka_broker_port, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_int(subtree, hf_kafka_broker_port, tvb, offset, 4, ENC_BIG_ENDIAN, &broker_port);
     offset += 4;
 
     if (api_version >= 4) {
@@ -3185,7 +3261,7 @@ dissect_kafka_leader_and_isr_request_live_leader(tvbuff_t *tvb, packet_info *pin
     }
 
     proto_item_set_end(subti, tvb, offset);
-    proto_item_append_text(subti, " (node %u: %s:%u)",
+    proto_item_append_text(subti, " (node %d: %s:%d)",
                            nodeid,
                            tvb_get_string_enc(pinfo->pool, tvb, host_start, host_len, ENC_UTF_8),
                            broker_port);
@@ -3285,7 +3361,7 @@ dissect_kafka_leader_and_isr_response_partition(tvbuff_t *tvb, packet_info *pinf
                                tvb_get_string_enc(pinfo->pool, tvb,
                                                   topic_start, topic_len, ENC_UTF_8),
                                partition,
-                               kafka_error_to_str(error));
+                               kafka_error_to_str(pinfo->pool, error));
     }
 
     return offset;
@@ -3588,7 +3664,7 @@ dissect_kafka_stop_replica_response_partition(tvbuff_t *tvb, packet_info *pinfo,
                            tvb_get_string_enc(pinfo->pool, tvb,
                                               topic_start, topic_len, ENC_UTF_8),
                            partition,
-                           kafka_error_to_str(error));
+                           kafka_error_to_str(pinfo->pool, error));
 
     return offset;
 }
@@ -3661,7 +3737,7 @@ dissect_kafka_fetch_request_topic(tvbuff_t *tvb, packet_info *pinfo, proto_tree 
 {
     proto_item *subti, *subsubti;
     proto_tree *subtree, *subsubtree;
-    uint32_t    count = 0;
+    int         count = 0;
     int         name_start, name_length;
 
     subtree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_kafka_topic, &subti, "Topic");
@@ -3684,7 +3760,8 @@ dissect_kafka_fetch_request_topic(tvbuff_t *tvb, packet_info *pinfo, proto_tree 
     }
 
     proto_item_set_end(subti, tvb, offset);
-    proto_item_append_text(subti, " (%u partitions)", count);
+    proto_item_append_text(subti, " (%u partition%s)", (count < 0) ? 0 : count, plurality(count, "", "s"));
+
 
     return offset;
 }
@@ -3704,7 +3781,7 @@ dissect_kafka_fetch_request_forgotten_topics_data(tvbuff_t *tvb, packet_info *pi
 {
     proto_item *ti;
     proto_tree *subtree;
-    uint32_t    count = 0;
+    int         count = 0;
     int         name_start, name_length;
 
     subtree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_kafka_request_forgotten_topic, &ti, "Fetch Request Forgotten Topic Data");
@@ -3726,7 +3803,8 @@ dissect_kafka_fetch_request_forgotten_topics_data(tvbuff_t *tvb, packet_info *pi
     }
 
     proto_item_set_end(ti, tvb, offset);
-    proto_item_append_text(ti, " (%u partitions)", count);
+    proto_item_append_text(ti, " (%u partition%s)", (count < 0) ? 0 : count, plurality(count, "", "s"));
+
 
     return offset;
 }
@@ -3885,7 +3963,7 @@ dissect_kafka_fetch_response_topic(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 {
     proto_item *subti, *subsubti;
     proto_tree *subtree, *subsubtree;
-    uint32_t    count = 0;
+    int         count = 0;
 
     subtree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_kafka_topic, &subti, "Topic");
 
@@ -3907,7 +3985,7 @@ dissect_kafka_fetch_response_topic(tvbuff_t *tvb, packet_info *pinfo, proto_tree
     }
 
     proto_item_set_end(subti, tvb, offset);
-    proto_item_append_text(subti, " (%u partitions)", count);
+    proto_item_append_text(subti, " (%u partition%s)", (count < 0) ? 0 : count, plurality(count, "", "s"));
 
     return offset;
 }
@@ -4349,13 +4427,13 @@ dissect_kafka_api_versions_response_api_version(tvbuff_t *tvb, packet_info *pinf
     if (max_version != min_version) {
         /* Range of versions supported. */
         proto_item_append_text(subtree, " %s (v%d-%d)",
-                               kafka_api_key_to_str(api_key),
+                               kafka_api_key_to_str(pinfo->pool, api_key),
                                min_version, max_version);
     }
     else {
         /* Only one version. */
         proto_item_append_text(subtree, " %s (v%d)",
-                               kafka_api_key_to_str(api_key),
+                               kafka_api_key_to_str(pinfo->pool, api_key),
                                min_version);
     }
 
@@ -4363,7 +4441,7 @@ dissect_kafka_api_versions_response_api_version(tvbuff_t *tvb, packet_info *pinf
     if (api_info == NULL) {
         proto_item_append_text(subtree, " [Unknown API key]");
         expert_add_info_format(pinfo, ti, &ei_kafka_unknown_api_key,
-                               "%s API key", kafka_api_key_to_str(api_key));
+                               "%s API key", kafka_api_key_to_str(pinfo->pool, api_key));
     }
     else if (!kafka_is_api_version_supported(api_info, min_version) ||
              !kafka_is_api_version_supported(api_info, max_version)) {
@@ -4371,20 +4449,20 @@ dissect_kafka_api_versions_response_api_version(tvbuff_t *tvb, packet_info *pinf
             proto_item_append_text(subtree, " [Unsupported API version]");
             expert_add_info_format(pinfo, ti, &ei_kafka_unsupported_api_version,
                                    "Unsupported %s version.",
-                                   kafka_api_key_to_str(api_key));
+                                   kafka_api_key_to_str(pinfo->pool, api_key));
         }
         else if (api_info->min_version == api_info->max_version) {
             proto_item_append_text(subtree, " [Unsupported API version. Supports v%d]",
                                    api_info->min_version);
             expert_add_info_format(pinfo, ti, &ei_kafka_unsupported_api_version,
                                    "Unsupported %s version. Supports v%d.",
-                                   kafka_api_key_to_str(api_key), api_info->min_version);
+                                   kafka_api_key_to_str(pinfo->pool, api_key), api_info->min_version);
         } else {
             proto_item_append_text(subtree, " [Unsupported API version. Supports v%d-%d]",
                                    api_info->min_version, api_info->max_version);
             expert_add_info_format(pinfo, ti, &ei_kafka_unsupported_api_version,
                                    "Unsupported %s version. Supports v%d-%d.",
-                                   kafka_api_key_to_str(api_key),
+                                   kafka_api_key_to_str(pinfo->pool, api_key),
                                    api_info->min_version, api_info->max_version);
         }
     }
@@ -4922,7 +5000,7 @@ dissect_kafka_offset_commit_response_partition_response(tvbuff_t *tvb, packet_in
 
     proto_item_set_end(subti, tvb, offset);
     proto_item_append_text(subti, " (Partition-ID=%d, Error=%s)",
-                           partition, kafka_error_to_str(error));
+                           partition, kafka_error_to_str(pinfo->pool, error));
 
     return offset;
 }
@@ -5047,8 +5125,7 @@ dissect_kafka_find_coordinator_response_coordinator_v1(tvbuff_t *tvb, packet_inf
     subtree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_kafka_broker, &subti, "Coordinator");
 
     /* node_id */
-    node_id = (int32_t) tvb_get_ntohl(tvb, offset);
-    proto_tree_add_item(subtree, hf_kafka_broker_nodeid, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_int(subtree, hf_kafka_broker_nodeid, tvb, offset, 4, ENC_BIG_ENDIAN, &node_id);
     offset += 4;
 
     /* host */
@@ -5056,8 +5133,7 @@ dissect_kafka_find_coordinator_response_coordinator_v1(tvbuff_t *tvb, packet_inf
                                   &host_start, &host_len);
 
      /* port */
-    port = (int32_t) tvb_get_ntohl(tvb, offset);
-    proto_tree_add_item(subtree, hf_kafka_broker_port, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_int(subtree, hf_kafka_broker_port, tvb, offset, 4, ENC_BIG_ENDIAN, &port);
     offset += 4;
 
     proto_item_set_end(subti, tvb, offset);
@@ -5091,8 +5167,7 @@ dissect_kafka_find_coordinator_response_coordinator_v2(tvbuff_t *tvb, packet_inf
     offset = dissect_kafka_string(subtree, hf_kafka_coordinator_key, tvb, pinfo, offset, api_version >= 3, NULL, NULL);
 
     /* node_id */
-    node_id = (int32_t) tvb_get_ntohl(tvb, offset);
-    proto_tree_add_item(subtree, hf_kafka_broker_nodeid, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_int(subtree, hf_kafka_broker_nodeid, tvb, offset, 4, ENC_BIG_ENDIAN, &node_id);
     offset += 4;
 
     /* host */
@@ -5100,8 +5175,7 @@ dissect_kafka_find_coordinator_response_coordinator_v2(tvbuff_t *tvb, packet_inf
                                   &host_start, &host_len);
 
     /* port */
-    port = (int32_t) tvb_get_ntohl(tvb, offset);
-    proto_tree_add_item(subtree, hf_kafka_broker_port, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_int(subtree, hf_kafka_broker_port, tvb, offset, 4, ENC_BIG_ENDIAN, &port);
     offset += 4;
 
     /* error_code */
@@ -6223,7 +6297,7 @@ dissect_kafka_create_topics_response_topic(tvbuff_t *tvb, packet_info *pinfo, pr
     proto_item_set_end(subti, tvb, offset);
     proto_item_append_text(subti, " (Topic=%s, Error=%s)",
                            kafka_tvb_get_string(pinfo->pool, tvb, topic_start, topic_len),
-                           kafka_error_to_str(error));
+                           kafka_error_to_str(pinfo->pool, error));
 
     return offset;
 }
@@ -6373,7 +6447,7 @@ dissect_kafka_delete_topics_response_topic_error_code(tvbuff_t *tvb, packet_info
     proto_item_append_text(subti, " (Topic=%s, Error=%s)",
                            tvb_get_string_enc(pinfo->pool, tvb,
                                               topic_start, topic_len, ENC_UTF_8),
-                           kafka_error_to_str(error));
+                           kafka_error_to_str(pinfo->pool, error));
 
     return offset;
 }
@@ -6385,7 +6459,7 @@ dissect_kafka_delete_topics_response(tvbuff_t *tvb, packet_info *pinfo, proto_tr
     proto_item *subti;
     proto_tree *subtree;
 
-    if (api_version >= 3) {
+    if (api_version >= 1) {
         offset = dissect_kafka_throttle_time(tvb, pinfo, tree, offset);
     }
 
@@ -6513,7 +6587,7 @@ dissect_kafka_delete_records_response_topic_partition(tvbuff_t *tvb, packet_info
     if (partition_error_code == 0) {
         proto_item_append_text(subti, " (ID=%u, Offset=%" PRIi64 ")", partition_id, partition_offset);
     } else {
-        proto_item_append_text(subti, " (ID=%u, Error=%s)", partition_id, kafka_error_to_str(partition_error_code));
+        proto_item_append_text(subti, " (ID=%u, Error=%s)", partition_id, kafka_error_to_str(pinfo->pool, partition_error_code));
     }
 
     return offset;
@@ -6736,7 +6810,7 @@ dissect_kafka_offset_for_leader_epoch_response_topic_partition(tvbuff_t *tvb, pa
     if (partition_error_code == 0) {
         proto_item_append_text(subti, " (ID=%u)", partition_id);
     } else {
-        proto_item_append_text(subti, " (ID=%u, Error=%s)", partition_id, kafka_error_to_str(partition_error_code));
+        proto_item_append_text(subti, " (ID=%u, Error=%s)", partition_id, kafka_error_to_str(pinfo->pool, partition_error_code));
     }
 
     return offset;
@@ -6877,7 +6951,7 @@ dissect_kafka_add_partitions_to_txn_response_topic_partition(tvbuff_t *tvb, pack
     if (partition_error_code == 0) {
         proto_item_append_text(subti, " (ID=%u)", partition_id);
     } else {
-        proto_item_append_text(subti, " (ID=%u, Error=%s)", partition_id, kafka_error_to_str(partition_error_code));
+        proto_item_append_text(subti, " (ID=%u, Error=%s)", partition_id, kafka_error_to_str(pinfo->pool, partition_error_code));
     }
 
     return offset;
@@ -7110,7 +7184,7 @@ dissect_kafka_write_txn_markers_response_partition(tvbuff_t *tvb, packet_info *p
     if (partition_error_code == 0) {
         proto_item_append_text(subti, " (ID=%u", partition_id);
     } else {
-        proto_item_append_text(subti, " (ID=%u, Error=%s)", partition_id, kafka_error_to_str(partition_error_code));
+        proto_item_append_text(subti, " (ID=%u, Error=%s)", partition_id, kafka_error_to_str(pinfo->pool, partition_error_code));
     }
 
     return offset;
@@ -7328,7 +7402,7 @@ dissect_kafka_txn_offset_commit_response_partition(tvbuff_t *tvb, packet_info *p
     if (partition_error_code == 0) {
         proto_item_append_text(subti, " (ID=%u)", partition_id);
     } else {
-        proto_item_append_text(subti, " (ID=%u, Error=%s)", partition_id, kafka_error_to_str(partition_error_code));
+        proto_item_append_text(subti, " (ID=%u, Error=%s)", partition_id, kafka_error_to_str(pinfo->pool, partition_error_code));
     }
 
     return offset;
@@ -9587,6 +9661,241 @@ dissect_kafka_offset_delete_response(tvbuff_t *tvb, packet_info *pinfo, proto_tr
     return offset;
 }
 
+/* DESCRIBE CLIENT QUOTAS REQUEST/RESPONSE */
+static int
+dissect_kafka_quota_filter_components(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset,
+                                      kafka_api_version_t api_version)
+{
+    // { "name": "EntityType", "type": "string", "versions": "0+",
+    //   "about": "The entity type that the filter component applies to." },
+    offset = dissect_kafka_string(tree, hf_kafka_filter_entity_type, tvb, pinfo, offset, api_version >= 1, NULL, NULL);
+    // { "name": "MatchType", "type": "int8", "versions": "0+",
+    //   "about": "How to match the entity {0 = exact name, 1 = default name, 2 = any specified name}." },
+    offset = dissect_kafka_int8(tree, hf_kafka_filter_match_type, tvb, pinfo, offset, NULL);
+    // { "name": "Match", "type": "string", "versions": "0+", "nullableVersions": "0+",
+    //   "about": "The string to match against, or null if unused for the match type." }
+    offset = dissect_kafka_string(tree, hf_kafka_filter_match, tvb, pinfo, offset, api_version >= 1, NULL, NULL);
+    if (api_version >= 1) {
+        offset = dissect_kafka_tagged_fields(tvb, pinfo, tree, offset, 0);
+    }
+    return offset;
+}
+
+// DescribeClientQuotasRequest
+// Version 1 enables flexible versions.
+// "validVersions": "0-1",
+// "flexibleVersions": "1+",
+static int
+dissect_kafka_describe_client_quotas_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset,
+                                             kafka_api_version_t api_version)
+{
+    // { "name": "Components", "type": "[]ComponentData", "versions": "0+",
+    //   "about": "Filter components to apply to quota entities." }
+    proto_item *subti;
+    proto_tree *subtree;
+    subtree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_kafka_quota_filter_components, &subti, "Components");
+    offset  = dissect_kafka_array(subtree, tvb, pinfo, offset, api_version >= 1, api_version,
+                                  &dissect_kafka_quota_filter_components, NULL);
+    proto_item_set_end(subti, tvb, offset);
+    // { "name": "Strict", "type": "bool", "versions": "0+",
+    //   "about": "Whether the match is strict, i.e. should exclude entities with unspecified entity types." }
+    offset = dissect_kafka_bool(tree, hf_kafka_filter_strict, tvb, pinfo, offset);
+    if (api_version >= 1) {
+        offset = dissect_kafka_tagged_fields(tvb, pinfo, tree, offset, 0);
+    }
+    return offset;
+}
+
+static int
+dissect_kafka_quota_entity_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset,
+                                kafka_api_version_t api_version)
+{
+    // { "name": "EntityType", "type": "string", "versions": "0+",
+    //   "about": "The entity type." },
+    offset = dissect_kafka_string(tree, hf_kafka_filter_entity_type, tvb, pinfo, offset, api_version >= 1, NULL, NULL);
+    // { "name": "EntityName", "type": "string", "versions": "0+", "nullableVersions": "0+",
+    //   "about": "The entity name, or null if the default." }
+    offset = dissect_kafka_string(tree, hf_kafka_filter_entity_name, tvb, pinfo, offset, api_version >= 1, NULL, NULL);
+    if (api_version >= 1) {
+        offset = dissect_kafka_tagged_fields(tvb, pinfo, tree, offset, 0);
+    }
+    return offset;
+}
+
+static int
+dissect_kafka_quota_value_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset,
+                               kafka_api_version_t api_version)
+{
+    // { "name": "Key", "type": "string", "versions": "0+",
+    //   "about": "The quota configuration key." },
+    offset = dissect_kafka_string(tree, hf_kafka_quota_config_key, tvb, pinfo, offset, api_version >= 1, NULL, NULL);
+    // { "name": "Value", "type": "float64", "versions": "0+",
+    //   "about": "The quota configuration value." }
+    offset = dissect_kafka_float64(tree, hf_kafka_quota_config_value, tvb, pinfo, offset, NULL);
+    if (api_version >= 1) {
+        offset = dissect_kafka_tagged_fields(tvb, pinfo, tree, offset, 0);
+    }
+    return offset;
+}
+
+static int
+dissect_kafka_quota_entries(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset,
+                            kafka_api_version_t api_version)
+{
+    // { "name": "Entity", "type": "[]EntityData", "versions": "0+",
+    //   "about": "The quota entity description." }
+    offset = dissect_kafka_array(tree, tvb, pinfo, offset, api_version >= 1, api_version,
+                                 &dissect_kafka_quota_entity_data, NULL);
+    // { "name": "Values", "type": "[]ValueData", "versions": "0+",
+    //   "about": "The quota values for the entity." }
+    offset = dissect_kafka_array(tree, tvb, pinfo, offset, api_version >= 1, api_version,
+                                 &dissect_kafka_quota_value_data, NULL);
+    if (api_version >= 1) {
+        offset = dissect_kafka_tagged_fields(tvb, pinfo, tree, offset, 0);
+    }
+    return offset;
+}
+
+// DescribeClientQuotasResponse
+// Version 1 enables flexible versions.
+// "validVersions": "0-1",
+// "flexibleVersions": "1+",
+static int
+dissect_kafka_describe_client_quotas_response(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset,
+                                              kafka_api_version_t api_version)
+{
+    // { "name": "ThrottleTimeMs", "type": "int32", "versions": "0+",
+    //   "about": "The duration in milliseconds for which the request was throttled due to a quota violation, or zero if the request did not violate any quota." },
+    offset = dissect_kafka_throttle_time(tvb, pinfo, tree, offset);
+    // { "name": "ErrorCode", "type": "int16", "versions": "0+",
+    //   "about": "The error code, or `0` if the quota description succeeded." },
+    offset = dissect_kafka_error(tvb, pinfo, tree, offset);
+    // { "name": "ErrorMessage", "type": "string", "versions": "0+", "nullableVersions": "0+",
+    //   "about": "The error message, or `null` if the quota description succeeded." },
+    offset = dissect_kafka_string(tree, hf_kafka_error_message, tvb, pinfo, offset, api_version >= 1, NULL, NULL);
+    // { "name": "Entries", "type": "[]EntryData", "versions": "0+", "nullableVersions": "0+",
+    //   "about": "A result entry." }
+    proto_item *subti;
+    proto_tree *subtree;
+    subtree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_kafka_quota_entries, &subti, "Entries");
+    offset  = dissect_kafka_array(subtree, tvb, pinfo, offset, api_version >= 1, api_version,
+                                  &dissect_kafka_quota_entries, NULL);
+    proto_item_set_end(subti, tvb, offset);
+    if (api_version >= 1) {
+        offset = dissect_kafka_tagged_fields(tvb, pinfo, tree, offset, 0);
+    }
+    return offset;
+}
+
+/* ALTER CLIENT QUOTAS REQUEST/RESPONSE */
+static int
+dissect_kafka_quota_op_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset,
+                            kafka_api_version_t api_version)
+{
+    // { "name": "Key", "type": "string", "versions": "0+",
+    //   "about": "The quota configuration key." },
+    offset = dissect_kafka_string(tree, hf_kafka_quota_config_key, tvb, pinfo, offset, api_version >= 1, NULL, NULL);
+    // { "name": "Value", "type": "float64", "versions": "0+",
+    //   "about": "The value to set, otherwise ignored if the value is to be removed." },
+    offset = dissect_kafka_float64(tree, hf_kafka_quota_config_value, tvb, pinfo, offset, NULL);
+    // { "name": "Remove", "type": "bool", "versions": "0+",
+    //   "about": "Whether the quota configuration value should be removed, otherwise set." }
+    offset = dissect_kafka_bool(tree, hf_kafka_quota_remove, tvb, pinfo, offset);
+    if (api_version >= 1) {
+        offset = dissect_kafka_tagged_fields(tvb, pinfo, tree, offset, 0);
+    }
+    return offset;
+}
+
+static int
+dissect_kafka_quota_alter_entries(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset,
+                                  kafka_api_version_t api_version)
+{
+    // { "name": "Entity", "type": "[]EntityData", "versions": "0+",
+    //   "about": "The quota entity to alter."
+    offset = dissect_kafka_array(tree, tvb, pinfo, offset, api_version >= 1, api_version,
+                                 &dissect_kafka_quota_entity_data, NULL);
+    // { "name": "Ops", "type": "[]OpData", "versions": "0+",
+    //   "about": "An individual quota configuration entry to alter.", "fields": [
+    offset = dissect_kafka_array(tree, tvb, pinfo, offset, api_version >= 1, api_version,
+                                 &dissect_kafka_quota_op_data, NULL);
+    if (api_version >= 1) {
+        offset = dissect_kafka_tagged_fields(tvb, pinfo, tree, offset, 0);
+    }
+    return offset;
+}
+
+// AlterClientQuotasRequest
+// Version 1 enables flexible versions.
+// "validVersions": "0-1",
+// "flexibleVersions": "1+",
+static int
+dissect_kafka_alter_client_quotas_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset,
+                                          kafka_api_version_t api_version)
+{
+    proto_item *subti;
+    proto_tree *subtree;
+    // { "name": "Entries", "type": "[]EntryData", "versions": "0+",
+    //   "about": "The quota configuration entries to alter."
+    subtree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_kafka_quota_entries, &subti, "Entries");
+    offset  = dissect_kafka_array(subtree, tvb, pinfo, offset, api_version >= 1, api_version,
+                                  &dissect_kafka_quota_alter_entries, NULL);
+    proto_item_set_end(subti, tvb, offset);
+    // { "name": "ValidateOnly", "type": "bool", "versions": "0+",
+    //   "about": "Whether the alteration should be validated, but not performed." }
+    proto_tree_add_item(subtree, hf_kafka_validate_only, tvb, offset, 1, ENC_BIG_ENDIAN);
+    offset += 1;
+    if (api_version >= 1) {
+        offset = dissect_kafka_tagged_fields(tvb, pinfo, tree, offset, 0);
+    }
+    return offset;
+}
+
+static int
+dissect_kafka_quota_alter_response_entries(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset,
+                                           kafka_api_version_t api_version)
+{
+    // { "name": "ErrorCode", "type": "int16", "versions": "0+",
+    //   "about": "The error code, or `0` if the quota alteration succeeded." },
+    offset = dissect_kafka_error(tvb, pinfo, tree, offset);
+    // { "name": "ErrorMessage", "type": "string", "versions": "0+", "nullableVersions": "0+",
+    //   "about": "The error message, or `null` if the quota alteration succeeded." },
+    offset = dissect_kafka_string(tree, hf_kafka_error_message, tvb, pinfo, offset, api_version >= 1, NULL, NULL);
+    // { "name": "Entity", "type": "[]EntityData", "versions": "0+",
+    //   "about": "The quota entity to alter.", "fields": [
+    offset = dissect_kafka_array(tree, tvb, pinfo, offset, api_version >= 1, api_version,
+                                 &dissect_kafka_quota_entity_data, NULL);
+    if (api_version >= 1) {
+        offset = dissect_kafka_tagged_fields(tvb, pinfo, tree, offset, 0);
+    }
+    return offset;
+}
+
+// AlterClientQuotasResponse
+// Version 1 enables flexible versions.
+// "validVersions": "0-1",
+// "flexibleVersions": "1+",
+static int
+dissect_kafka_alter_client_quotas_response(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset,
+                                           kafka_api_version_t api_version)
+{
+    // { "name": "ThrottleTimeMs", "type": "int32", "versions": "0+",
+    //   "about": "The duration in milliseconds for which the request was throttled due to a quota violation, or zero if the request did not violate any quota." },
+    offset = dissect_kafka_throttle_time(tvb, pinfo, tree, offset);
+    proto_item *subti;
+    proto_tree *subtree;
+    // { "name": "Entries", "type": "[]EntryData", "versions": "0+",
+    //   "about": "The quota configuration entries to alter."
+    subtree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_kafka_quota_entries, &subti, "Entries");
+    offset  = dissect_kafka_array(subtree, tvb, pinfo, offset, api_version >= 1, api_version,
+                                  &dissect_kafka_quota_alter_response_entries, NULL);
+    proto_item_set_end(subti, tvb, offset);
+    if (api_version >= 1) {
+        offset = dissect_kafka_tagged_fields(tvb, pinfo, tree, offset, 0);
+    }
+    return offset;
+}
+
 /* DESCRIBE_CLUSTER REQUEST/RESPONSE */
 static int
 dissect_kafka_describe_cluster_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset,
@@ -9787,12 +10096,12 @@ dissect_kafka(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
         matcher->flexible_api   = kafka_is_api_version_flexible(matcher->api_key, matcher->api_version);
 
         col_add_fstr(pinfo->cinfo, COL_INFO, "Kafka %s v%d Request",
-                     kafka_api_key_to_str(matcher->api_key),
+                     kafka_api_key_to_str(pinfo->pool, matcher->api_key),
                      matcher->api_version);
 
         /* Also add to protocol root */
         proto_item_append_text(root_ti, " (%s v%d Request)",
-                               kafka_api_key_to_str(matcher->api_key),
+                               kafka_api_key_to_str(pinfo->pool, matcher->api_key),
                                matcher->api_version);
 
         /* for the header implementation check RequestHeaderData class */
@@ -9984,6 +10293,12 @@ dissect_kafka(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
             case KAFKA_OFFSET_DELETE:
                 offset = dissect_kafka_offset_delete_request(tvb, pinfo, kafka_tree, offset, dissect_api_version);
                 break;
+            case KAFKA_DESCRIBE_CLIENT_QUOTAS:
+                offset = dissect_kafka_describe_client_quotas_request(tvb, pinfo, kafka_tree, offset, dissect_api_version);
+                break;
+            case KAFKA_ALTER_CLIENT_QUOTAS:
+                offset = dissect_kafka_alter_client_quotas_request(tvb, pinfo, kafka_tree, offset, dissect_api_version);
+                break;
             case KAFKA_DESCRIBE_CLUSTER:
                 offset = dissect_kafka_describe_cluster_request(tvb, pinfo, kafka_tree, offset, dissect_api_version);
                 break;
@@ -10014,11 +10329,11 @@ dissect_kafka(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
         }
 
         col_add_fstr(pinfo->cinfo, COL_INFO, "Kafka %s v%d Response",
-                     kafka_api_key_to_str(matcher->api_key),
+                     kafka_api_key_to_str(pinfo->pool, matcher->api_key),
                      matcher->api_version);
         /* Also add to protocol root */
         proto_item_append_text(root_ti, " (%s v%d Response)",
-                               kafka_api_key_to_str(matcher->api_key),
+                               kafka_api_key_to_str(pinfo->pool, matcher->api_key),
                                matcher->api_version);
 
 
@@ -10200,6 +10515,12 @@ dissect_kafka(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
             case KAFKA_OFFSET_DELETE:
                 offset = dissect_kafka_offset_delete_response(tvb, pinfo, kafka_tree, offset, dissect_api_version);
                 break;
+            case KAFKA_DESCRIBE_CLIENT_QUOTAS:
+                offset = dissect_kafka_describe_client_quotas_response(tvb, pinfo, kafka_tree, offset, dissect_api_version);
+                break;
+            case KAFKA_ALTER_CLIENT_QUOTAS:
+                offset = dissect_kafka_alter_client_quotas_response(tvb, pinfo, kafka_tree, offset, dissect_api_version);
+                break;
             case KAFKA_DESCRIBE_CLUSTER:
                 offset = dissect_kafka_describe_cluster_response(tvb, pinfo, kafka_tree, offset, dissect_api_version);
                 break;
@@ -10210,7 +10531,7 @@ dissect_kafka(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
 
     }
 
-    if (offset != (int)pdu_length + 4) {
+    if (offset != (int)(pdu_length + 4)) {
         expert_add_info(pinfo, root_ti, &ei_kafka_pdu_length_mismatch);
     }
 
@@ -11147,6 +11468,46 @@ proto_register_kafka_protocol_fields(int protocol)
               FT_INT32, BASE_DEC, 0, 0,
               NULL, HFILL }
         },
+        { &hf_kafka_filter_entity_type,
+            { "Entity Type", "kafka.filter_entity_type",
+               FT_STRING, BASE_NONE, 0, 0,
+               NULL, HFILL }
+        },
+        { &hf_kafka_filter_entity_name,
+            { "Entity Name", "kafka.filter_entity_name",
+               FT_STRING, BASE_NONE, 0, 0,
+               NULL, HFILL }
+        },
+        { &hf_kafka_filter_match_type,
+            { "Match Type", "kafka.filter_match_type",
+               FT_INT8, BASE_DEC, VALS(filter_match_types), 0,
+               NULL, HFILL }
+        },
+        { &hf_kafka_filter_match,
+            { "Match", "kafka.filter_match",
+               FT_STRING, BASE_NONE, 0, 0,
+               NULL, HFILL }
+        },
+        { &hf_kafka_filter_strict,
+            { "Strict", "kafka.filter_strict",
+               FT_BOOLEAN, BASE_NONE, 0, 0,
+               NULL, HFILL }
+        },
+        { &hf_kafka_quota_config_key,
+            { "Quota Config Key", "kafka.quota_config_key",
+               FT_STRING, BASE_NONE, 0, 0,
+               NULL, HFILL }
+        },
+        { &hf_kafka_quota_config_value,
+            { "Quota Config Value", "kafka.quota_config_value",
+               FT_DOUBLE, BASE_NONE, 0, 0,
+               NULL, HFILL }
+        },
+        { &hf_kafka_quota_remove,
+            { "Remove Quota", "kafka.quota_remove",
+               FT_BOOLEAN, BASE_NONE, 0, 0,
+               NULL, HFILL }
+        },
     };
 
     proto_register_field_array(protocol, hf, array_length(hf));
@@ -11212,6 +11573,8 @@ proto_register_kafka_protocol_subtrees(const int proto _U_)
         &ett_kafka_renewer,
         &ett_kafka_owners,
         &ett_kafka_owner,
+        &ett_kafka_quota_entries,
+        &ett_kafka_quota_filter_components,
         &ett_kafka_tokens,
         &ett_kafka_token,
         &ett_kafka_tagged_fields,

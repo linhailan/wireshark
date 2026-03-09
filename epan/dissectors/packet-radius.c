@@ -725,15 +725,15 @@ dissect_ascend_data_filter(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo)
 	proto_tree_add_item(ascend_tree, hf_radius_ascend_data_filter_reserved, tvb, offset, 2, ENC_BIG_ENDIAN);
 
 	wmem_strbuf_append_printf(filterstr, "%s %s %s",
-		val_to_str(type, ascenddf_filtertype, "%u"),
-		val_to_str(tvb_get_uint8(tvb, 2), ascenddf_inout, "%u"),
-		val_to_str(tvb_get_uint8(tvb, 1), ascenddf_filteror, "%u"));
+		val_to_str(pinfo->pool, type, ascenddf_filtertype, "%u"),
+		val_to_str(pinfo->pool, tvb_get_uint8(tvb, 2), ascenddf_inout, "%u"),
+		val_to_str(pinfo->pool, tvb_get_uint8(tvb, 1), ascenddf_filteror, "%u"));
 
 
 	proto = tvb_get_uint8(tvb, 6+iplen*2);
 	if (proto) {
 		wmem_strbuf_append_printf(filterstr, " %s",
-				val_to_str(proto, ascenddf_proto, "%u"));
+				val_to_str(pinfo->pool, proto, ascenddf_proto, "%u"));
 	}
 
 	if (type == 3) { /* IPv6 */
@@ -749,7 +749,7 @@ dissect_ascend_data_filter(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo)
 		wmem_strbuf_append_printf(filterstr, " srcip %s/%d", address_to_display(pinfo->pool, &srcip), srclen);
 		if (srcportq)
 			wmem_strbuf_append_printf(filterstr, " srcport %s %d",
-				val_to_str(srcportq, ascenddf_portq, "%u"), srcport);
+				val_to_str(pinfo->pool, srcportq, ascenddf_portq, "%u"), srcport);
 	}
 
 	if (type == 3) { /* IPv6-*/
@@ -765,7 +765,7 @@ dissect_ascend_data_filter(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo)
 		wmem_strbuf_append_printf(filterstr, " dstip %s/%d", address_to_display(pinfo->pool, &dstip), dstlen);
 		if (dstportq)
 			wmem_strbuf_append_printf(filterstr, " dstport %s %d",
-				val_to_str(dstportq, ascenddf_portq, "%u"), dstport);
+				val_to_str(pinfo->pool, dstportq, ascenddf_portq, "%u"), dstport);
 	}
 
 	return wmem_strbuf_get_str(filterstr);
@@ -1321,10 +1321,7 @@ add_avp_to_tree(proto_tree *avp_tree, proto_item *avp_item, packet_info *pinfo, 
 				add_new_data_source(pinfo, tvb_decrypted, "Decrypted Data");
 				/* strip padding for string type */
 				if (dictionary_entry->type == radius_string) {
-					for (uint8_t i=0; i < avp_length; i++){
-						if (buffer[i] == '\0')
-							avp_length = i;
-					}
+					avp_length = (uint32_t)strnlen((const char *)buffer, avp_length);
 				}
 				dictionary_entry->type(dictionary_entry, avp_tree, pinfo, tvb_decrypted, 0, avp_length, avp_item);
 			break;
@@ -1337,7 +1334,7 @@ add_avp_to_tree(proto_tree *avp_tree, proto_item *avp_item, packet_info *pinfo, 
 					break;
 				}
 				/* decrypted data is same length as encrypted data */
-				buffer = (char *)wmem_alloc(pinfo->pool, avp_length - 2);
+				buffer = (uint8_t *)wmem_alloc(pinfo->pool, avp_length - 2);
 				uint8_t salt[2];
 
 				tvb_memcpy(tvb, salt, offset, 2);
@@ -1914,17 +1911,17 @@ dissect_attribute_value_pairs(proto_tree *tree, packet_info *pinfo, tvbuff_t *tv
 					eap_buffer = NULL;
 
 					/*
-					 * Set the columns non-writable,
+					 * Set Protocol column non-writable,
 					 * so that the packet list shows
 					 * this as an RADIUS packet, not
 					 * as an EAP packet.
 					 */
-					save_writable = col_get_writable(pinfo->cinfo, -1);
-					col_set_writable(pinfo->cinfo, -1, false);
+					save_writable = col_get_writable(pinfo->cinfo, COL_PROTOCOL);
+					col_set_writable(pinfo->cinfo, COL_PROTOCOL, false);
 
 					call_dissector(eap_handle, eap_tvb, pinfo, eap_tree);
 
-					col_set_writable(pinfo->cinfo, -1, save_writable);
+					col_set_writable(pinfo->cinfo, COL_PROTOCOL, save_writable);
 				} else {
 					proto_item_append_text(avp_item, " Segment[%u]",
 							       eap_seg_num);
@@ -2031,7 +2028,7 @@ dissect_radius(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
 
 
 	/* Initialise stat info for passing to tap */
-	rad_info = wmem_new(wmem_packet_scope(), radius_info_t);
+	rad_info = wmem_new(pinfo->pool, radius_info_t);
 	rad_info->req_time.secs = 0;
 	rad_info->req_time.nsecs = 0;
 	rad_info->is_duplicate = false;
@@ -2613,21 +2610,6 @@ radius_register_avp_dissector(uint32_t vendor_id, uint32_t _attribute_id, radius
 
 }
 
-/* Discard and init any state we've saved */
-static void
-radius_init_protocol(void)
-{
-	module_t *radius_module = prefs_find_module("radius");
-	pref_t *alternate_port;
-
-	if (radius_module) {
-		/* Find alternate_port preference and mark it obsolete (thus hiding it from a user) */
-		alternate_port = prefs_find_preference(radius_module, "alternate_port");
-		if (! prefs_get_preference_obsolete(alternate_port))
-			prefs_set_preference_obsolete(alternate_port);
-	}
-}
-
 static void
 radius_shutdown(void)
 {
@@ -2661,7 +2643,7 @@ _radius_load_dictionary(char* dir)
 static void
 register_radius_fields(const char *unused _U_)
 {
-	hf_register_info base_hf[] = {
+	static const hf_register_info base_hf[] = {
 		{ &hf_radius_req,
 		{ "Request", "radius.req", FT_BOOLEAN, BASE_NONE, NULL, 0x0,
 			"true if RADIUS request", HFILL }},
@@ -2872,10 +2854,10 @@ register_radius_fields(const char *unused _U_)
 	wmem_array_append(ri.ett, base_ett, array_length(base_ett));
 
 
-	dir = get_datafile_path("radius");
+	dir = get_datafile_path("radius", epan_get_environment_prefix());
 	_radius_load_dictionary(dir);
 	g_free(dir);
-	dir = get_persconffile_path("radius", false);
+	dir = get_persconffile_path("radius", false, epan_get_environment_prefix());
 	_radius_load_dictionary(dir);
 	g_free(dir);
 
@@ -2915,7 +2897,6 @@ proto_register_radius(void)
 
 	proto_radius = proto_register_protocol("RADIUS Protocol", "RADIUS", "radius");
 	radius_handle = register_dissector("radius", dissect_radius, proto_radius);
-	register_init_routine(&radius_init_protocol);
 	register_shutdown_routine(radius_shutdown);
 	radius_module = prefs_register_protocol(proto_radius, NULL);
 	prefs_register_string_preference(radius_module, "shared_secret", "Shared Secret",
@@ -2935,6 +2916,7 @@ proto_register_radius(void)
 				       "Whether to interpret 241-246 as extended attributes according to RFC 6929",
 				       &disable_extended_attributes);
 	prefs_register_obsolete_preference(radius_module, "request_ttl");
+	prefs_register_obsolete_preference(radius_module, "alternate_port");
 
 	radius_tap = register_tap("radius");
 	proto_register_prefix("radius", register_radius_fields);

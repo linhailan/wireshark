@@ -330,7 +330,7 @@ dissect_lltd_tlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t o
     {
         length = tvb_get_uint8(tvb, offset+1);
         tlv_tree = proto_tree_add_subtree_format(tree, tvb, offset, length+2, ett_tlv_item, &tlv_item,
-                    "TLV Item (%s)", val_to_str(type, lltd_tlv_type_vals, "Unknown (0x%02x)"));
+                    "TLV Item (%s)", val_to_str(pinfo->pool, type, lltd_tlv_type_vals, "Unknown (0x%02x)"));
         *end = false;
     }
 
@@ -407,7 +407,7 @@ dissect_lltd_tlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t o
             expert_add_info_format(pinfo, tlv_item, &ei_lltd_tlv_length_invalid, "SSID length too large");
         }
 
-        proto_tree_add_item(tlv_tree, hf_lltd_ssid, tvb, offset+2, length, ENC_NA|ENC_ASCII);
+        proto_tree_add_item(tlv_tree, hf_lltd_ssid, tvb, offset+2, length, ENC_ASCII);
         break;
     case 0x07: /* IPv4 Address */
         if (length != 4)
@@ -556,9 +556,8 @@ dissect_lltd_discovery(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int 
     bool       end_tlv = false;
     int loop_offset, start_offset;
 
-    func = tvb_get_uint8(tvb, offset);
-    proto_tree_add_item(tree, hf_lltd_discovery_func, tvb, offset, 1, ENC_NA);
-    col_add_str(pinfo->cinfo, COL_INFO, val_to_str(func, lltd_discovery_vals, "Unknown (0x%02x)"));
+    proto_tree_add_item_ret_uint8(tree, hf_lltd_discovery_func, tvb, offset, 1, ENC_NA, &func);
+    col_add_str(pinfo->cinfo, COL_INFO, val_to_str(pinfo->pool, func, lltd_discovery_vals, "Unknown (0x%02x)"));
     offset++;
 
     /* Demultiplex header */
@@ -673,17 +672,15 @@ dissect_lltd_qos(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset
     uint16_t   seq_num, temp16;
     int loop_offset;
 
-    func = tvb_get_uint8(tvb, offset);
-    proto_tree_add_item(tree, hf_lltd_qos_diag_func, tvb, offset, 1, ENC_NA);
-    col_add_str(pinfo->cinfo, COL_INFO, val_to_str(func, lltd_qos_diag_vals, "Unknown (0x%02x)"));
+    proto_tree_add_item_ret_uint8(tree, hf_lltd_qos_diag_func, tvb, offset, 1, ENC_NA, &func);
+    col_add_str(pinfo->cinfo, COL_INFO, val_to_str(pinfo->pool, func, lltd_qos_diag_vals, "Unknown (0x%02x)"));
     offset++;
 
     header_tree = proto_tree_add_subtree(tree, tvb, offset, 14, ett_base_header, &header_item, "Base header");
 
     proto_tree_add_item(header_tree, hf_lltd_qos_real_dest_addr, tvb, offset, 6, ENC_NA);
     proto_tree_add_item(header_tree, hf_lltd_qos_real_src_addr, tvb, offset+6, 6, ENC_NA);
-    proto_tree_add_item(header_tree, hf_lltd_qos_seq_num, tvb, offset+12, 2, ENC_BIG_ENDIAN);
-    seq_num = tvb_get_ntohs(tvb, offset+12);
+    proto_tree_add_item_ret_uint16(header_tree, hf_lltd_qos_seq_num, tvb, offset+12, 2, ENC_BIG_ENDIAN, &seq_num);
 
     switch(func)
     {

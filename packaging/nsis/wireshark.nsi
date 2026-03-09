@@ -41,9 +41,9 @@ ${UnStrRep}
 ; The file to write
 OutFile "${OUTFILE_DIR}\${PROGRAM_NAME}-${VERSION}-${WIRESHARK_TARGET_PLATFORM}.exe"
 ; Installer icon
-Icon "${TOP_SRC_DIR}\resources\icons\wiresharkinst.ico"
+Icon "${TOP_SRC_DIR}\resources\icons\wireshark.ico"
 ; Uninstaller icon
-UninstallIcon "${TOP_SRC_DIR}\resources\icons\wiresharkinst.ico"
+UninstallIcon "${TOP_SRC_DIR}\resources\icons\wireshark.ico"
 
 ; ============================================================================
 ; Modern UI
@@ -58,8 +58,8 @@ UninstallIcon "${TOP_SRC_DIR}\resources\icons\wiresharkinst.ico"
 !include "InstallOptions.nsh"
 ;!addplugindir ".\Plugins"
 
-!define MUI_ICON "${TOP_SRC_DIR}\resources\icons\wiresharkinst.ico"
-!define MUI_UNICON "${TOP_SRC_DIR}\resources\icons\wiresharkinst.ico"
+!define MUI_ICON "${TOP_SRC_DIR}\resources\icons\wireshark.ico"
+!define MUI_UNICON "${TOP_SRC_DIR}\resources\icons\wireshark.ico"
 BrandingText "Wireshark${U+00ae} Installer"
 
 !define MUI_COMPONENTSPAGE_SMALLDESC
@@ -95,7 +95,8 @@ BrandingText "Wireshark${U+00ae} Installer"
 !define MUI_LICENSEPAGE_BUTTON "Noted"
 !insertmacro MUI_PAGE_LICENSE "${STAGING_DIR}\COPYING.txt"
 
-Page custom DisplayDonatePage
+; Page custom DisplayDonatePage
+Page custom DisplayCertificationPage
 
 !insertmacro MUI_PAGE_COMPONENTS
 !ifdef QT_DIR
@@ -138,7 +139,8 @@ Page custom DisplayUSBPcapPage
   ; Old Modern 1 UI: https://nsis.sourceforge.io/Docs/Modern%20UI/Readme.html
   ; To do: Upgrade to the Modern 2 UI:
   ;ReserveFile "AdditionalTasksPage.ini"
-  ReserveFile "DonatePage.ini"
+  ;ReserveFile "DonatePage.ini"
+  ReserveFile "CertificationPage.ini"
   ReserveFile "NpcapPage.ini"
   ReserveFile "USBPcapPage.ini"
   ReserveFile /plugin InstallOptions.dll
@@ -298,7 +300,7 @@ Function .onInit
 
   !if ${WIRESHARK_TARGET_PLATFORM} == "x64"
     ${If} ${IsNativeARM64}
-      MessageBox MB_OK "You're installing the x64 version of Wireshark on an Arm64 system.$\nThe native Arm64 installer might work better." /SD IDOK
+      MessageBox MB_OK "You're installing the x64 version of Wireshark on an Arm64 system.$\nWe recommend using the native Arm64 installer instead." /SD IDOK
     ${EndIf}
   !endif
 
@@ -311,7 +313,7 @@ Function .onInit
 
   ; This should match the following:
   ; - The NTDDI_VERSION and _WIN32_WINNT parts of cmakeconfig.h.in
-  ; - The <compatibility><application> section in image\wireshark.exe.manifest.in
+  ; - The <compatibility><application> section in resources\wireshark.exe.manifest.in
   ; - The VersionNT parts of packaging\wix\Prerequisites.wxi
 
   ; Uncomment to test.
@@ -358,6 +360,20 @@ ${If} ${AtMostWin8.1}
 ${OrIf} ${AtMostWin2012R2}
   MessageBox MB_OK \
     "Windows 7, 8, 8.1, Server 2008R2, and Server 2012 are no longer supported.$\nPlease install ${PROGRAM_NAME} 4.0 instead." \
+    /SD IDOK
+  Quit
+${EndIf}
+
+${IfNot} ${AtLeastBuild} 14393
+  MessageBox MB_OK \
+    "Windows 10 versions before 1607 are no longer supported.$\nPlease install ${PROGRAM_NAME} 4.0 instead." \
+    /SD IDOK
+  Quit
+${EndIf}
+
+${IfNot} ${AtLeastBuild} 17763
+  MessageBox MB_OK \
+    "Windows 10 versions before 1809 and Windows Server 2016 are no longer supported.$\nPlease install ${PROGRAM_NAME} 4.4 instead." \
     /SD IDOK
   Quit
 ${EndIf}
@@ -485,7 +501,8 @@ done:
 
   ;Extract InstallOptions INI files
   ;!insertmacro INSTALLOPTIONS_EXTRACT "AdditionalTasksPage.ini"
-  !insertmacro INSTALLOPTIONS_EXTRACT "DonatePage.ini"
+  ;!insertmacro INSTALLOPTIONS_EXTRACT "DonatePage.ini"
+  !insertmacro INSTALLOPTIONS_EXTRACT "CertificationPage.ini"
   !insertmacro INSTALLOPTIONS_EXTRACT "NpcapPage.ini"
   !insertmacro INSTALLOPTIONS_EXTRACT "USBPcapPage.ini"
 FunctionEnd
@@ -496,9 +513,14 @@ Function DisplayAdditionalTasksPage
 FunctionEnd
 !endif
 
-Function DisplayDonatePage
-  !insertmacro MUI_HEADER_TEXT "Your donations keep these releases coming" "Donate today"
-  !insertmacro INSTALLOPTIONS_DISPLAY "DonatePage.ini"
+; Function DisplayDonatePage
+;   !insertmacro MUI_HEADER_TEXT "Your donations keep these releases coming" "Donate today!"
+;   !insertmacro INSTALLOPTIONS_DISPLAY "DonatePage.ini"
+; FunctionEnd
+
+Function DisplayCertificationPage
+  !insertmacro MUI_HEADER_TEXT "Do you use Wireshark professionally?" "Become a Wireshark Certified analyst!"
+  !insertmacro INSTALLOPTIONS_DISPLAY "CertificationPage.ini"
 FunctionEnd
 
 Function DisplayNpcapPage
@@ -533,6 +555,7 @@ WriteUninstaller "$INSTDIR\${UNINSTALLER_NAME}"
 File "${STAGING_DIR}\libwiretap.dll"
 File "${STAGING_DIR}\libwireshark.dll"
 File "${STAGING_DIR}\libwsutil.dll"
+File "${STAGING_DIR}\libuiqt_plugin.dll"
 
 !include wireshark-manifest.nsh
 
@@ -609,8 +632,8 @@ File "${STAGING_DIR}\diameter\AlcatelLucent.xml"
 File "${STAGING_DIR}\diameter\chargecontrol.xml"
 File "${STAGING_DIR}\diameter\Cisco.xml"
 File "${STAGING_DIR}\diameter\CiscoSystems.xml"
-File "${STAGING_DIR}\diameter\Custom.xml"
 File "${STAGING_DIR}\diameter\dictionary.dtd"
+File "${STAGING_DIR}\diameter\dictionary.ent"
 File "${STAGING_DIR}\diameter\dictionary.xml"
 File "${STAGING_DIR}\diameter\eap.xml"
 File "${STAGING_DIR}\diameter\Ericsson.xml"
@@ -940,6 +963,20 @@ File "${STAGING_DIR}\wimaxasncp\dictionary.xml"
 File "${STAGING_DIR}\wimaxasncp\dictionary.dtd"
 SetOutPath $INSTDIR
 
+;
+; Install the Qualcomm DTD and XML files in the "qualcomm" subdirectory
+;
+SetOutPath $INSTDIR\qualcomm
+File "${STAGING_DIR}\qualcomm\dictionary.dtd"
+File "${STAGING_DIR}\qualcomm\dictionary.xml"
+File "${STAGING_DIR}\qualcomm\logcode_1x.xml"
+File "${STAGING_DIR}\qualcomm\logcode_gsm.xml"
+File "${STAGING_DIR}\qualcomm\logcode_lte.xml"
+File "${STAGING_DIR}\qualcomm\logcode_nr.xml"
+File "${STAGING_DIR}\qualcomm\logcode_umts.xml"
+File "${STAGING_DIR}\qualcomm\logcode_wcdma.xml"
+SetOutPath $INSTDIR
+
 ; Write the installation path into the registry for InstallDirRegKey
 WriteRegStr HKEY_LOCAL_MACHINE SOFTWARE\${PROGRAM_NAME} InstallDir "$INSTDIR"
 
@@ -1023,6 +1060,16 @@ ${If} $0 == "0"
 ${EndIf}
 SecRequired_skip_USBPcap:
 
+; Create a dummy configuraton directory for libgcrypt
+; XXX Is there a way to confidently and cleanly remove this?
+CreateDirectory $COMMONPROGRAMDATA\GNU\etc\gcrypt
+; This *should* match the gpg4win installer behavior.
+ExecShellWait "" "$SYSDIR\icacls.exe" '"$COMMONPROGRAMDATA\GNU\etc\gcrypt" /inheritance:r' SW_HIDE
+; BUILTIN\Administrators
+ExecShellWait "" "$SYSDIR\icacls.exe" '"$COMMONPROGRAMDATA\GNU\etc\gcrypt" /grant *S-1-5-32-544:(GA)' SW_HIDE
+; BUILTIN\Users
+ExecShellWait "" "$SYSDIR\icacls.exe" '"$COMMONPROGRAMDATA\GNU\etc\gcrypt" /grant *S-1-5-32-545:(R,RA,REA,RC,GE)' SW_HIDE
+
 ; If no user profile exists for Wireshark but for Ethereal, copy it over
 SetShellVarContext current
 IfFileExists $APPDATA\Wireshark profile_done
@@ -1073,55 +1120,48 @@ SectionEnd
 Section "-Plugins & Extensions"
 
 SetOutPath '$INSTDIR\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\codecs'
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\g711.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\g711.dll"
 !ifdef SPANDSP_FOUND
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\g722.dll"
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\g726.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\g722.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\g726.dll"
 !endif
 !ifdef BCG729_FOUND
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\g729.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\g729.dll"
 !endif
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\l16mono.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\l16mono.dll"
 !ifdef SBC_FOUND
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\sbc.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\sbc.dll"
 !endif
 !ifdef ILBC_FOUND
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\ilbc.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\ilbc.dll"
 !endif
 !ifdef OPUS_FOUND
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\opus_dec.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\opus_dec.dll"
 !endif
 !ifdef AMRNB_FOUND
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\amrnb.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\codecs\amrnb.dll"
 !endif
 
-; This should be a function or macro
-SetOutPath '$INSTDIR\profiles\Bluetooth'
-File "${STAGING_DIR}\profiles\Bluetooth\colorfilters"
-File "${STAGING_DIR}\profiles\Bluetooth\preferences"
-SetOutPath '$INSTDIR\profiles\Classic'
-File "${STAGING_DIR}\profiles\Classic\colorfilters"
-SetOutPath '$INSTDIR\profiles\No Reassembly'
-File "${STAGING_DIR}\profiles\No Reassembly\preferences"
+!include wireshark-profile-manifest.nsh
 
 SetOutPath '$INSTDIR\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan'
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\ethercat.dll"
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\gryphon.dll"
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\ipaddr.dll"
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\irda.dll"
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\opcua.dll"
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\profinet.dll"
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\unistim.dll"
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\wimax.dll"
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\wimaxasncp.dll"
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\wimaxmacphy.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\epan\ethercat.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\epan\gryphon.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\epan\ipaddr.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\epan\irda.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\epan\opcua.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\epan\profinet.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\epan\unistim.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\epan\wimax.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\epan\wimaxasncp.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\epan\wimaxmacphy.dll"
 !include "custom_plugins.txt"
 
 SetOutPath '$INSTDIR\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\wiretap'
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\wiretap\usbdump.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\wiretap\usbdump.dll"
 
 SetOutPath '$INSTDIR\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan'
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\mate.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\epan\mate.dll"
 
 !ifdef SMI_DIR
 SetOutPath '$INSTDIR\snmp\mibs'
@@ -1135,10 +1175,10 @@ File "${SMI_DIR}\share\yang\*.yang"
 !endif
 
 SetOutPath '$INSTDIR\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan'
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\transum.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\epan\transum.dll"
 
 SetOutPath '$INSTDIR\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan'
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\stats_tree.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\epan\stats_tree.dll"
 
 SectionEnd ; "Plugins / Extensions"
 
@@ -1395,6 +1435,7 @@ Delete "$INSTDIR\networkinformation\*.*"
 Delete "$INSTDIR\platforms\*.*"
 Delete "$INSTDIR\playlistformats\*.*"
 Delete "$INSTDIR\printsupport\*.*"
+Delete "$INSTDIR\qualcomm\*.*"
 Delete "$INSTDIR\share\glib-2.0\schemas\*.*"
 Delete "$INSTDIR\snmp\*.*"
 Delete "$INSTDIR\snmp\mibs\*.*"
@@ -1455,6 +1496,7 @@ RMDir "$INSTDIR\snmp"
 RMDir "$INSTDIR\radius"
 RMDir "$INSTDIR\dtds"
 RMDir "$INSTDIR\protobuf"
+RMDir "$INSTDIR\qualcomm"
 RMDir "$INSTDIR\tls"
 RMDir "$INSTDIR\tpncp"
 RMDir "$INSTDIR\translations"
@@ -1464,7 +1506,7 @@ RMDir "$INSTDIR"
 
 SectionEnd ; "Uinstall"
 
-Section "Un.Plugins" un.SecPlugins
+Section "Un.Global Plugins" un.SecPlugins
 ;-------------------------------------------
 SectionIn 1 2
 ;Delete "$INSTDIR\plugins\${VERSION}\*.*"
@@ -1558,7 +1600,7 @@ SectionEnd
 
 !insertmacro MUI_UNFUNCTION_DESCRIPTION_BEGIN
   !insertmacro MUI_DESCRIPTION_TEXT ${un.SecUinstall} "Uninstall all ${PROGRAM_NAME} components."
-  !insertmacro MUI_DESCRIPTION_TEXT ${un.SecPlugins} "Uninstall all Plugins (even from previous ${PROGRAM_NAME} versions)."
+  !insertmacro MUI_DESCRIPTION_TEXT ${un.SecPlugins} "Uninstall all global plugins (even from previous ${PROGRAM_NAME} versions)."
   !insertmacro MUI_DESCRIPTION_TEXT ${un.SecProfiles} "Uninstall all global configuration profiles."
   !insertmacro MUI_DESCRIPTION_TEXT ${un.SecGlobalSettings} "Uninstall global settings like: $INSTDIR\cfilters"
   !insertmacro MUI_DESCRIPTION_TEXT ${un.SecPersonalSettings} "Delete personal configuration folder: $APPDATA\${PROGRAM_NAME}."

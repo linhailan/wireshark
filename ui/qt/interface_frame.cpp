@@ -33,7 +33,7 @@
 #include "ui/capture_opts.h"
 #include "ui/capture_globals.h"
 #include <ui/iface_lists.h>
-#include <wsutil/application_flavor.h>
+#include <app/application_flavor.h>
 #include <wsutil/utf8_entities.h>
 #ifdef Q_OS_UNIX
 #include <unistd.h> /* for access() and X_OK */
@@ -227,7 +227,7 @@ void InterfaceFrame::scanLocalInterfaces(GList *filter_list)
         }
         mainApp->setInterfaceList(if_list);
         free_interface_list(if_list);
-        scan_local_interfaces_filtered(filter_list, main_window_update);
+        scan_local_interfaces_filtered(&global_capture_opts, filter_list, main_window_update);
         mainApp->emitAppSignal(MainApplication::LocalInterfacesChanged);
         scan_mutex.unlock();
     } else {
@@ -410,8 +410,12 @@ void InterfaceFrame::resetInterfaceTreeDisplay()
 bool InterfaceFrame::haveLocalCapturePermissions() const
 {
 #ifdef Q_OS_MAC
-    QFileInfo bpf0_fi = QFileInfo("/dev/bpf0");
-    return bpf0_fi.isReadable() && bpf0_fi.isWritable();
+    if (application_flavor_is_wireshark()) {
+        QFileInfo bpf0_fi = QFileInfo("/dev/bpf0");
+        return bpf0_fi.isReadable() && bpf0_fi.isWritable();
+    } else {
+        return true;
+    }
 #elif defined(Q_OS_UNIX)
     char *dumpcap_bin = get_executable_path("dumpcap");
     bool executable = access(dumpcap_bin, X_OK) == 0;

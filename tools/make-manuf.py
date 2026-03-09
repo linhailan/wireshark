@@ -13,11 +13,12 @@ IDs from the databases at IEEE.
 
 import csv
 import html
-import io
 import os
 import re
 import sys
-import urllib.request, urllib.error, urllib.parse
+import urllib.request
+import urllib.error
+import urllib.parse
 
 have_icu = False
 try:
@@ -53,8 +54,12 @@ def open_url(url):
             req = urllib.request.Request(url_path, headers=req_headers)
             response = urllib.request.urlopen(req)
             body = response.read().decode('UTF-8', 'replace').replace(u'\u200e', '')
-        except Exception:
-            exit_msg('Error opening ' + url_path)
+        except urllib.error.HTTPError as e:
+            exit_msg(f'Error {e.code} opening {url_path}: {e.reason}')
+        except urllib.error.URLError as e:
+            exit_msg(f'Error opening {url_path}: {e.reason}')
+        except Exception as e:
+            exit_msg(f'Error opening {url_path}: {e}')
 
     return body
 
@@ -296,7 +301,7 @@ def main():
         exit_msg("Too few total entries ({})".format(total_added))
 
     try:
-        manuf_fd = io.open(manuf_path, 'w', encoding='UTF-8')
+        manuf_fd = open(manuf_path, 'w', encoding='UTF-8')
     except Exception:
         exit_msg("Couldn't open manuf file for reading ({}) ".format(manuf_path))
 

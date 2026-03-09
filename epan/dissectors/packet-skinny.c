@@ -2255,7 +2255,7 @@ dissect_skinny_xml(ptvcursor_t *cursor, int hfindex, packet_info *pinfo, uint32_
 
   item = proto_tree_add_item(tree, hf_skinny_xmlData, tvb, offset, length, ENC_ASCII);
   subtree = proto_item_add_subtree(item, 0);
-  next_tvb = tvb_new_subset_length_caplen(tvb, offset, length, -1);
+  next_tvb = tvb_new_subset_length(tvb, offset, length);
   if (xml_handle != NULL) {
     call_dissector(xml_handle, next_tvb, pinfo, subtree);
   }
@@ -8253,7 +8253,6 @@ static int dissect_skinny_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
   uint32_t hdr_data_length;
   uint32_t hdr_version;
   uint32_t hdr_opcode;
-  uint16_t i;
 
   /* Set up structures we will need to add the protocol subtree and manage it */
   proto_tree *skinny_tree = NULL;
@@ -8264,7 +8263,7 @@ static int dissect_skinny_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
   hdr_version     = tvb_get_letohl(tvb, 4);
   hdr_opcode      = tvb_get_letohl(tvb, 8);
 
-  for (i = 0; i < array_length(skinny_opcode_map); i++) {
+  for (size_t i = 0; i < array_length(skinny_opcode_map); i++) {
     if (skinny_opcode_map[i].opcode == hdr_opcode) {
       opcode_entry = &skinny_opcode_map[i];
     }
@@ -8293,7 +8292,7 @@ static int dissect_skinny_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
   }
   si = &pi_arr[pi_current];
   si->messId = hdr_opcode;
-  si->messageName = val_to_str_ext(hdr_opcode, &message_id_ext, "0x%08X (Unknown)");
+  si->messageName = val_to_str_ext(pinfo->pool, hdr_opcode, &message_id_ext, "0x%08X (Unknown)");
   si->callId = 0;
   si->lineId = 0;
   si->passThroughPartyId = 0;

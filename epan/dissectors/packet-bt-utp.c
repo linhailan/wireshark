@@ -484,7 +484,6 @@ utp_dissect_pdus(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   int offset_before;
   unsigned captured_length_remaining;
   volatile unsigned plen;
-  unsigned length;
   tvbuff_t *next_tvb;
   proto_item *item=NULL;
   const char *saved_proto;
@@ -616,8 +615,8 @@ utp_dissect_pdus(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
           proto_item_set_generated(item);
 #if 0
     } else {
-          item = proto_tree_add_expert_format((proto_tree *)p_get_proto_data(pinfo->pool, pinfo, proto_bt_utp, curr_layer_num),
-                                  tvb, offset, -1,
+          item = proto_tree_add_expert_format_remaining((proto_tree *)p_get_proto_data(pinfo->pool, pinfo, proto_bt_utp, curr_layer_num),
+                                  tvb, offset,
               "PDU Size: %u cut short at %u",plen,captured_length_remaining);
           proto_item_set_generated(item);
     }
@@ -627,11 +626,7 @@ utp_dissect_pdus(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
      * Construct a tvbuff containing the amount of the payload we have
      * available.  Make its reported length the amount of data in the PDU.
      */
-    length = captured_length_remaining;
-    if (length > plen) {
-      length = plen;
-    }
-    next_tvb = tvb_new_subset_length_caplen(tvb, offset, length, plen);
+    next_tvb = tvb_new_subset_length(tvb, offset, plen);
     if (!(proto_desegment && pinfo->can_desegment)) {
       /* If we can't do reassembly, give a hint that bounds errors
        * are probably fragment errors. */
@@ -773,7 +768,7 @@ dissect_utp_header_v0(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int o
   proto_tree_add_item_ret_uint(tree, hf_bt_utp_flags, tvb, offset, 1, ENC_BIG_ENDIAN, &type);
   offset += 1;
 
-  col_append_fstr(pinfo->cinfo, COL_INFO, "Connection ID:%d [%s]", connection, val_to_str(type, bt_utp_type_vals, "Unknown %d"));
+  col_append_fstr(pinfo->cinfo, COL_INFO, "Connection ID:%d [%s]", connection, val_to_str(pinfo->pool, type, bt_utp_type_vals, "Unknown %d"));
   p_utp_info->type = type;
   p_utp_info->connection = connection;
 
@@ -824,7 +819,7 @@ dissect_utp_header_v1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int o
   proto_tree_add_item_ret_uint(tree, hf_bt_utp_connection_id_v1, tvb, offset, 2, ENC_BIG_ENDIAN, &connection);
   offset += 2;
 
-  col_append_fstr(pinfo->cinfo, COL_INFO, "Connection ID:%d [%s]", connection, val_to_str(type, bt_utp_type_vals, "Unknown %d"));
+  col_append_fstr(pinfo->cinfo, COL_INFO, "Connection ID:%d [%s]", connection, val_to_str(pinfo->pool, type, bt_utp_type_vals, "Unknown %d"));
   p_utp_info->type = type;
   p_utp_info->connection = connection;
 
@@ -892,7 +887,7 @@ dissect_utp_extension(tvbuff_t *tvb, packet_info _U_*pinfo, proto_tree *tree, in
         if (extension_length != 4) {
           expert_add_info(pinfo, ti, &ei_extension_len_invalid);
         }
-        proto_tree_add_item(ext_tree, hf_bt_utp_extension_close_reason, tvb, offset, 4, ENC_NA);
+        proto_tree_add_item(ext_tree, hf_bt_utp_extension_close_reason, tvb, offset, 4, ENC_BIG_ENDIAN);
         break;
       }
       default:
@@ -959,7 +954,7 @@ process_utp_payload(tvbuff_t *tvb, packet_info *pinfo,
 
     if ((offset != -1) && decode_utp(tvb, offset, pinfo, tree)) {
       /*
-       * We succeeded in handing off to bittorent.
+       * We succeeded in handing off to bittorrent.
        *
        * Is this a segment (so we're not desegmenting for whatever
        * reason)? Then at least do rudimentary PDU tracking.

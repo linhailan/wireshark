@@ -23,12 +23,8 @@
 #include "packet-e212.h"
 #include "packet-gsm_map.h"
 #include "packet-gsm_sms.h"
-#include <epan/sctpppids.h>
+#include "packet-sctp.h"
 #include "packet-cell_broadcast.h"
-
-#define PNAME  "UTRAN IuBC interface SABP signaling"
-#define PSNAME "SABP"
-#define PFNAME "sabp"
 
 #include "packet-sabp-val.h"
 
@@ -50,7 +46,6 @@ static int ett_sabp_e212;
 static int ett_sabp_cbs_data_coding;
 static int ett_sabp_bcast_msg;
 static int ett_sabp_cbs_serial_number;
-static int ett_sabp_cbs_new_serial_number;
 static int ett_sabp_cbs_page;
 static int ett_sabp_cbs_page_content;
 
@@ -134,6 +129,7 @@ dissect_sabp_cb_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     /* Error */
     return;
   }
+
   for (n = 0; n < nr_pages; n++) {
     subtree = proto_tree_add_subtree_format(tree, tvb, offset, 83, ett_sabp_cbs_page, NULL,
                 "CB page %u data",  n+1);
@@ -142,8 +138,8 @@ dissect_sabp_cb_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     cb_inf_msg_len = tvb_get_uint8(tvb,offset+82);
     page_tvb = tvb_new_subset_length(tvb, offset, cb_inf_msg_len);
     unpacked_tvb = dissect_cbs_data(sms_encoding, page_tvb, subtree, pinfo, 0);
-    len = tvb_captured_length(unpacked_tvb);
     if (unpacked_tvb != NULL){
+      len = tvb_captured_length(unpacked_tvb);
       if (tree != NULL){
         proto_tree *cbs_page_subtree = proto_item_add_subtree(cbs_page_item, ett_sabp_cbs_page_content);
         proto_tree_add_item(cbs_page_subtree, hf_sabp_cbs_page_content, unpacked_tvb, 0, len, ENC_UTF_8);
@@ -164,7 +160,7 @@ dissect_sabp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
   proto_tree  *sabp_tree = NULL;
 
   /* make entry in the Protocol column on summary display */
-  col_set_str(pinfo->cinfo, COL_PROTOCOL, PSNAME);
+  col_set_str(pinfo->cinfo, COL_PROTOCOL, "SABP");
 
   /* create the sabp protocol tree */
   sabp_item = proto_tree_add_item(tree, proto_sabp, tvb, 0, -1, ENC_NA);
@@ -246,7 +242,6 @@ void proto_register_sabp(void) {
     &ett_sabp_cbs_data_coding,
     &ett_sabp_bcast_msg,
     &ett_sabp_cbs_serial_number,
-    &ett_sabp_cbs_new_serial_number,
     &ett_sabp_cbs_page,
     &ett_sabp_cbs_page_content,
 #include "packet-sabp-ettarr.c"
@@ -254,7 +249,7 @@ void proto_register_sabp(void) {
 
 
   /* Register protocol */
-  proto_sabp = proto_register_protocol(PNAME, PSNAME, PFNAME);
+  proto_sabp = proto_register_protocol("UTRAN IuBC interface SABP signaling", "SABP", "sabp");
   /* Register fields and subtrees */
   proto_register_field_array(proto_sabp, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));

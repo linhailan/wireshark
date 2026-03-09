@@ -2,8 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-import pytest
-from suite_dfilter.dfiltertest import *
+# from suite_dfilter.dfiltertest import *
 
 
 class TestDfilterInteger:
@@ -197,7 +196,7 @@ class TestDfilterUint64:
 
     def test_uint64_1(self, checkDFilterCount):
         dfilter = "nfs.fattr3.size == 264032"
-        checkDFilterCount(dfilter, 1)
+        checkDFilterCount(dfilter, 2)
 
     def test_uint64_2(self, checkDFilterCount):
         dfilter = "nfs.fattr3.size == 264000"

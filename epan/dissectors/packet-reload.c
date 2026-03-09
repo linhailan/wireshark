@@ -30,7 +30,6 @@
 #include <wsutil/array.h>
 #include "packet-x509af.h"
 #include "packet-tls-utils.h"
-#include "packet-reload.h"
 
 void proto_register_reload(void);
 void proto_reg_handoff_reload(void);
@@ -1024,7 +1023,8 @@ dissect_opaque_string_or_data(tvbuff_t *tvb, packet_info *pinfo,proto_tree *tree
   proto_tree *opaque_tree;
   proto_item *ti_anchor;
   int         length_index     = -1;
-  int32_t     length           = -1;
+  uint32_t    length           = 0;
+  int         total_length     = -1;
   int         hf               = hf_reload_opaque;
   int         hf_data          = hf_reload_opaque_data;
   unsigned    hf_data_encoding = ENC_NA;
@@ -1041,38 +1041,54 @@ dissect_opaque_string_or_data(tvbuff_t *tvb, packet_info *pinfo,proto_tree *tree
   switch (length_size) {
   case 1:
     length_index = hf_reload_length_uint8;
-    length = (int32_t)tvb_get_uint8(tvb,offset);
     break;
   case 2:
     length_index = hf_reload_length_uint16;
-    length = (int32_t)tvb_get_ntohs(tvb, offset);
     break;
   case 3:
     length_index = hf_reload_length_uint24;
-    length = ((int32_t) (tvb_get_ntohs(tvb, offset) <<8) + (tvb_get_uint8(tvb, offset+2)));
     break;
   case 4:
     length_index = hf_reload_length_uint32;
-    length = (int32_t)tvb_get_ntohl(tvb, offset);
     break;
 
   default:
+    // XXX - DISSECTOR_ASSERT_NOT_REACHED() instead of just returning
+    // below? Looks like a dissector bug if this happens.
     break;
   }
 
   if (length_index < 0) return 0;
 
-  ti_anchor = proto_tree_add_item(tree, hf, tvb, offset, length_size + length, ENC_NA);
-
-  if (max_field_length > 0) {
-    if ((length + length_size) > max_field_length) {
-      expert_add_info(pinfo, ti_anchor, &ei_reload_computed_len_too_big);
-      length = max_field_length - length_size;
-    }
-  }
+  // hf is a FT_NONE, so it's more straightforward to set the length later.
+  ti_anchor = proto_tree_add_item(tree, hf, tvb, offset, length_size, ENC_NA);
 
   opaque_tree = proto_item_add_subtree(ti_anchor, ett_reload_opaque);
-  proto_tree_add_uint(opaque_tree, length_index, tvb, offset, length_size, (unsigned)length);
+  proto_tree_add_item_ret_uint(opaque_tree, length_index, tvb, offset, length_size, ENC_BIG_ENDIAN, &length);
+
+  // max_field_length is the maximum allowable sum of length_size and length
+  if (max_field_length > 0) {
+    if (max_field_length < length_size) {
+      expert_add_info_format(pinfo, ti_anchor, &ei_reload_computed_len_too_big, "Length size %i > max_field length %i", length_size, max_field_length);
+      max_field_length = length_size;
+    }
+  } else {
+    max_field_length = INT_MAX;
+  }
+
+  if (ckd_add(&total_length, length_size, length)) {
+    // Overflow
+    expert_add_info_format(pinfo, ti_anchor, &ei_reload_computed_len_too_big, "Computed length overflows an int");
+    total_length = max_field_length;
+    length = max_field_length - length_size;
+  } else if (total_length > max_field_length) {
+    expert_add_info(pinfo, ti_anchor, &ei_reload_computed_len_too_big);
+    total_length = max_field_length;
+    length = max_field_length - length_size;
+  }
+
+  proto_item_set_len(ti_anchor, total_length);
+
   if (length) {
     proto_tree_add_item(opaque_tree, hf_data, tvb, offset + length_size, length, hf_data_encoding);
   }
@@ -1083,7 +1099,7 @@ dissect_opaque_string_or_data(tvbuff_t *tvb, packet_info *pinfo,proto_tree *tree
     proto_item_append_text(ti_anchor, "<%d>", length);
   }
 
-  return (length_size + length);
+  return total_length;
 }
 
 static int
@@ -1484,8 +1500,7 @@ dissect_icecandidates(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint1
     {
       uint32_t priority;
 
-      priority = tvb_get_ntohl(tvb, offset+local_offset + icecandidates_offset);
-      proto_tree_add_item(icecandidate_tree, hf_reload_icecandidate_priority, tvb, offset+local_offset + icecandidates_offset, 4, ENC_BIG_ENDIAN);
+      proto_tree_add_item_ret_uint(icecandidate_tree, hf_reload_icecandidate_priority, tvb, offset+local_offset + icecandidates_offset, 4, ENC_BIG_ENDIAN, &priority);
       icecandidate_offset += 4;
       proto_tree_add_item(icecandidate_tree, hf_reload_icecandidate_type, tvb,
                           offset+local_offset+icecandidates_offset+icecandidate_offset, 1, ENC_BIG_ENDIAN);
@@ -3056,9 +3071,8 @@ static int dissect_diagnosticinfo(tvbuff_t *tvb, proto_tree *tree, uint16_t offs
       instances_per_kindid_tree = proto_item_add_subtree(ti_instances_per_kindid,
                                                          ett_reload_diagnosticinfo_instancesstored_info);
       dissect_kindid(hf_reload_kinddata_kind, tvb, instances_per_kindid_tree, offset+local_offset+instances_offset, &kind);
-      proto_tree_add_item(instances_per_kindid_tree, hf_reload_diagnosticinfo_instancesstored_instances,
-                          tvb, offset+local_offset+instances_offset+4, 8, ENC_BIG_ENDIAN);
-      instances = tvb_get_ntoh64(tvb, offset+local_offset+instances_offset+4);
+      proto_tree_add_item_ret_uint64(instances_per_kindid_tree, hf_reload_diagnosticinfo_instancesstored_instances,
+                                     tvb, offset+local_offset+instances_offset+4, 8, ENC_BIG_ENDIAN, &instances);
       proto_item_append_text(ti_instances_per_kindid, ": %s/%" PRId64,
           ((kind != NULL) && (kind->name != NULL)) ? kind->name : "UNKNOWN KIND", instances);
       instances_offset += 12;
@@ -3341,7 +3355,7 @@ static int dissect_probeans(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   return length;
 }
 
-extern int dissect_reload_messagecontents(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint16_t offset, uint16_t length)
+static int dissect_reload_messagecontents(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint16_t offset, uint16_t length)
 {
   uint32_t    message_body_length;
   uint32_t    extensions_length;
@@ -3374,8 +3388,8 @@ extern int dissect_reload_messagecontents(tvbuff_t *tvb, packet_info *pinfo, pro
       ti_message_code = proto_tree_add_item(message_contents_tree, hf_reload_message_code, tvb,
                                             offset, 2, ENC_BIG_ENDIAN);
       proto_item_append_text(ti_message_code, " (%s_%s)",
-                             val_to_str(MSGCODE_TO_METHOD(message_code), methods_short, "Unknown %d"),
-                             val_to_str(MSGCODE_TO_CLASS(message_code), classes_short, "Unknown %d"));
+                             val_to_str(pinfo->pool, MSGCODE_TO_METHOD(message_code), methods_short, "Unknown %d"),
+                             val_to_str(pinfo->pool, MSGCODE_TO_CLASS(message_code), classes_short, "Unknown %d"));
     }
     offset += 2;
     /* Message body */
@@ -3540,7 +3554,7 @@ extern int dissect_reload_messagecontents(tvbuff_t *tvb, packet_info *pinfo, pro
               config_data_tree = proto_item_add_subtree(ti_config_data, ett_reload_configupdatereq_config_data);
               proto_tree_add_item(config_data_tree, hf_reload_length_uint24, tvb, offset+local_offset, 3, ENC_BIG_ENDIAN);
               call_dissector_only(xml_handle,
-                                  tvb_new_subset_length_caplen(tvb, offset+local_offset+3, config_length, length-offset-local_offset-3),
+                                  tvb_new_subset_length(tvb, offset+local_offset+3, config_length),
                                   pinfo, config_data_tree, NULL);
             }
           }
@@ -3577,9 +3591,8 @@ extern int dissect_reload_messagecontents(tvbuff_t *tvb, packet_info *pinfo, pro
                 proto_tree_add_item(kinddescription_tree, hf_reload_length_uint16,
                                     tvb, offset+local_offset+kinds_offset, 2, ENC_BIG_ENDIAN);
                 call_dissector(xml_handle,
-                               tvb_new_subset_length_caplen(tvb, offset+local_offset+kinds_offset+2,
-                                              local_increment,
-                                              length-(offset+local_offset+kinds_offset+2)),
+                               tvb_new_subset_length(tvb, offset+local_offset+kinds_offset+2,
+                                              local_increment),
                                pinfo, kinddescription_tree);
               }
               local_increment += 2;
@@ -4193,8 +4206,8 @@ dissect_reload_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
     proto_item_append_text(ti, ": %s %s", msg_class_str, val_to_str_const(error_code, errorcodes, "Unknown"));
   }
   else {
-    msg_class_str = val_to_str(MSGCODE_TO_CLASS(message_code), classes, "Unknown %d");
-    msg_method_str = val_to_str(MSGCODE_TO_METHOD(message_code), methods, "Unknown %d");
+    msg_class_str = val_to_str(pinfo->pool, MSGCODE_TO_CLASS(message_code), classes, "Unknown %d");
+    msg_method_str = val_to_str(pinfo->pool, MSGCODE_TO_METHOD(message_code), methods, "Unknown %d");
 
     col_add_fstr(pinfo->cinfo, COL_INFO, "%s %s",
                  msg_method_str, msg_class_str);

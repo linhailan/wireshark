@@ -207,7 +207,7 @@ dissect_btmesh_pbadv_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
     proto_tree *sub_tree, *sub_tree_generic_provisioning;
     proto_item *ti;
     bool defragment = false;
-    int offset = 0;
+    unsigned offset = 0;
     btle_mesh_transport_ctx_t tr_ctx;
     uint8_t segn, length;
     uint32_t total_length;
@@ -219,7 +219,7 @@ dissect_btmesh_pbadv_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
     sub_tree = proto_item_add_subtree(item, ett_btmesh_pbadv);
 
     uint32_t pbadv_link_id = tvb_get_uint32(tvb, offset, ENC_BIG_ENDIAN);
-    proto_tree_add_item(sub_tree, hf_btmesh_pbadv_linkid, tvb, offset, 4, ENC_NA);
+    proto_tree_add_item(sub_tree, hf_btmesh_pbadv_linkid, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset += 4;
 
     uint8_t pbadv_trnumber = tvb_get_uint8(tvb, offset);
@@ -243,11 +243,9 @@ dissect_btmesh_pbadv_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
     switch (gpcf) {
         //Transaction Start
         case TRANSACTION_START:
-            proto_tree_add_item(sub_tree_generic_provisioning, hf_btmesh_gpcf_segn, tvb, offset, 1, ENC_NA);
-            segn = (tvb_get_uint8(tvb, offset) & 0xFC) >> 2;
+            proto_tree_add_item_ret_uint8(sub_tree_generic_provisioning, hf_btmesh_gpcf_segn, tvb, offset, 1, ENC_NA, &segn);
             offset += 1;
-            total_length = (uint32_t)tvb_get_uint16(tvb, offset, ENC_BIG_ENDIAN);
-            proto_tree_add_item(sub_tree_generic_provisioning, hf_btmesh_gpcf_total_length, tvb, offset, 2, ENC_NA);
+            proto_tree_add_item_ret_uint(sub_tree_generic_provisioning, hf_btmesh_gpcf_total_length, tvb, offset, 2, ENC_BIG_ENDIAN, &total_length);
             offset += 2;
             proto_tree_add_item(sub_tree_generic_provisioning, hf_btmesh_gpcf_fcs, tvb, offset, 1, ENC_NA);
             offset += 1;
@@ -314,12 +312,11 @@ dissect_btmesh_pbadv_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
         break;
         //Provisioning Bearer Control
         case PROVISIONING_BEARER_CONTROL:
-            proto_tree_add_item(sub_tree_generic_provisioning, hf_btmesh_gpcf_bearer_opcode, tvb, offset, 1, ENC_NA);
-            gpcf_bearer_opcode = (tvb_get_uint8(tvb, offset) & 0xFC) >> 2;
+            proto_tree_add_item_ret_uint8(sub_tree_generic_provisioning, hf_btmesh_gpcf_bearer_opcode, tvb, offset, 1, ENC_NA, &gpcf_bearer_opcode);
             offset += 1;
             switch(gpcf_bearer_opcode) {
                 case LINK_OPEN:
-                    proto_tree_add_item(sub_tree_generic_provisioning, hf_btmesh_gpcf_bearer_opcode_device_UUID, tvb, offset, 16, ENC_NA);
+                    proto_tree_add_item(sub_tree_generic_provisioning, hf_btmesh_gpcf_bearer_opcode_device_UUID, tvb, offset, 16, ENC_BIG_ENDIAN);
                     offset += 16;
 
                 break;
@@ -336,12 +333,12 @@ dissect_btmesh_pbadv_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
                     //Unknown data
                     proto_tree_add_item(sub_tree_generic_provisioning, hf_btmesh_gpcf_bearer_unknown_data, tvb, offset, -1, ENC_NA);
                     offset += tvb_captured_length_remaining(tvb, offset);
-                    proto_tree_add_expert(sub_tree, pinfo, &ei_btmesh_gpcf_unknown_opcode, tvb, offset, -1);
+                    proto_tree_add_expert_remaining(sub_tree, pinfo, &ei_btmesh_gpcf_unknown_opcode, tvb, offset);
                 break;
             }
             //There is still some data but all data should be already disssected
             if (tvb_captured_length_remaining(tvb, offset) != 0) {
-                proto_tree_add_expert(sub_tree, pinfo, &ei_btmesh_gpcf_unknown_payload, tvb, offset, -1);
+                proto_tree_add_expert_remaining(sub_tree, pinfo, &ei_btmesh_gpcf_unknown_payload, tvb, offset);
             }
 
         break;

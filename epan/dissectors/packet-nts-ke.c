@@ -177,7 +177,7 @@ static const range_string nts_ke_aead_rvals[] = {
  *
  * All crypto functions will need GCRYPT >= 1.10.0 because
  * GCRY_CIPHER_MODE_SIV is a mandatory algorithm. If'ing out SIV algos
- * to compile sucessfully without GCRYPT support.
+ * to compile successfully without GCRYPT support.
  */
 static const nts_aead nts_ke_aead_gcry_map[] = {
 #if GCRYPT_VERSION_NUMBER >= 0x010a00
@@ -248,8 +248,8 @@ nts_cookie_t*
 nts_new_cookie(tvbuff_t *tvb, uint16_t aead, packet_info *pinfo)
 {
     unsigned int cookie_len = tvb_reported_length(tvb);
-    unsigned char *key_c2s = (char *)wmem_alloc0(pinfo->pool, NTS_KE_TLS13_KEY_MAX_LEN);
-    unsigned char *key_s2c = (char *)wmem_alloc0(pinfo->pool, NTS_KE_TLS13_KEY_MAX_LEN);
+    uint8_t *key_c2s = (uint8_t *)wmem_alloc0(pinfo->pool, NTS_KE_TLS13_KEY_MAX_LEN);
+    uint8_t *key_s2c = (uint8_t *)wmem_alloc0(pinfo->pool, NTS_KE_TLS13_KEY_MAX_LEN);
     uint8_t *tvb_bytes;
     nts_cookie_t *cookie;
     uint32_t strong_hash;
@@ -432,9 +432,10 @@ nts_find_cookie_by_uid(tvbuff_t *tvb_uid)
         return NULL;
 
     /* Hash UID */
-    tvb_uid_bytes = (uint8_t *)tvb_memdup(wmem_packet_scope(), tvb_uid, 0, uid_len);
+    tvb_uid_bytes = (uint8_t *)tvb_memdup(NULL, tvb_uid, 0, uid_len);
     lookup.uid_hash = wmem_strong_hash(tvb_uid_bytes, uid_len);
     lookup.cookie = NULL;
+    wmem_free(NULL, tvb_uid_bytes);
 
     /* Find cookie by UID hash */
     wmem_map_foreach(nts_cookies, nts_uid_lookup_callback, &lookup);
@@ -460,17 +461,19 @@ dissect_nts_ke(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _
     nts_cookie_t *cookie;
     struct tcp_analysis *tcp_conv;
     nts_used_frames_lookup_t lookup_data = {.tvb = tvb, .hfindex = hf_nts_ke_cookie_used_frame};
+    const char *alpn;
 
     offset = 0;
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "NTS-KE");
     col_clear(pinfo->cinfo,COL_INFO);
 
-    ti = proto_tree_add_item(tree, proto_nts_ke, tvb, 0, 0, ENC_NA);
+    ti = proto_tree_add_item(tree, proto_nts_ke, tvb, 0, -1, ENC_NA);
     nts_ke_tree = proto_item_add_subtree(ti, ett_nts_ke);
 
     /* Error on ALPN mismatch */
-    if(strcmp(tls_get_alpn(pinfo), NTS_KE_ALPN) != 0)
+    alpn = tls_get_alpn(pinfo);
+    if(!alpn || strcmp(alpn, NTS_KE_ALPN) != 0)
         expert_add_info(pinfo, nts_ke_tree, &ei_nts_ke_alpn_mismatch);
 
     /* Conversation init */

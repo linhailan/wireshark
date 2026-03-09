@@ -73,13 +73,14 @@
 #include <epan/packet.h>
 #include <epan/capture_dissectors.h>
 #include <epan/etypes.h>
-#include <epan/ppptypes.h>
-#include <epan/ipproto.h>
-#include <epan/arcnet_pids.h>
-#include <epan/llcsaps.h>
 #include <epan/to_str.h>
 #include <epan/tfs.h>
+#include <epan/iana-info.h>
 #include <wsutil/array.h>
+#include "packet-ppp.h"
+#include "packet-llc.h"
+#include "packet-arcnet.h"
+
 
 void proto_register_vines_frp(void);
 void proto_reg_handoff_vines_frp(void);
@@ -290,7 +291,7 @@ enum {
 	PKTTYPE_DGRAM = 0,	/* Unreliable datagram */
 	PKTTYPE_DATA = 1,	/* User Data */
 	PKTTYPE_ERR = 2,	/* Error */
-	PKTTYPE_DISC = 3,	/* Diconnect Request */
+	PKTTYPE_DISC = 3,	/* Disconnect Request */
 	PKTTYPE_PROBE = 4,	/* Probe (retransmit) */
 	PKTTYPE_ACK = 5	/* Acknowledgement */
 };
@@ -444,7 +445,7 @@ static const value_string vines_llc_ptype_vals[] = {
 static int
 dissect_vines_llc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
-	uint8_t  ptype;
+	uint32_t  ptype;
 	proto_tree *vines_llc_tree;
 	proto_item *ti;
 	tvbuff_t *next_tvb;
@@ -452,16 +453,13 @@ dissect_vines_llc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "Vines LLC");
 	col_clear(pinfo->cinfo, COL_INFO);
 
-	ptype = tvb_get_uint8(tvb, 0);
-	col_add_str(pinfo->cinfo, COL_INFO,
-		    val_to_str(ptype, vines_llc_ptype_vals,
-		      "Unknown protocol 0x%02x"));
-	if (tree) {
-		ti = proto_tree_add_item(tree, proto_vines_llc, tvb, 0, 1, ENC_NA);
-		vines_llc_tree = proto_item_add_subtree(ti, ett_vines_llc);
+	ti = proto_tree_add_item(tree, proto_vines_llc, tvb, 0, 1, ENC_NA);
+	vines_llc_tree = proto_item_add_subtree(ti, ett_vines_llc);
 
-		proto_tree_add_item(vines_llc_tree, hf_vines_llc_packet_type, tvb, 0, 1, ENC_NA);
-	}
+	proto_tree_add_item_ret_uint(vines_llc_tree, hf_vines_llc_packet_type, tvb, 0, 1, ENC_NA, &ptype);
+	col_add_str(pinfo->cinfo, COL_INFO,
+		val_to_str(pinfo->pool, ptype, vines_llc_ptype_vals,
+			"Unknown protocol 0x%02x"));
 
 	next_tvb = tvb_new_subset_remaining(tvb, 1);
 	if (!dissector_try_uint(vines_llc_dissector_table, ptype,
@@ -821,7 +819,7 @@ dissect_vines_ipc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 	case PKTTYPE_DGRAM:
 		col_add_fstr(pinfo->cinfo, COL_INFO,
 				     "%s D=%04x S=%04x",
-				     val_to_str(viph.vipc_pkttype, pkttype_vals,
+				     val_to_str(pinfo->pool, viph.vipc_pkttype, pkttype_vals,
 				         "Unknown packet type (0x%02x)"),
 				     viph.vipc_dport, viph.vipc_sport);
 		break;
@@ -829,10 +827,10 @@ dissect_vines_ipc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 	case PKTTYPE_ERR:
 		col_add_fstr(pinfo->cinfo, COL_INFO,
 				     "%s NS=%u NR=%u Err=%s RID=%04x LID=%04x D=%04x S=%04x",
-				     val_to_str(viph.vipc_pkttype, pkttype_vals,
+				     val_to_str(pinfo->pool, viph.vipc_pkttype, pkttype_vals,
 				         "Unknown packet type (0x%02x)"),
 				     viph.vipc_seqno, viph.vipc_ack,
-				     val_to_str(viph.vipc_err_len,
+				     val_to_str(pinfo->pool, viph.vipc_err_len,
 				         vipc_err_vals, "Unknown (%u)"),
 				     viph.vipc_rmtid, viph.vipc_lclid,
 				     viph.vipc_dport, viph.vipc_sport);
@@ -841,7 +839,7 @@ dissect_vines_ipc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 	default:
 		col_add_fstr(pinfo->cinfo, COL_INFO,
 				     "%s NS=%u NR=%u Len=%u RID=%04x LID=%04x D=%04x S=%04x",
-				     val_to_str(viph.vipc_pkttype, pkttype_vals,
+				     val_to_str(pinfo->pool, viph.vipc_pkttype, pkttype_vals,
 				         "Unknown packet type (0x%02x)"),
 				     viph.vipc_seqno, viph.vipc_ack,
 				     viph.vipc_err_len, viph.vipc_rmtid,
@@ -1030,7 +1028,7 @@ dissect_vines_spp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "Vines SPP");
 	col_add_fstr(pinfo->cinfo, COL_INFO,
 			     "%s NS=%u NR=%u Window=%u RID=%04x LID=%04x D=%04x S=%04x",
-			     val_to_str(viph.vspp_pkttype, pkttype_vals,
+			     val_to_str(pinfo->pool, viph.vspp_pkttype, pkttype_vals,
 			         "Unknown packet type (0x%02x)"),
 			     viph.vspp_seqno, viph.vspp_ack, viph.vspp_win,
 			     viph.vspp_rmtid, viph.vspp_lclid, viph.vspp_dport,
@@ -1212,10 +1210,10 @@ dissect_vines_arp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 		col_set_str(pinfo->cinfo, COL_PROTOCOL, "Vines SARP");
 		packet_type = tvb_get_uint8(tvb, 1);
 		col_add_str(pinfo->cinfo, COL_INFO,
-			    val_to_str(packet_type, vines_arp_packet_type_vals,
+			    val_to_str(pinfo->pool, packet_type, vines_arp_packet_type_vals,
 			      "Unknown (0x%02x)"));
 
-		proto_tree_add_item(vines_arp_tree, hf_vines_arp_packet_type, tvb, 1, 1, ENC_NA);
+		proto_tree_add_item(vines_arp_tree, hf_vines_arp_packet_type, tvb, 1, 1, ENC_BIG_ENDIAN);
 
 		if (packet_type == VARP_ASSIGNMENT_RESP) {
 			col_append_fstr(pinfo->cinfo, COL_INFO,
@@ -1235,7 +1233,7 @@ dissect_vines_arp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 		 */
 		packet_type = (uint8_t) tvb_get_ntohs(tvb, 0);
 		col_add_str(pinfo->cinfo, COL_INFO,
-			    val_to_str(packet_type, vines_arp_packet_type_vals,
+			    val_to_str(pinfo->pool, packet_type, vines_arp_packet_type_vals,
 			      "Unknown (0x%02x)"));
 		proto_tree_add_item(vines_arp_tree, hf_vines_arp_packet_type, tvb, 0, 2, ENC_BIG_ENDIAN);
 
@@ -1436,7 +1434,7 @@ dissect_vines_rtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 		 */
 		operation_type = tvb_get_uint8(tvb, offset);
 		col_add_str(pinfo->cinfo, COL_INFO,
-			    val_to_str(operation_type, vines_rtp_operation_type_vals,
+			    val_to_str(pinfo->pool, operation_type, vines_rtp_operation_type_vals,
 			      "Unknown (0x%02x)"));
 
 		if (tree) {
@@ -1492,7 +1490,7 @@ dissect_vines_rtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 		offset += 2;
 		operation_type = tvb_get_uint8(tvb, offset);
 		col_add_str(pinfo->cinfo, COL_INFO,
-			    val_to_str(operation_type, vines_rtp_operation_type_vals,
+			    val_to_str(pinfo->pool, operation_type, vines_rtp_operation_type_vals,
 			      "Unknown (0x%02x)"));
 
 		if (tree) {
@@ -1919,7 +1917,7 @@ dissect_vines_icp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 
 	packet_type = tvb_get_ntohs(tvb, offset);
 	col_add_str(pinfo->cinfo, COL_INFO,
-		    val_to_str(packet_type, vines_icp_packet_type_vals,
+		    val_to_str(pinfo->pool, packet_type, vines_icp_packet_type_vals,
 		      "Unknown (0x%02x)"));
 
 	proto_tree_add_item(vines_icp_tree, hf_vines_icp_packet_type, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -1930,7 +1928,7 @@ dissect_vines_icp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 	case VICP_EXCEPTION_NOTIFICATION:
 		exception_code = tvb_get_ntohs(tvb, offset);
 		col_append_fstr(pinfo->cinfo, COL_INFO, ", %s",
-			    val_to_str(exception_code, vipc_err_vals,
+			    val_to_str(pinfo->pool, exception_code, vipc_err_vals,
 			        "Unknown exception code (%u)"));
 		proto_tree_add_item(vines_icp_tree, hf_vines_icp_exception_code, tvb, offset, 2, ENC_BIG_ENDIAN);
 		break;

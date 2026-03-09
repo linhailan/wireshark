@@ -233,7 +233,7 @@ static inline void memcpy_reverse(uint8_t *dst, const uint8_t *src, size_t len)
  *
  * @param  str       pointer to a hex string
  * @param  buf       pointer to buffer, where to place result
- * @param  bytes_num number of bytes to retrive from the string
+ * @param  bytes_num number of bytes to retrieve from the string
  * @return success
  */
 static bool zbd_parse_uat_hexline(const char *str,
@@ -253,7 +253,7 @@ static bool zbd_parse_uat_hexline(const char *str,
 
     /**
      * Attempt to parse the hex string. The hex string must
-     * be at least 16 pairs of hexidecimal digits with the
+     * be at least 16 pairs of hexadecimal digits with the
      * following optional separators: ':', '-', " ", or 16
      * alphanumeric characters after a double-quote.
      */
@@ -447,7 +447,7 @@ static void zbd_free_key_record(void *ptr)
 }
 
 /**
- * Deletes all existing keys in zbee_pc_keyrig and adds new ones
+ * Deletes all existing keys in zbee_pc_keyring and adds new ones
  * from uat_key_records.
  */
 static void uat_key_record_post_update(void)
@@ -725,7 +725,7 @@ static int zb_direct_decrypt(tvbuff_t    **tvb,
         bool success = false;
         uint16_t size = tvb_reported_length_remaining(*tvb, offset);
         uint8_t *decrypted = (uint8_t *)wmem_alloc(pinfo->pool, 512);
-        GList   *pan_keyring;
+        GSList **pan_keyring;
         GSList  *i = zbee_pc_keyring;
         uint16_t init_size = size;
 
@@ -762,14 +762,13 @@ static int zb_direct_decrypt(tvbuff_t    **tvb,
         /* Retrieve all pan-specific nwk keyrings from the hash table */
         if (!success && zbee_table_nwk_keyring)
         {
-            pan_keyring = (GList*)g_hash_table_get_values(zbee_table_nwk_keyring);
+            GHashTableIter keyring_iter;
+            g_hash_table_iter_init(&keyring_iter, zbee_table_nwk_keyring);
 
-            while (!success && pan_keyring)
+            while (!success && g_hash_table_iter_next(&keyring_iter, NULL, (void*)&pan_keyring))
             {
-                i = *((GSList**)pan_keyring->data);
-
                 /* Iterate over keys in the keyring */
-                while (!success && i)
+                for (i = *pan_keyring; !success && i; i = g_slist_next(i))
                 {
                     if (!ignore_late_keys || ((key_record_t*)i->data)->frame_num > pinfo->num)
                     {
@@ -778,14 +777,12 @@ static int zb_direct_decrypt(tvbuff_t    **tvb,
                                                decrypted, &size,
                                                ieee, NULL, ((key_record_t*)i->data)->key);
 
-                        i = g_slist_next(i);
                         if (!success)
                         {
                             size = init_size;
                         }
                     }
                 }
-                pan_keyring = g_list_next(i);
             }
         }
 
@@ -806,23 +803,6 @@ static int zb_direct_decrypt(tvbuff_t    **tvb,
 
     return offset;
 }
-
-/* 6.4.3. CCM Nonce */
-typedef struct
-#if defined(_MSC_VER)
-# pragma pack(push, 1)
-#else
-__attribute__((__packed__))
-#endif
-    zb_secur_ccm_nonce_s
-{
-    uint8_t  source_address[8];
-    uint32_t frame_counter;
-    uint8_t  secur_control;
-} zb_secur_ccm_nonce_t;
-#ifdef _MSC_VER
-# pragma pack(pop)
-#endif
 
 /**
  * Creates an auth string.
@@ -875,22 +855,26 @@ static bool decrypt_data(const uint8_t *serv_uuid,
     const uint8_t *encrypted_data     = in + sizeof(uint32_t);
     uint16_t      encrypted_data_len = *len - sizeof(uint32_t);
 
+    /* 6.4.3. CCM Nonce */
     /* Form the nonce */
-    zb_secur_ccm_nonce_t nonce = (zb_secur_ccm_nonce_t)
-    {
-        .secur_control = ZIGBEE_DIRECT_SECUR_CONTROL
-    };
+    uint8_t nonce[ZBEE_SEC_CONST_NONCE_LEN];
 
-    /* Fetch counter from the packet (don't check) */
-    memcpy(&nonce.frame_counter, in, sizeof(uint32_t));
-    memcpy(&nonce.source_address, to_zdd ? zvd_ieee : zdd_ieee, 8);
+    /* First 8 bytes are the source address. (Little-Endian) */
+    memcpy(nonce, to_zdd ? zvd_ieee : zdd_ieee, 8);
+
+    /* Fetch counter from the packet (don't check),
+     * in Little-Endian order as transmitted.  */
+    memcpy(&nonce[8], in, 4);
+
+    /* Last byte is the security control field. */
+    nonce[12] = ZIGBEE_DIRECT_SECUR_CONTROL;
 
     if (*len < 8) return false;
 
     create_auth_string(serv_uuid, char_uuid, auth_str);
 
     success = zbee_sec_ccm_decrypt(key,
-                                   (uint8_t*)&nonce,
+                                   nonce,
                                    auth_str,
                                    encrypted_data,
                                    decrypted_data,
@@ -1039,12 +1023,12 @@ static int dissect_zb_direct_dump_info(tvbuff_t    *tvb,
             tvb_memcpy(tvb, key_record.zvd_ieee, offset, sizeof(key_record.zdd_ieee));
             offset += 8;
 
-            key_record.frame_num = pinfo->num;
-            key_record.label = g_strdup_printf("Key reported over air in packet #%d", pinfo->num);
-
             /* Check if this key was already added */
             if (zbee_pc_keyring == NULL || keyrec(zbee_pc_keyring)->frame_num < pinfo->num)
             {
+                key_record.frame_num = pinfo->num;
+                key_record.label = g_strdup_printf("Key reported over air in packet #%d", pinfo->num);
+
                 /* store the keys in order: latest <- ... <- first <- (UAT: top <- ... <- bottom) */
                 zbee_pc_keyring = g_slist_prepend(zbee_pc_keyring,
                                                   g_memdup2(&key_record, sizeof(zb_direct_key_record_t)));
@@ -1385,7 +1369,7 @@ static int dissect_zb_direct_permit_join(tvbuff_t    *tvb,
 }
 
 /**
- * Dissector for Leave Networ.
+ * Dissector for Leave Network.
  *
  * @param  tvb     pointer to buffer containing raw packet
  * @param  pinfo   pointer to packet information fields
@@ -1458,7 +1442,7 @@ static int dissect_zb_direct_manage_joiners(tvbuff_t    *tvb,
 }
 
 /**
- * Dissector for Indentify.
+ * Dissector for Identify.
  *
  * @param  tvb     pointer to buffer containing raw packet
  * @param  pinfo   pointer to packet information fields
@@ -1604,6 +1588,7 @@ static void zb_direct_cleanup(void)
     {
         GSList *element = zbee_pc_keyring;
 
+        zbd_free_key_record(element->data);
         zbee_pc_keyring = g_slist_delete_link(zbee_pc_keyring, element);
     }
 }
@@ -1794,9 +1779,7 @@ void proto_register_zb_direct(void)
 
     expert_module_t *expert_zb_direct;
 
-    proto_zb_direct = proto_register_protocol("ZigBee Direct", /* name        */
-                                              "ZBD",           /* short_name  */
-                                              "zbd");          /* filter_name */
+    proto_zb_direct = proto_register_protocol("ZigBee Direct", "ZBD", "zbd"); /* name, short name, abbreviation */
 
     proto_register_field_array(proto_zb_direct, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
@@ -1899,7 +1882,7 @@ void proto_reg_handoff_zb_direct(void)
 
     for (size_t i = 0; services[i].uuid; i++)
     {
-        wmem_tree_insert_string(bluetooth_uuids, services[i].uuid, services[i].description, 0);
+        bluetooth_add_custom_uuid(services[i].uuid, services[i].description, false);
 
         dissector_handle_t handle = create_dissector_handle_with_name_and_description(
             services[i].dissector, proto_zb_direct,

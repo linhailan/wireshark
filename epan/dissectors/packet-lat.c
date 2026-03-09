@@ -348,7 +348,7 @@ dissect_lat(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 	command = tvb_get_uint8(tvb, offset) >> 2;
 
 	col_add_str(pinfo->cinfo, COL_INFO,
-	    val_to_str(command, msg_typ_vals, "Unknown command (%u)"));
+	    val_to_str(pinfo->pool, command, msg_typ_vals, "Unknown command (%u)"));
 
 	if (tree) {
 		ti = proto_tree_add_item(tree, proto_lat, tvb, offset, -1,
@@ -1064,7 +1064,7 @@ dissect_lat_status(tvbuff_t *tvb, int offset, proto_tree *tree,
     packet_info *pinfo)
 {
 	uint32_t entries_counter;
-	uint32_t subj_node_name_len;
+	int subj_node_name_len;
 	unsigned i;
 
 	proto_tree_add_item(tree, hf_lat_prtcl_format, tvb, offset, 1, ENC_LITTLE_ENDIAN);

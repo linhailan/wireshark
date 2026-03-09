@@ -454,7 +454,7 @@ static const value_string CommandCode_vals[] = {
 	{AFP_ADDICON,		"FPAddIcon" },
 	{0,			 NULL }
 };
-value_string_ext CommandCode_vals_ext = VALUE_STRING_EXT_INIT(CommandCode_vals);
+static value_string_ext CommandCode_vals_ext = VALUE_STRING_EXT_INIT(CommandCode_vals);
 
 static const value_string unicode_hint_vals[] = {
 	{    0,	"MacRoman" },
@@ -1095,7 +1095,7 @@ static const value_string afp_server_addr_type_vals[] = {
 	{6,   "IP6 address" },
 	{7,   "IP6+port address" },
 	{0,   NULL } };
-value_string_ext afp_server_addr_type_vals_ext = VALUE_STRING_EXT_INIT(afp_server_addr_type_vals);
+static value_string_ext afp_server_addr_type_vals_ext = VALUE_STRING_EXT_INIT(afp_server_addr_type_vals);
 
 #define AFP_NUM_PROCEDURES     256
 
@@ -1108,7 +1108,7 @@ afpstat_init(struct register_srt* srt _U_, GArray* srt_array)
 	afp_srt_table = init_srt_table("AFP Commands", NULL, srt_array, AFP_NUM_PROCEDURES, NULL, "afp.command", NULL);
 	for (i = 0; i < AFP_NUM_PROCEDURES; i++)
 	{
-		char* tmp_str = val_to_str_ext_wmem(NULL, i, &CommandCode_vals_ext, "Unknown(%u)");
+		char* tmp_str = val_to_str_ext(NULL, i, &CommandCode_vals_ext, "Unknown(%u)");
 		init_srt_table_row(afp_srt_table, i, tmp_str);
 		wmem_free(NULL, tmp_str);
 	}
@@ -1319,8 +1319,7 @@ parse_vol_bitmap (proto_tree *tree, tvbuff_t *tvb, int offset, uint16_t bitmap)
 		offset += 4;
 	}
 	if ((bitmap & kFPVolNameBit)) {
-		nameoff = tvb_get_ntohs(tvb, offset);
-		proto_tree_add_item(tree, hf_afp_vol_name_offset,tvb, offset, 2, ENC_BIG_ENDIAN);
+		proto_tree_add_item_ret_uint16(tree, hf_afp_vol_name_offset,tvb, offset, 2, ENC_BIG_ENDIAN, &nameoff);
 		offset += 2;
 	}
 	if ((bitmap & kFPVolExtBytesFreeBit)) {
@@ -1337,7 +1336,7 @@ parse_vol_bitmap (proto_tree *tree, tvbuff_t *tvb, int offset, uint16_t bitmap)
 	}
 	if (nameoff) {
 		uint8_t len;
-
+		/* TODO: this doesn't look right! */
 		len = tvb_get_uint8(tvb, offset);
 		proto_tree_add_item(tree, hf_afp_vol_name, tvb, offset, 1, ENC_UTF_8|ENC_BIG_ENDIAN);
 		offset += len +1;
@@ -1478,8 +1477,7 @@ parse_long_filename(proto_tree *tree, tvbuff_t *tvb, int offset, int org_offset)
 	proto_tree_add_item(tree, hf_afp_long_name_offset,tvb, offset, 2, ENC_BIG_ENDIAN);
 	if (lnameoff) {
 		tp_ofs = lnameoff +org_offset;
-		len = tvb_get_uint8(tvb, tp_ofs);
-		proto_tree_add_item(tree, hf_afp_path_len, tvb, tp_ofs,	 1, ENC_BIG_ENDIAN);
+		proto_tree_add_item_ret_uint8(tree, hf_afp_path_len, tvb, tp_ofs,	 1, ENC_BIG_ENDIAN, &len);
 		tp_ofs++;
 		proto_tree_add_item(tree, hf_afp_path_name, tvb, tp_ofs, len, ENC_UTF_8);
 		tp_ofs += len;
@@ -2619,7 +2617,7 @@ dissect_query_afp_login(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
 static int
 dissect_query_afp_login_ext(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
 {
-	int len;
+	uint16_t len;
 	int len_uam;
 	const char *uam;
 	uint8_t path_type;
@@ -2640,15 +2638,13 @@ dissect_query_afp_login_ext(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 	proto_tree_add_item(tree, hf_afp_user_type, tvb, offset, 1, ENC_BIG_ENDIAN);
 	offset++;
 	/* only type 3 */
-	len = tvb_get_ntohs(tvb, offset);
-	proto_tree_add_item(tree, hf_afp_user_len, tvb, offset, 2, ENC_BIG_ENDIAN);
+	proto_tree_add_item_ret_uint16(tree, hf_afp_user_len, tvb, offset, 2, ENC_BIG_ENDIAN, &len);
 	offset += 2;
 	proto_tree_add_item(tree, hf_afp_user_name, tvb, offset, len, ENC_UTF_8);
 	offset += len;
 
 	/* directory service */
-	path_type = tvb_get_uint8(tvb, offset);
-	proto_tree_add_item(tree, hf_afp_path_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_item_ret_uint8(tree, hf_afp_path_type, tvb, offset, 1, ENC_BIG_ENDIAN, &path_type);
 	offset++;
 	/* FIXME use 16 bit len + unicode from smb dissector */
 	switch (path_type) {
@@ -2661,8 +2657,7 @@ dissect_query_afp_login_ext(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		offset += len;
 		break;
 	case 3:
-		len = tvb_get_ntohs(tvb, offset);
-		proto_tree_add_item( tree, hf_afp_path_unicode_len, tvb, offset, 2, ENC_BIG_ENDIAN);
+		proto_tree_add_item_ret_uint16( tree, hf_afp_path_unicode_len, tvb, offset, 2, ENC_BIG_ENDIAN, &len);
 		offset += 2;
 		proto_tree_add_item(tree, hf_afp_path_name, tvb, offset, len, ENC_UTF_8);
 		offset += len;
@@ -3535,9 +3530,9 @@ dissect_reply_afp_map_id(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
 static int
 dissect_query_afp_map_name(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset)
 {
-	int len;
-	int type;
-	int size;
+	int     len;
+	uint8_t type;
+	int     size;
 
 	type = tvb_get_uint8(tvb, offset);
 	proto_tree_add_item(tree, hf_afp_map_name_type, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -3561,7 +3556,7 @@ dissect_query_afp_map_name(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tr
 		break;
 	}
 	proto_tree_add_item(tree, hf_afp_map_name, tvb, offset, size, ENC_ASCII|ENC_BIG_ENDIAN);
-	offset += len +size;
+	offset += (len+size);
 
 	return offset;
 }
@@ -4549,7 +4544,7 @@ dissect_spotlight(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 static int
 dissect_query_afp_spotlight(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset, afp_request_val *request_val)
 {
-	int len;
+	unsigned len;
 	tvbuff_t *spotlight_tvb;
 
 	PAD(1);
@@ -4764,7 +4759,7 @@ dissect_reply_afp_get_acl(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, i
 static int
 dissect_reply_afp_spotlight(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset, afp_request_val *request_val)
 {
-	int len;
+	unsigned len;
 	tvbuff_t *spotlight_tvb;
 
 	switch (request_val->spotlight_req_command) {
@@ -5162,12 +5157,12 @@ dissect_afp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 
 	afp_command = request_val->command;
 	col_add_fstr(pinfo->cinfo, COL_INFO, "%s %s",
-		     val_to_str_ext(afp_command, &CommandCode_vals_ext,
+		     val_to_str_ext(pinfo->pool, afp_command, &CommandCode_vals_ext,
 				"Unknown command (%u)"),
 		     atp_asp_dsi_info->reply ? "reply" : "request");
 	if (atp_asp_dsi_info->reply && atp_asp_dsi_info->code != 0) {
 		col_append_fstr(pinfo->cinfo, COL_INFO, ": %s (%d)",
-			val_to_str_ext(atp_asp_dsi_info->code, &asp_error_vals_ext,
+			val_to_str_ext(pinfo->pool, atp_asp_dsi_info->code, &asp_error_vals_ext,
 				"Unknown error (%u)"), atp_asp_dsi_info->code);
 	}
 

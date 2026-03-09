@@ -23,7 +23,7 @@
 #include <wsutil/strtoi.h>
 #include <wsutil/ws_assert.h>
 
-#include "enterprises.h"
+#include "iana-info.h"
 #include "manuf.h"
 
 /*
@@ -81,7 +81,7 @@
 
 #include <glib.h>
 
-#include "packet.h"
+#include <epan/packet.h>
 #include "addr_resolv.h"
 #include "wsutil/filesystem.h"
 
@@ -95,7 +95,6 @@
 #include <epan/maxmind_db.h>
 #include <epan/prefs.h>
 #include <epan/uat.h>
-#include "services.h"
 
 #define ENAME_HOSTS     "hosts"
 #define ENAME_SUBNETS   "subnets"
@@ -107,6 +106,7 @@
 #define ENAME_VLANS     "vlans"
 #define ENAME_SS7PCS    "ss7pcs"
 #define ENAME_ENTERPRISES "enterprises"
+#define ENAME_TACS      "tacs"
 
 #define HASHETHSIZE      2048
 #define HASHHOSTSIZE     2048
@@ -208,12 +208,6 @@ typedef struct _vlan
     char              name[MAXVLANNAMELEN];
 } vlan_t;
 
-/* internal services custom type */
-typedef struct _serv_port_custom_key {
-    uint16_t          port;
-    port_type         type;
-} serv_port_custom_key_t;
-
 static wmem_allocator_t *addr_resolv_scope;
 
 // Maps unsigned -> hashipxnet_t*
@@ -223,6 +217,7 @@ static wmem_map_t *ipv6_hash_table;
 // Maps unsigned -> hashvlan_t*
 static wmem_map_t *vlan_hash_table;
 static wmem_map_t *ss7pc_hash_table;
+static wmem_map_t *tac_hash_table;
 
 // Maps IP address -> manually set hostname.
 static wmem_map_t *manually_resolved_ipv4_list;
@@ -288,6 +283,16 @@ ipv6_oat_hash(const void *key)
     return h;
 }
 
+unsigned
+ws_ipv6_hash(const void* key)
+{
+#ifdef HAVE_XXHASH
+    return wmem_strong_hash(key, 16);
+#else
+    return ipv6_oat_hash(key);
+#endif
+}
+
 gboolean
 ipv6_equal(const void *v1, const void *v2)
 {
@@ -312,6 +317,7 @@ e_addr_resolve gbl_resolv_flags = {
     false,  /* vlan_name */
     false,  /* ss7 point code names */
     true,   /* maxmind_geoip */
+    false,  /* tac_name */
 };
 
 /* XXX - ares_init_options(3) says:
@@ -783,14 +789,14 @@ static void subnet_entry_set(uint32_t subnet_addr, const uint8_t mask_length, co
 
 static unsigned serv_port_custom_hash(const void *k)
 {
-    const serv_port_custom_key_t *key = (const serv_port_custom_key_t*)k;
+    const serv_port_key_t *key = (const serv_port_key_t*)k;
     return key->port + (key->type << 16);
 }
 
 static gboolean serv_port_custom_equal(const void *k1, const void *k2)
 {
-    const serv_port_custom_key_t *key1 = (const serv_port_custom_key_t*)k1;
-    const serv_port_custom_key_t *key2 = (const serv_port_custom_key_t*)k2;
+    const serv_port_key_t *key1 = (const serv_port_key_t*)k1;
+    const serv_port_key_t *key2 = (const serv_port_key_t*)k2;
 
     return (key1->port == key2->port) && (key1->type == key2->type);
 }
@@ -799,9 +805,9 @@ static void
 add_custom_service_name(port_type proto, const unsigned port, const char *service_name)
 {
     char *name;
-    serv_port_custom_key_t *key, *orig_key;
+    serv_port_key_t *key, *orig_key;
 
-    key = wmem_new(addr_resolv_scope, serv_port_custom_key_t);
+    key = wmem_new(addr_resolv_scope, serv_port_key_t);
     key->port = (uint16_t)port;
     key->type = proto;
 
@@ -817,41 +823,16 @@ add_custom_service_name(port_type proto, const unsigned port, const char *servic
     // new_resolved_objects = true;
 }
 
-static serv_port_t*
+static void
 add_service_name(port_type proto, const unsigned port, const char *service_name)
 {
-    serv_port_t *serv_port_names;
+    serv_port_key_t *key = wmem_new(addr_resolv_scope, serv_port_key_t);
+    key->port = (uint16_t)port;
+    key->type = proto;
 
-    serv_port_names = (serv_port_t *)wmem_map_lookup(serv_port_hashtable, GUINT_TO_POINTER(port));
-    if (serv_port_names == NULL) {
-        serv_port_names = wmem_new0(addr_resolv_scope, serv_port_t);
-        wmem_map_insert(serv_port_hashtable, GUINT_TO_POINTER(port), serv_port_names);
-    }
-
-    /* We don't need to strdup because service_name is owned by either
-     * the global arrays or the custom table, which manage the memory
-     * and have lifespans at least as long as the addr_resolv_scope.
-     */
-    switch(proto) {
-        case PT_TCP:
-            serv_port_names->tcp_name = service_name;
-            break;
-        case PT_UDP:
-            serv_port_names->udp_name = service_name;
-            break;
-        case PT_SCTP:
-            serv_port_names->sctp_name = service_name;
-            break;
-        case PT_DCCP:
-            serv_port_names->dccp_name = service_name;
-            break;
-        default:
-            return serv_port_names;
-            /* Should not happen */
-    }
+    wmem_map_insert(serv_port_hashtable, key, (void*)service_name);
 
     new_resolved_objects = true;
-    return serv_port_names;
 }
 
 static void
@@ -955,117 +936,93 @@ wmem_utoa(wmem_allocator_t *allocator, unsigned port)
 }
 
 static const char *
-_serv_name_lookup(port_type proto, unsigned port, serv_port_t **value_ret)
+_serv_name_lookup(port_type proto, unsigned port)
 {
-    serv_port_t *serv_port_names;
     const char* name = NULL;
     ws_services_proto_t p;
     ws_services_entry_t const *serv;
 
-    /* Look in the cache */
-    serv_port_names = (serv_port_t *)wmem_map_lookup(serv_port_hashtable, GUINT_TO_POINTER(port));
-
-    if (serv_port_names == NULL) {
+    const serv_port_key_t custom_key = { (uint16_t)port, proto };
+    /* Look in the cache. Use an extended lookup so we can distinguish a port
+     * we already tried but had no name from one we haven't tried. */
+    if (!wmem_map_lookup_extended(serv_port_hashtable, &custom_key, NULL, (void **)&name)) {
         /* Try the user custom table */
-        serv_port_custom_key_t custom_key = { (uint16_t)port, proto };
         name = wmem_map_lookup(serv_port_custom_hashtable, &custom_key);
-    }
 
-    if (name == NULL && serv_port_names == NULL) {
-        /* now look in the global tables */
-        bool valid_proto = true;
-        switch(proto) {
-            case PT_TCP: p = ws_tcp; break;
-            case PT_UDP: p = ws_udp; break;
-            case PT_SCTP: p = ws_sctp; break;
-            case PT_DCCP: p = ws_dccp; break;
-            default: valid_proto = false;
-        }
-        if (valid_proto) {
-            serv = global_services_lookup(port, p);
-            if (serv) {
-                name = serv->name;
+        if (name == NULL) {
+            /* now look in the global tables */
+            bool valid_proto = true;
+            switch(proto) {
+                case PT_TCP: p = ws_tcp; break;
+                case PT_UDP: p = ws_udp; break;
+                case PT_SCTP: p = ws_sctp; break;
+                case PT_DCCP: p = ws_dccp; break;
+                default: valid_proto = false;
+            }
+            if (valid_proto) {
+                serv = global_services_lookup(port, p);
+                if (serv) {
+                    name = serv->name;
+                }
             }
         }
+
+        /* Cache result (even if NULL, so we can know we have no result.) */
+        add_service_name(proto, port, name);
     }
 
-    if (name) {
-        /* Cache result */
-        serv_port_names = add_service_name(proto, port, name);
-    }
-
-    if (value_ret != NULL)
-        *value_ret = serv_port_names;
-
-    if (serv_port_names == NULL)
-        return NULL;
-
-    switch (proto) {
-        case PT_UDP:
-            return serv_port_names->udp_name;
-        case PT_TCP:
-            return serv_port_names->tcp_name;
-        case PT_SCTP:
-            return serv_port_names->sctp_name;
-        case PT_DCCP:
-            return serv_port_names->dccp_name;
-        default:
-            break;
-    }
-    return NULL;
+    return name;
 }
 
 const char *
 try_serv_name_lookup(port_type proto, unsigned port)
 {
-    return (proto == PT_NONE) ? NULL : _serv_name_lookup(proto, port, NULL);
+    return (proto == PT_NONE) ? NULL : _serv_name_lookup(proto, port);
 }
 
 const char *
 serv_name_lookup(port_type proto, unsigned port)
 {
-    serv_port_t *serv_port_names = NULL;
     const char *name;
 
     /* first look for the name */
-    name = _serv_name_lookup(proto, port, &serv_port_names);
+    name = _serv_name_lookup(proto, port);
     if (name != NULL)
         return name;
 
-    if (serv_port_names == NULL) {
-        serv_port_names = wmem_new0(addr_resolv_scope, serv_port_t);
-        wmem_map_insert(serv_port_hashtable, GUINT_TO_POINTER(port), serv_port_names);
-    }
-
+    /* No resolved name. Do we have a cached numeric string? */
+    const serv_port_key_t key = { (uint16_t)port, PT_NONE };
+    name = (const char*)wmem_map_lookup(serv_port_hashtable, &key);
     /* No name; create the numeric string. */
-    if (serv_port_names->numeric == NULL) {
-        serv_port_names->numeric = wmem_strdup_printf(addr_resolv_scope, "%u", port);
+    if (name == NULL) {
+        name = wmem_strdup_printf(addr_resolv_scope, "%u", port);
+        add_service_name(PT_NONE, port, name);
     }
 
-    return serv_port_names->numeric;
+    return name;
 }
 
 static void
-initialize_services(void)
+initialize_services(const char* app_env_var_prefix)
 {
     ws_assert(serv_port_hashtable == NULL);
-    serv_port_hashtable = wmem_map_new(addr_resolv_scope, g_direct_hash, g_direct_equal);
+    serv_port_hashtable = wmem_map_new(addr_resolv_scope, serv_port_custom_hash, serv_port_custom_equal);
     ws_assert(serv_port_custom_hashtable == NULL);
     serv_port_custom_hashtable = wmem_map_new(addr_resolv_scope, serv_port_custom_hash, serv_port_custom_equal);
 
     /* Compute the pathname of the global services file. */
     if (g_services_path == NULL) {
-        g_services_path = get_datafile_path(ENAME_SERVICES);
+        g_services_path = get_datafile_path(ENAME_SERVICES, app_env_var_prefix);
     }
     parse_services_file(g_services_path);
 
     /* Compute the pathname of the personal services file */
     if (g_pservices_path == NULL) {
         /* Check profile directory before personal configuration */
-        g_pservices_path = get_persconffile_path(ENAME_SERVICES, true);
+        g_pservices_path = get_persconffile_path(ENAME_SERVICES, true, app_env_var_prefix);
         if (!parse_services_file(g_pservices_path)) {
             g_free(g_pservices_path);
-            g_pservices_path = get_persconffile_path(ENAME_SERVICES, false);
+            g_pservices_path = get_persconffile_path(ENAME_SERVICES, false, app_env_var_prefix);
             parse_services_file(g_pservices_path);
         }
     }
@@ -1133,23 +1090,23 @@ parse_enterprises_file(const char * path)
 }
 
 static void
-initialize_enterprises(void)
+initialize_enterprises(const char* app_env_var_prefix)
 {
     ws_assert(enterprises_hashtable == NULL);
     enterprises_hashtable = g_hash_table_new_full(NULL, NULL, NULL, g_free);
 
     if (g_enterprises_path == NULL) {
-        g_enterprises_path = get_datafile_path(ENAME_ENTERPRISES);
+        g_enterprises_path = get_datafile_path(ENAME_ENTERPRISES, app_env_var_prefix);
     }
     parse_enterprises_file(g_enterprises_path);
 
     /* Populate entries from profile or personal */
     if (g_penterprises_path == NULL) {
         /* Check profile directory before personal configuration */
-        g_penterprises_path = get_persconffile_path(ENAME_ENTERPRISES, true);
+        g_penterprises_path = get_persconffile_path(ENAME_ENTERPRISES, true, app_env_var_prefix);
         if (!file_exists(g_penterprises_path)) {
             g_free(g_penterprises_path);
-            g_penterprises_path = get_persconffile_path(ENAME_ENTERPRISES, false);
+            g_penterprises_path = get_persconffile_path(ENAME_ENTERPRISES, false, app_env_var_prefix);
         }
     }
     /* Parse personal file (if present) */
@@ -1161,12 +1118,10 @@ try_enterprises_lookup(uint32_t value)
 {
     /* Trying extra entries first. N.B. This does allow entries to be overwritten and found.. */
     const char *name = (const char *)g_hash_table_lookup(enterprises_hashtable, GUINT_TO_POINTER(value));
-    if (name) {
+    if (name)
         return name;
-    }
-    else {
-        return global_enterprises_lookup(value);
-    }
+
+    return val_to_str_ext_const(value, &enterprise_val_ext, "Unknown");
 }
 
 const char *
@@ -1354,7 +1309,7 @@ host_lookup(const unsigned addr)
             if (resolve_synchronously || name_resolve_concurrency == 0) {
                 /*
                  * Either all names are to be resolved synchronously or
-                 * the concurrencly level is 0; do the resolution
+                 * the concurrency level is 0; do the resolution
                  * synchronously.
                  */
                 sync_lookup_ip4(addr);
@@ -1429,7 +1384,7 @@ host_lookup6(const ws_in6_addr *addr)
             if (resolve_synchronously || name_resolve_concurrency == 0) {
                 /*
                  * Either all names are to be resolved synchronously or
-                 * the concurrencly level is 0; do the resolution
+                 * the concurrency level is 0; do the resolution
                  * synchronously.
                  */
                 sync_lookup_ip6(addr);
@@ -1714,7 +1669,7 @@ parse_ether_line(char *line, ether_t *eth, unsigned int *mask,
         return -1;
 
     /* First try to match the common format for the large ethers file. */
-    if (!parse_ether_address_fast(cp, eth, mask, accept_mask)) {
+    if (!parse_ether_address_fast((const uint8_t*)cp, eth, mask, accept_mask)) {
         /* Fallback for the well-known addresses (wka) file. */
         if (!parse_ether_address(cp, eth, mask, accept_mask))
             return -1;
@@ -2015,7 +1970,7 @@ eui64_addr_cmp(const void *a, const void *b)
 }
 
 static void
-initialize_ethers(void)
+initialize_ethers(const char* app_env_var_prefix)
 {
     ether_t *eth;
     unsigned mask = 0;
@@ -2032,22 +1987,22 @@ initialize_ethers(void)
 
     /* Compute the pathname of the ethers file. */
     if (g_ethers_path == NULL) {
-        g_ethers_path = g_build_filename(get_systemfile_dir(), ENAME_ETHERS, NULL);
+        g_ethers_path = g_build_filename(get_systemfile_dir(app_env_var_prefix), ENAME_ETHERS, NULL);
     }
 
     /* Compute the pathname of the personal ethers file. */
     if (g_pethers_path == NULL) {
         /* Check profile directory before personal configuration */
-        g_pethers_path = get_persconffile_path(ENAME_ETHERS, true);
+        g_pethers_path = get_persconffile_path(ENAME_ETHERS, true, app_env_var_prefix);
         if (!file_exists(g_pethers_path)) {
             g_free(g_pethers_path);
-            g_pethers_path = get_persconffile_path(ENAME_ETHERS, false);
+            g_pethers_path = get_persconffile_path(ENAME_ETHERS, false, app_env_var_prefix);
         }
     }
 
     /* Compute the pathname of the global manuf file */
     if (g_manuf_path == NULL)
-        g_manuf_path = get_datafile_path(ENAME_MANUF);
+        g_manuf_path = get_datafile_path(ENAME_MANUF, app_env_var_prefix);
     /* Read it and initialize the hash table */
     if (file_exists(g_manuf_path)) {
         set_ethent(g_manuf_path);
@@ -2060,10 +2015,10 @@ initialize_ethers(void)
     /* Compute the pathname of the personal manuf file */
     if (g_pmanuf_path == NULL) {
         /* Check profile directory before personal configuration */
-        g_pmanuf_path = get_persconffile_path(ENAME_MANUF, true);
+        g_pmanuf_path = get_persconffile_path(ENAME_MANUF, true, app_env_var_prefix);
         if (!file_exists(g_pmanuf_path)) {
             g_free(g_pmanuf_path);
-            g_pmanuf_path = get_persconffile_path(ENAME_MANUF, false);
+            g_pmanuf_path = get_persconffile_path(ENAME_MANUF, false, app_env_var_prefix);
         }
     }
     /* Read it and initialize the hash table */
@@ -2077,7 +2032,7 @@ initialize_ethers(void)
 
     /* Compute the pathname of the wka file */
     if (g_wka_path == NULL)
-        g_wka_path = get_datafile_path(ENAME_WKA);
+        g_wka_path = get_datafile_path(ENAME_WKA, app_env_var_prefix);
 
     /* Read it and initialize the hash table */
     set_ethent(g_wka_path);
@@ -2639,7 +2594,7 @@ get_ipxnetbyaddr(uint32_t addr)
 } /* get_ipxnetbyaddr */
 
 static void
-initialize_ipxnets(void)
+initialize_ipxnets(const char* app_env_var_prefix)
 {
     /* Compute the pathname of the ipxnets file.
      *
@@ -2650,7 +2605,7 @@ initialize_ipxnets(void)
      */
     if (g_ipxnets_path == NULL) {
         g_ipxnets_path = wmem_strdup_printf(addr_resolv_scope, "%s" G_DIR_SEPARATOR_S "%s",
-                get_systemfile_dir(), ENAME_IPXNETS);
+                get_systemfile_dir(app_env_var_prefix), ENAME_IPXNETS);
     }
 
     /* Set g_pipxnets_path here, but don't actually do anything
@@ -2658,10 +2613,10 @@ initialize_ipxnets(void)
      */
     if (g_pipxnets_path == NULL) {
         /* Check profile directory before personal configuration */
-        g_pipxnets_path = get_persconffile_path(ENAME_IPXNETS, true);
+        g_pipxnets_path = get_persconffile_path(ENAME_IPXNETS, true, app_env_var_prefix);
         if (!file_exists(g_pipxnets_path)) {
             g_free(g_pipxnets_path);
-            g_pipxnets_path = get_persconffile_path(ENAME_IPXNETS, false);
+            g_pipxnets_path = get_persconffile_path(ENAME_IPXNETS, false, app_env_var_prefix);
         }
     }
 
@@ -2793,7 +2748,7 @@ get_vlannamebyid(uint16_t id)
 } /* get_vlannamebyid */
 
 static void
-initialize_vlans(void)
+initialize_vlans(const char* app_env_var_prefix)
 {
     ws_assert(vlan_hash_table == NULL);
     vlan_hash_table = wmem_map_new(addr_resolv_scope, g_direct_hash, g_direct_equal);
@@ -2803,10 +2758,10 @@ initialize_vlans(void)
      */
     if (g_pvlan_path == NULL) {
         /* Check profile directory before personal configuration */
-        g_pvlan_path = get_persconffile_path(ENAME_VLANS, true);
+        g_pvlan_path = get_persconffile_path(ENAME_VLANS, true, app_env_var_prefix);
         if (!file_exists(g_pvlan_path)) {
             g_free(g_pvlan_path);
-            g_pvlan_path = get_persconffile_path(ENAME_VLANS, false);
+            g_pvlan_path = get_persconffile_path(ENAME_VLANS, false, app_env_var_prefix);
         }
     }
 } /* initialize_vlans */
@@ -3200,7 +3155,7 @@ subnet_entry_set(uint32_t subnet_addr, const uint8_t mask_length, const char* na
 }
 
 static void
-subnet_name_lookup_init(void)
+subnet_name_lookup_init(const char* app_env_var_prefix)
 {
     char* subnetspath;
     uint32_t i;
@@ -3214,14 +3169,14 @@ subnet_name_lookup_init(void)
     }
 
     /* Check profile directory before personal configuration */
-    subnetspath = get_persconffile_path(ENAME_SUBNETS, true);
+    subnetspath = get_persconffile_path(ENAME_SUBNETS, true, app_env_var_prefix);
     if (!read_subnets_file(subnetspath)) {
         if (errno != ENOENT) {
             report_open_failure(subnetspath, errno, false);
         }
 
         g_free(subnetspath);
-        subnetspath = get_persconffile_path(ENAME_SUBNETS, false);
+        subnetspath = get_persconffile_path(ENAME_SUBNETS, false, app_env_var_prefix);
         if (!read_subnets_file(subnetspath) && errno != ENOENT) {
             report_open_failure(subnetspath, errno, false);
         }
@@ -3231,7 +3186,7 @@ subnet_name_lookup_init(void)
     /*
      * Load the global subnets file, if we have one.
      */
-    subnetspath = get_datafile_path(ENAME_SUBNETS);
+    subnetspath = get_datafile_path(ENAME_SUBNETS, app_env_var_prefix);
     if (!read_subnets_file(subnetspath) && errno != ENOENT) {
         report_open_failure(subnetspath, errno, false);
     }
@@ -3360,7 +3315,7 @@ read_ss7pcs_file(const char *ss7pcspath)
 }
 
 static void
-ss7pc_name_lookup_init(void)
+ss7pc_name_lookup_init(const char* app_env_var_prefix)
 {
     char *ss7pcspath;
 
@@ -3371,7 +3326,7 @@ ss7pc_name_lookup_init(void)
     /*
      * Load the user's ss7pcs file
      */
-    ss7pcspath = get_persconffile_path(ENAME_SS7PCS, true);
+    ss7pcspath = get_persconffile_path(ENAME_SS7PCS, true, app_env_var_prefix);
     if (!read_ss7pcs_file(ss7pcspath) && errno != ENOENT) {
         report_open_failure(ss7pcspath, errno, false);
     }
@@ -3380,6 +3335,71 @@ ss7pc_name_lookup_init(void)
 
 /* SS7PC Name Resolution End*/
 
+/* TACS */
+static bool
+read_tacs_file(const char *tacspath)
+{
+    FILE *hf;
+    char line[MAX_LINELEN];
+    char *cp;
+    uint16_t id;
+
+    /*
+    *  File format is TAC(decimal)<tab/space>TACName (no spaces)
+    */
+    if ((hf = ws_fopen(tacspath, "r")) == NULL)
+        return false;
+
+    while (fgetline(line, sizeof(line), hf) >= 0) {
+        if ((cp = strchr(line, '#')))
+            *cp = '\0';
+
+        if ((cp = strtok(line, " \t")) == NULL)
+            continue;
+
+        if (sscanf(cp, "%" SCNu16, &id) != 1) {
+            continue;
+        }
+
+        if ((cp = strtok(NULL, " \t\n")) == NULL)
+            continue; /* no TAC name */
+
+        if (!wmem_map_lookup(tac_hash_table, GUINT_TO_POINTER(id))) {
+            char *buf = wmem_strdup(addr_resolv_scope, cp);
+            wmem_map_insert(tac_hash_table, GUINT_TO_POINTER(id), (void *)buf);
+        }
+    }
+
+    fclose(hf);
+    return true;
+}
+
+static void
+initialize_tacs(const char* app_env_var_prefix)
+{
+    char *tacspath;
+    ws_assert(tac_hash_table == NULL);
+    tac_hash_table = wmem_map_new(addr_resolv_scope, g_direct_hash, g_direct_equal);
+
+    tacspath = get_persconffile_path(ENAME_TACS, true, app_env_var_prefix);
+    if (!read_tacs_file(tacspath) && errno != ENOENT) {
+        report_open_failure(tacspath, errno, false);
+    }
+    g_free(tacspath);
+}
+
+static void
+tac_name_lookup_cleanup(void)
+{
+    tac_hash_table = NULL;
+}
+
+const char *
+tac_name_lookup(const unsigned id)
+{
+    return (const char *)wmem_map_lookup(tac_hash_table, GUINT_TO_POINTER(id));
+}
+/* TAC END */
 
 /*
  *  External Functions
@@ -3485,6 +3505,13 @@ addr_resolve_pref_init(module_t *nameres)
             " One line per Point Code, e.g.: 2-1234 MyPointCode1",
             &gbl_resolv_flags.ss7pc_name);
 
+    prefs_register_bool_preference(nameres, "tac_name",
+            "Resolve TAC",
+            "Resolve TAC to area names from the preferences \"tac\" file."
+            " Format of the file is: \"TAC(decimail)<Tab/space>Name\"."
+            " One line per TAC, e.g.: 30123 City1",
+            &gbl_resolv_flags.tac_name);
+
 }
 
 void addr_resolve_pref_apply(void)
@@ -3504,6 +3531,7 @@ disable_name_resolution(void) {
     gbl_resolv_flags.vlan_name                          = false;
     gbl_resolv_flags.ss7pc_name                         = false;
     gbl_resolv_flags.maxmind_geoip                      = false;
+    gbl_resolv_flags.tac_name                           = false;
 }
 
 bool
@@ -3709,7 +3737,7 @@ add_manually_resolved(void)
 }
 
 static void
-host_name_lookup_init(void)
+host_name_lookup_init(const char* app_env_var_prefix)
 {
     char *hostspath;
     unsigned i;
@@ -3737,12 +3765,12 @@ host_name_lookup_init(void)
         manually_resolved_ipv4_list = wmem_map_new(wmem_epan_scope(), g_direct_hash, g_direct_equal);
 
     if (manually_resolved_ipv6_list == NULL)
-        manually_resolved_ipv6_list = wmem_map_new(wmem_epan_scope(), ipv6_oat_hash, ipv6_equal);
+        manually_resolved_ipv6_list = wmem_map_new(wmem_epan_scope(), ws_ipv6_hash, ipv6_equal);
 
     /*
      * Load the global hosts file, if we have one.
      */
-    hostspath = get_datafile_path(ENAME_HOSTS);
+    hostspath = get_datafile_path(ENAME_HOSTS, app_env_var_prefix);
     if (!read_hosts_file(hostspath, true) && errno != ENOENT) {
         report_open_failure(hostspath, errno, false);
     }
@@ -3750,7 +3778,7 @@ host_name_lookup_init(void)
     /*
      * Load the user's hosts file no matter what, if they have one.
      */
-    hostspath = get_persconffile_path(ENAME_HOSTS, true);
+    hostspath = get_persconffile_path(ENAME_HOSTS, true, app_env_var_prefix);
     if (!read_hosts_file(hostspath, true) && errno != ENOENT) {
         report_open_failure(hostspath, errno, false);
     }
@@ -3773,11 +3801,11 @@ host_name_lookup_init(void)
         }
     }
 
-    subnet_name_lookup_init();
+    subnet_name_lookup_init(app_env_var_prefix);
 
     add_manually_resolved();
 
-    ss7pc_name_lookup_init();
+    ss7pc_name_lookup_init(app_env_var_prefix);
 }
 
 static void
@@ -3812,10 +3840,10 @@ host_name_lookup_cleanup(void)
 }
 
 
-void host_name_lookup_reset(void)
+void host_name_lookup_reset(const char* app_env_var_prefix)
 {
     addr_resolv_cleanup();
-    addr_resolv_init();
+    addr_resolv_init(app_env_var_prefix);
 }
 
 char *
@@ -3907,7 +3935,7 @@ get_ether_name(const uint8_t *addr)
 } /* get_ether_name */
 
 const char *
-tvb_get_ether_name(tvbuff_t *tvb, int offset)
+tvb_get_ether_name(tvbuff_t *tvb, unsigned offset)
 {
     return get_ether_name(tvb_get_ptr(tvb, offset, 6));
 }
@@ -4003,7 +4031,7 @@ get_manuf_name(const uint8_t *addr, size_t size)
 } /* get_manuf_name */
 
 const char *
-tvb_get_manuf_name(tvbuff_t *tvb, int offset)
+tvb_get_manuf_name(tvbuff_t *tvb, unsigned offset)
 {
     uint8_t buf[3] = { 0 };
     tvb_memcpy(tvb, buf, offset, 3);
@@ -4048,7 +4076,7 @@ uint_get_manuf_name_if_known(const uint32_t manuf_key)
 }
 
 const char *
-tvb_get_manuf_name_if_known(tvbuff_t *tvb, int offset)
+tvb_get_manuf_name_if_known(tvbuff_t *tvb, unsigned offset)
 {
     uint8_t buf[3] = { 0 };
     tvb_memcpy(tvb, buf, offset, 3);
@@ -4082,7 +4110,7 @@ eui64_to_display(wmem_allocator_t *allocator, const uint64_t addr_eui64)
 {
     uint8_t addr[EUI64_ADDR_LEN];
 
-    phton64(addr, addr_eui64);
+    phtonu64(addr, addr_eui64);
 
     const char *result = get_eui64_name(addr);
 
@@ -4281,16 +4309,17 @@ get_ipv6_hash_table(void)
 }
 /* Initialize all the address resolution subsystems in this file */
 void
-addr_resolv_init(void)
+addr_resolv_init(const char* app_env_var_prefix)
 {
     ws_assert(addr_resolv_scope == NULL);
     addr_resolv_scope = wmem_allocator_new(WMEM_ALLOCATOR_BLOCK);
-    initialize_services();
-    initialize_ethers();
-    initialize_ipxnets();
-    initialize_vlans();
-    initialize_enterprises();
-    host_name_lookup_init();
+    initialize_services(app_env_var_prefix);
+    initialize_ethers(app_env_var_prefix);
+    initialize_ipxnets(app_env_var_prefix);
+    initialize_vlans(app_env_var_prefix);
+    initialize_enterprises(app_env_var_prefix);
+    host_name_lookup_init(app_env_var_prefix);
+    initialize_tacs(app_env_var_prefix);
 }
 
 /* Clean up all the address resolution subsystems in this file */
@@ -4303,6 +4332,7 @@ addr_resolv_cleanup(void)
     ipx_name_lookup_cleanup();
     enterprises_cleanup();
     host_name_lookup_cleanup();
+    tac_name_lookup_cleanup();
 
     wmem_destroy_allocator(addr_resolv_scope);
     addr_resolv_scope = NULL;
@@ -4326,7 +4356,7 @@ str_to_ip6(const char *str, void *dst)
  * eth_bytes is a buffer >= 6 bytes that was allocated by the caller
  */
 bool
-str_to_eth(const char *str, char *eth_bytes)
+str_to_eth(const char *str, uint8_t (*eth_bytes)[6])
 {
     ether_t eth;
     unsigned mask;

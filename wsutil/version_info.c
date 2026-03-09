@@ -28,6 +28,10 @@
 #include <gmodule.h>
 #include <pcre2.h>
 
+#ifdef HAVE_XXHASH
+#include <xxhash.h>
+#endif
+
 #ifdef HAVE_ZLIB
 #include <zlib.h>
 #endif
@@ -36,9 +40,6 @@
 //#include <zlib-ng.h>
 //#endif
 
-#include "vcs_version.h"
-
-#include <wsutil/application_flavor.h>
 #include <wsutil/cpu_info.h>
 #include <wsutil/os_version_info.h>
 #include <wsutil/crash_info.h>
@@ -56,6 +57,8 @@ static void get_mem_info(GString *str);
 
 void
 ws_init_version_info(const char *appname,
+		const char* appflavor,
+		get_version_func version_func,
 		gather_feature_func gather_compile,
 		gather_feature_func gather_runtime)
 {
@@ -76,16 +79,14 @@ ws_init_version_info(const char *appname,
 	 * version - including the VCS version, for a build from
 	 * a checkout.
 	 */
-	if (strstr(appname, application_flavor_name_proper()) != NULL) {
+	if ((appflavor != NULL) && strstr(appname, appflavor) != NULL) {
 		appname_with_version = ws_strdup_printf("%s %s",
-			appname,
-			application_flavor_is_wireshark() ? get_ws_vcs_version_info() : get_ss_vcs_version_info());
+			appname, version_func());
 	}
 	/* Include our application flavor. The default is "Wireshark" */
 	else {
 		appname_with_version = ws_strdup_printf("%s (%s) %s",
-			appname, application_flavor_name_proper(),
-			application_flavor_is_wireshark() ? get_ws_vcs_version_info() : get_ss_vcs_version_info());
+			appname, (appflavor != NULL) ? appflavor : "Wireshark", version_func());
 	}
 
 	/* Get the compile-time version information string */
@@ -111,7 +112,7 @@ ws_init_version_info(const char *appname,
 static void
 rtrim_gstring(GString *str)
 {
-	gsize end = str->len - 1;   // get to 0-based offset
+	size_t end = str->len - 1;   // get to 0-based offset
 	while(str->str[end] == ' ') {
 		end--;
 	}
@@ -134,7 +135,7 @@ features_to_columns(feature_list l, GString *str)
 	uint8_t ncols = 0;		// number of columns to show
 	uint8_t maxlen = 0;		// length of longest item
 	unsigned num = 0;		// number of items in list
-	gchar *c;
+	char *c;
 	GPtrArray *a;
 	GList *iter;
 
@@ -144,7 +145,7 @@ features_to_columns(feature_list l, GString *str)
 	}
 	a = g_ptr_array_sized_new(num);
 	for (iter = *l; iter != NULL; iter = iter->next) {
-		c = (gchar *)iter->data;
+		c = (char *)iter->data;
 		maxlen = MAX(maxlen, (uint8_t)strlen(c));
 		g_ptr_array_add(a, iter->data);
 	}
@@ -152,7 +153,7 @@ features_to_columns(feature_list l, GString *str)
 	ncols = (linelen - linepad) / maxlen;
 	if (ncols <= 1 || num <= 1) {
 		for (iter = *l; iter != NULL; iter = iter->next) {
-			c = (gchar *)iter->data;
+			c = (char *)iter->data;
 			g_string_append_printf(str, "%*s%s\n", linepad, "", c);
 		}
 	}
@@ -164,7 +165,7 @@ features_to_columns(feature_list l, GString *str)
 			for (j = 0; j < ncols; j++) {
 				unsigned idx = i + (j * nrows);
 				if (idx < num) {
-					g_string_append_printf(str, "%-*s", maxlen, (gchar *)g_ptr_array_index(a, idx));
+					g_string_append_printf(str, "%-*s", maxlen, (char *)g_ptr_array_index(a, idx));
 				}
 			}
 			rtrim_gstring(str);
@@ -220,6 +221,16 @@ gather_pcre2_compile_info(feature_list l)
 	 * I don't know what it is for a pre-release.
 	 */
 	with_feature(l, "PCRE2 %u.%u %s", PCRE2_MAJOR, PCRE2_MINOR, PCRE2_DATE_EXPAND_AND_QUOTE(PCRE2_DATE));
+}
+
+void
+gather_xxhash_compile_info(feature_list l)
+{
+#ifdef HAVE_XXHASH
+	with_feature(l, "xxhash " XXHASH_VERSION_STRING);
+#else
+	without_feature(l, "xxhash");
+#endif /* HAVE_XXHASH */
 }
 
 void
@@ -287,9 +298,11 @@ get_compiled_version_info(gather_feature_func gather_compile)
 	separate_features(&l, &with_list, &without_list);
 	free_features(&l);
 
-	g_string_append(str, " With:\n");
-	features_to_columns(&with_list, str);
-	free_features(&with_list);
+	if (with_list != NULL) {
+		g_string_append(str, " With:\n");
+		features_to_columns(&with_list, str);
+		free_features(&with_list);
+	}
 	if (without_list != NULL) {
 		g_string_append(str, " Without:\n");
 		features_to_columns(&without_list, str);
@@ -318,11 +331,12 @@ get_mem_info(GString *str)
 #elif __linux__
 	struct sysinfo info;
 	if (sysinfo(&info) == 0)
-		memsize = info.totalram * info.mem_unit;
+		if (ckd_mul(&memsize, info.totalram, info.mem_unit))
+			memsize = 0;
 #endif
 
 	if (memsize > 0)
-		g_string_append_printf(str, "%" G_GINT64_FORMAT " MB of physical memory", memsize/(1024*1024));
+		g_string_append_printf(str, "%" PRId64 " MB of physical memory", memsize/(1024*1024));
 }
 
 /*
@@ -511,11 +525,20 @@ gather_pcre2_runtime_info(feature_list l)
 		without_feature(l, "PCRE2 (error querying)");
 		return;
 	}
-	buf_pcre2 = g_malloc(size + 1);
+	buf_pcre2 = g_malloc((size_t)size + 1);
 	pcre2_config(PCRE2_CONFIG_VERSION, buf_pcre2);
 	buf_pcre2[size] = '\0';
 	with_feature(l, "PCRE2 %s", buf_pcre2);
 	g_free(buf_pcre2);
+}
+
+void
+gather_xxhash_runtime_info(feature_list l)
+{
+	(void)l;
+#if defined(HAVE_XXHASH)
+	with_feature(l, "xxhash %u", XXH_versionNumber());
+#endif
 }
 
 void
@@ -540,7 +563,7 @@ GString *
 get_runtime_version_info(gather_feature_func gather_runtime)
 {
 	GString *str;
-	gchar *lc;
+	char *lc;
 	GList *l = NULL, *with_list = NULL, *without_list = NULL;
 
 	str = g_string_new("Runtime info:\n      OS: ");
@@ -583,9 +606,11 @@ get_runtime_version_info(gather_feature_func gather_runtime)
 	separate_features(&l, &with_list, &without_list);
 	free_features(&l);
 
-	g_string_append(str, " With:\n");
-	features_to_columns(&with_list, str);
-	free_features(&with_list);
+	if (with_list != NULL) {
+		g_string_append(str, " With:\n");
+		features_to_columns(&with_list, str);
+		free_features(&with_list);
+	}
 	if (without_list != NULL) {
 		g_string_append(str, " Without:\n");
 		features_to_columns(&without_list, str);
@@ -594,41 +619,6 @@ get_runtime_version_info(gather_feature_func gather_runtime)
 
 	end_string(str);
 	return str;
-}
-
-/*
- * Return a version number string for Wireshark, including, for builds
- * from a tree checked out from Wireshark's version control system,
- * something identifying what version was checked out.
- */
-const char *
-get_ws_vcs_version_info(void)
-{
-#ifdef WIRESHARK_VCS_VERSION
-	return VERSION " (" WIRESHARK_VCS_VERSION ")";
-#else
-	return VERSION;
-#endif
-}
-
-const char *
-get_ss_vcs_version_info(void)
-{
-#ifdef STRATOSHARK_VCS_VERSION
-	return STRATOSHARK_VERSION " (" STRATOSHARK_VCS_VERSION ")";
-#else
-	return STRATOSHARK_VERSION;
-#endif
-}
-
-const char *
-get_ws_vcs_version_info_short(void)
-{
-#ifdef WIRESHARK_VCS_VERSION
-	return WIRESHARK_VCS_VERSION;
-#else
-	return VERSION;
-#endif
 }
 
 void
@@ -674,7 +664,7 @@ const char *
 get_copyright_info(void)
 {
 	return
-		"Copyright 1998-2025 Gerald Combs <gerald@wireshark.org> and contributors.";
+		"Copyright 1998-2026 Gerald Combs <gerald@wireshark.org> and contributors.";
 }
 
 const char *

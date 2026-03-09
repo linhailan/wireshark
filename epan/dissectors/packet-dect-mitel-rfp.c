@@ -13,7 +13,7 @@
  */
 
 /*
- * This is a proprietary protocol deveolped by Mitel for communication
+ * This is a proprietary protocol developed by Mitel for communication
  * between the DECT system management Software (OMM) and the DECT
  * base station (RFPs)
  */
@@ -27,7 +27,6 @@
 #include <epan/tfs.h>
 #include <epan/tvbuff.h>
 #include <epan/unit_strings.h>
-#include <epan/value_string.h>
 #include <ftypes/ftypes.h>
 
 /* Prototypes */
@@ -650,9 +649,9 @@ CONTROL-ACK Message
  */
 static unsigned dissect_dect_mitel_rfp_control_ack(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_, unsigned offset)
 {
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_control_ack_message, tvb, offset, 2, ENC_NA);
+	proto_tree_add_item(tree, hf_dect_mitel_rfp_control_ack_message, tvb, offset, 2, ENC_BIG_ENDIAN);
 	offset += 2;
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_control_ack_call_id, tvb, offset, 2, ENC_NA);
+	proto_tree_add_item(tree, hf_dect_mitel_rfp_control_ack_call_id, tvb, offset, 2, ENC_BIG_ENDIAN);
 	offset += 2;
 	return offset;
 }
@@ -667,11 +666,11 @@ CONTROL-NACK Message
  */
 static unsigned dissect_dect_mitel_rfp_control_nack(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_, unsigned offset)
 {
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_control_nack_message, tvb, offset, 2, ENC_NA);
+	proto_tree_add_item(tree, hf_dect_mitel_rfp_control_nack_message, tvb, offset, 2, ENC_BIG_ENDIAN);
 	offset += 2;
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_control_nack_call_id, tvb, offset, 2, ENC_NA);
+	proto_tree_add_item(tree, hf_dect_mitel_rfp_control_nack_call_id, tvb, offset, 2, ENC_BIG_ENDIAN);
 	offset += 2;
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_control_nack_reason, tvb, offset, 4, ENC_NA);
+	proto_tree_add_item(tree, hf_dect_mitel_rfp_control_nack_reason, tvb, offset, 4, ENC_BIG_ENDIAN);
 	offset += 4;
 	return offset;
 }
@@ -685,9 +684,9 @@ CONTROL-HEARTBEAT Message
  */
 static unsigned dissect_dect_mitel_rfp_control_heartbeat(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_, unsigned offset)
 {
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_control_heartbeat_milliseconds, tvb, offset, 4, ENC_NA);
+	proto_tree_add_item(tree, hf_dect_mitel_rfp_control_heartbeat_milliseconds, tvb, offset, 4, ENC_BIG_ENDIAN);
 	offset += 4;
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_control_heartbeat_nanoseconds, tvb, offset, 4, ENC_NA);
+	proto_tree_add_item(tree, hf_dect_mitel_rfp_control_heartbeat_nanoseconds, tvb, offset, 4, ENC_BIG_ENDIAN);
 	offset += 4;
 	return offset;
 }
@@ -727,14 +726,12 @@ SYS-LED Message
 static unsigned dissect_dect_mitel_rfp_sys_led(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_, unsigned offset)
 {
 	uint8_t led_id, led_color;
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_sys_led_id, tvb, offset, 1, ENC_NA);
-	led_id = tvb_get_uint8(tvb, offset);
+	proto_tree_add_item_ret_uint8(tree, hf_dect_mitel_rfp_sys_led_id, tvb, offset, 1, ENC_NA, &led_id);
 	offset++;
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_sys_led_color, tvb, offset, 1, ENC_NA);
-	led_color = tvb_get_uint8(tvb, offset);
+	proto_tree_add_item_ret_uint8(tree, hf_dect_mitel_rfp_sys_led_color, tvb, offset, 1, ENC_NA, &led_color);
 	offset++;
 	col_append_fstr(pinfo->cinfo, COL_INFO, "LED %d:%s", led_id,
-		val_to_str(led_color, dect_mitel_rfp_sys_led_color_val, "Unknown: %02x"));
+		val_to_str(pinfo->pool, led_color, dect_mitel_rfp_sys_led_color_val, "Unknown: %02x"));
 	return offset;
 }
 
@@ -747,8 +744,7 @@ SYS-HEARTBEAT-INTERVAL Message
 static unsigned dissect_dect_mitel_rfp_sys_heartbeat_interval(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_, unsigned offset)
 {
 	uint8_t interval;
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_sys_heartbeat_interval_value, tvb, offset, 1, ENC_BIG_ENDIAN);
-	interval = tvb_get_uint8(tvb, offset);
+	proto_tree_add_item_ret_uint8(tree, hf_dect_mitel_rfp_sys_heartbeat_interval_value, tvb, offset, 1, ENC_BIG_ENDIAN, &interval);
 	col_append_fstr(pinfo->cinfo, COL_INFO, "Interval: %ds", interval);
 	offset++;
 
@@ -778,7 +774,7 @@ SYS-MAX-CHANNELS Message
 | Offset | Len | Content   |
 | ------ | --- | --------- |
 |      0 |   1 | DSP       |
-|      1 |   1 | Sesseions |
+|      1 |   1 | Sessions  |
 */
 static unsigned dissect_dect_mitel_rfp_sys_max_channels(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_, unsigned offset)
 {
@@ -904,7 +900,7 @@ SYS-INIT Message
 |      0 |   4 | Model Type        |
 |      8 |   6 | MAC Address       |
 |     20 |   4 | Capabilities      |
-|     24 |  64 | AES enrypted Data |
+|     24 |  64 | AES encrypted Data|
 |     88 |   4 | Protocol          |
 |    112 |  32 | Software Version  |
 |    256 |  16 | Signature         |
@@ -922,15 +918,15 @@ static unsigned dissect_dect_mitel_rfp_sys_init(tvbuff_t *tvb, packet_info *pinf
 		NULL
 	};
 
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_sys_init_rfp_model, tvb, offset, 4, ENC_NA);
+	proto_tree_add_item(tree, hf_dect_mitel_rfp_sys_init_rfp_model, tvb, offset, 4, ENC_BIG_ENDIAN);
 	offset += 8;
 	proto_tree_add_item(tree, hf_dect_mitel_rfp_sys_init_rfp_mac, tvb, offset, 6, ENC_NA);
 	offset += 12;
-	proto_tree_add_bitmask(tree, tvb, offset, hf_dect_mitel_rfp_sys_init_rfp_capabilities, ett_dect_mitel_rfp_sys_init_rfp_capabilities, capabilities_flags, ENC_NA);
+	proto_tree_add_bitmask(tree, tvb, offset, hf_dect_mitel_rfp_sys_init_rfp_capabilities, ett_dect_mitel_rfp_sys_init_rfp_capabilities, capabilities_flags, ENC_BIG_ENDIAN);
 	offset += 4;
 	proto_tree_add_item(tree, hf_dect_mitel_rfp_sys_init_crypted, tvb, offset, 64, ENC_NA);
 	offset += 64;
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_sys_init_protocol, tvb, offset, 4, ENC_NA);
+	proto_tree_add_item(tree, hf_dect_mitel_rfp_sys_init_protocol, tvb, offset, 4, ENC_BIG_ENDIAN);
 	offset += 24;
 	proto_tree_add_item(tree, hf_dect_mitel_rfp_sys_init_rfp_software_version, tvb, offset, 32, ENC_ASCII);
 	offset += 144;
@@ -949,9 +945,9 @@ SYS-AUTHENTICATE Message
 static unsigned dissect_dect_mitel_rfp_sys_authenticate(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_, unsigned offset)
 {
 	offset += 7;
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_sys_authenticate_rfp_iv, tvb, offset, 8, ENC_NA);
+	proto_tree_add_item(tree, hf_dect_mitel_rfp_sys_authenticate_rfp_iv, tvb, offset, 8, ENC_BIG_ENDIAN);
 	offset += 16;
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_sys_authenticate_omm_iv, tvb, offset, 8, ENC_NA);
+	proto_tree_add_item(tree, hf_dect_mitel_rfp_sys_authenticate_omm_iv, tvb, offset, 8, ENC_BIG_ENDIAN);
 	offset += 8;
 	return offset;
 }
@@ -1275,8 +1271,7 @@ static unsigned dissect_dect_mitel_rfp_media_tone(tvbuff_t *tvb, packet_info *pi
 	proto_tree_add_item(tree, hf_dect_mitel_rfp_media_direction, tvb, offset, 1, ENC_BIG_ENDIAN);
 	offset++;
 
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_media_tone_count, tvb, offset, 1, ENC_BIG_ENDIAN);
-	tone_count = tvb_get_uint8(tvb, offset);
+	proto_tree_add_item_ret_uint8(tree, hf_dect_mitel_rfp_media_tone_count, tvb, offset, 1, ENC_BIG_ENDIAN, &tone_count);
 	offset += 5;
 
 	for (uint8_t i = 0; i < tone_count; i++) {
@@ -1471,8 +1466,7 @@ static unsigned dissect_dect_mitel_rfp_sync_system_search_cfm(tvbuff_t *tvb, pac
 	uint8_t item_count;
 	proto_tree *item_tree;
 
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_sync_system_search_cfm_count, tvb, offset, 1, ENC_BIG_ENDIAN);
-	item_count = tvb_get_uint8(tvb, offset);
+	proto_tree_add_item_ret_uint8(tree, hf_dect_mitel_rfp_sync_system_search_cfm_count, tvb, offset, 1, ENC_BIG_ENDIAN, &item_count);
 	offset++;
 
 	for (uint8_t i = 0; i < item_count; i++) {
@@ -1512,8 +1506,7 @@ static unsigned dissect_dect_mitel_rfp_sync_phase_ofs_with_rssi_ind(tvbuff_t *tv
 	uint8_t item_count;
 	proto_tree *item_tree;
 
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_sync_phase_ofs_with_rssi_ind_count, tvb, offset, 1, ENC_BIG_ENDIAN);
-	item_count = tvb_get_uint8(tvb, offset);
+	proto_tree_add_item_ret_uint8(tree, hf_dect_mitel_rfp_sync_phase_ofs_with_rssi_ind_count, tvb, offset, 1, ENC_BIG_ENDIAN, &item_count);
 	offset++;
 
 	for (uint8_t i = 0; i < item_count; i++) {
@@ -1547,14 +1540,12 @@ static unsigned dissect_dect_mitel_rfp_sync(tvbuff_t *tvb, packet_info *pinfo, p
 {
 	uint16_t message_type;
 	uint8_t payload_length;
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_sync_payload_type, tvb, offset, 2, ENC_BIG_ENDIAN);
-	message_type = tvb_get_uint16(tvb, offset, ENC_BIG_ENDIAN);
+	proto_tree_add_item_ret_uint16(tree, hf_dect_mitel_rfp_sync_payload_type, tvb, offset, 2, ENC_BIG_ENDIAN, &message_type);
 	col_append_fstr(pinfo->cinfo, COL_INFO, "%s ",
-			val_to_str(message_type, dect_mitel_rfp_sync_payload_type_val, " Unknown 0x%04x"));
+			val_to_str(pinfo->pool, message_type, dect_mitel_rfp_sync_payload_type_val, " Unknown 0x%04x"));
 	offset += 2;
 
-	proto_tree_add_item(tree, hf_dect_mitel_rfp_sync_payload_length, tvb, offset, 1, ENC_BIG_ENDIAN);
-	payload_length = tvb_get_uint8(tvb, offset);
+	proto_tree_add_item_ret_uint8(tree, hf_dect_mitel_rfp_sync_payload_length, tvb, offset, 1, ENC_BIG_ENDIAN, &payload_length);
 	offset++;
 
 	if (payload_length > 0) {
@@ -1592,7 +1583,7 @@ static int dissect_dect_mitel_rfp(tvbuff_t *tvb, packet_info *pinfo, proto_tree 
 	proto_tree *dect_mitel_rfp_tree;
 
 	unsigned offset = 0;
-	uint16_t message_type, message_length;
+	uint32_t message_type, message_length;
 	tvbuff_t *next_tvb;
 	bool ip_encapsulated = true;
 
@@ -1605,16 +1596,14 @@ static int dissect_dect_mitel_rfp(tvbuff_t *tvb, packet_info *pinfo, proto_tree 
 
 	dect_mitel_rfp_tree = proto_item_add_subtree(ti, ett_dect_mitel_rfp);
 
-	proto_tree_add_item(dect_mitel_rfp_tree, hf_dect_mitel_rfp_message_type, tvb,
-			offset, 2, ENC_NA);
-	message_type = tvb_get_uint16(tvb, offset, ENC_NA);
+	proto_tree_add_item_ret_uint(dect_mitel_rfp_tree, hf_dect_mitel_rfp_message_type, tvb,
+			offset, 2, ENC_BIG_ENDIAN, &message_type);
 	col_append_fstr(pinfo->cinfo, COL_INFO, "%s ",
-			val_to_str(message_type, dect_mitel_rfp_message_type_val, "Unknown 0x%04x"));
+			val_to_str(pinfo->pool, message_type, dect_mitel_rfp_message_type_val, "Unknown 0x%04x"));
 	offset += 2;
 
-	proto_tree_add_item(dect_mitel_rfp_tree, hf_dect_mitel_rfp_message_length, tvb,
-		offset, 2, ENC_NA);
-	message_length = tvb_get_uint16(tvb, offset, ENC_BIG_ENDIAN);
+	proto_tree_add_item_ret_uint(dect_mitel_rfp_tree, hf_dect_mitel_rfp_message_length, tvb,
+		offset, 2, ENC_BIG_ENDIAN, &message_length);
 	offset += 2;
 
 	switch ( message_type ) {

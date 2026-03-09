@@ -16,7 +16,6 @@
 #include <epan/packet.h>
 #include <epan/capture_dissectors.h>
 #include <epan/addr_resolv.h>
-#include <epan/ipproto.h>
 #include <epan/in_cksum.h>
 #include <epan/prefs.h>
 #include <epan/follow.h>
@@ -34,6 +33,7 @@
 #include <epan/conversation_filter.h>
 #include <epan/exported_pdu.h>
 #include <epan/decode_as.h>
+#include <epan/iana-info.h>
 
 void proto_register_udp(void);
 void proto_reg_handoff_udp(void);
@@ -197,7 +197,7 @@ get_udp_conversation_data(conversation_t *conv, packet_info *pinfo)
 
     /* Did the caller supply the conversation pointer? */
     if (conv == NULL)
-        conv = find_or_create_conversation(pinfo);
+        conv = find_or_create_conversation_strat(pinfo);
 
     /* Get the data for this conversation */
     udpd = conversation_get_proto_data(conv, proto_udp);
@@ -591,10 +591,11 @@ decode_udp_ports(tvbuff_t *tvb, int offset, packet_info *pinfo,
         }
     }
 
-    /* determine if this packet is part of a conversation and call dissector */
-    /* for the conversation if available */
-    if (try_conversation_dissector(&pinfo->dst, &pinfo->src, CONVERSATION_UDP,
-             uh_dport, uh_sport, next_tvb, pinfo, tree, NULL, NO_ADDR_B|NO_PORT_B)) {
+    /* Determine if this packet is part of a conversation and call dissector
+     * for the conversation if available.
+     * This search is done on the 'other' direction */
+    if (try_conversation_dissector_strat(pinfo, CONVERSATION_UDP,
+             next_tvb, tree, NULL, NO_ADDR_B|NO_PORT_B, true)) {
         handle_export_pdu_conversation(pinfo, next_tvb, uh_dport, uh_sport);
         return;
     }
@@ -854,8 +855,8 @@ capture_udp(const unsigned char *pd _U_, int offset _U_, int len _U_, capture_pa
 
     capture_dissector_increment_count(cpinfo, proto_udp);
 
-    src_port = pntoh16(&pd[offset]);
-    dst_port = pntoh16(&pd[offset+2]);
+    src_port = pntohu16(&pd[offset]);
+    dst_port = pntohu16(&pd[offset+2]);
 
     if (src_port > dst_port) {
         low_port = dst_port;
@@ -1050,7 +1051,7 @@ dissect(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t ip_proto)
         item = proto_tree_add_uint(udp_tree, hf_udp_length, tvb, offset + 4, 0, udph->uh_ulen);
         proto_item_set_generated(item);
         if ((udph->uh_sum_cov < 8) || (udph->uh_sum_cov > udph->uh_ulen)) {
-            /* Bogus coverage - it includes the header, so it must be >= 8, and no larger then the IP payload size. */
+            /* Bogus coverage - it includes the header, so it must be >= 8, and no larger than the IP payload size. */
             proto_item_append_text(len_cov_item, " (bogus, must be >= 8 and <= %u)", udph->uh_ulen);
             expert_add_info_format(pinfo, len_cov_item, &ei_udplite_checksum_coverage_bad, "Bad checksum coverage length value %u < 8 or > %u",
                          udph->uh_sum_cov, udph->uh_ulen);
@@ -1115,6 +1116,15 @@ dissect(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t ip_proto)
                 break;
 
             case AT_IPv6:
+                if (ip_proto == IP_PROTO_UDP)
+                    phdr[0] = g_htonl(udph->uh_ulen);
+                else
+                    phdr[0] = g_htonl(reported_len);
+                phdr[1] = g_htonl(ip_proto);
+                SET_CKSUM_VEC_PTR(cksum_vec[2], (const uint8_t *)&phdr, 8);
+                break;
+
+            case AT_ILNP_NID:
                 if (ip_proto == IP_PROTO_UDP)
                     phdr[0] = g_htonl(udph->uh_ulen);
                 else
@@ -1217,10 +1227,18 @@ dissect(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t ip_proto)
     pinfo->srcport = udph->uh_sport;
     pinfo->destport = udph->uh_dport;
 
-    /* find (and extend) an existing conversation, or create a new one */
-    conv = find_conversation_strat(pinfo, CONVERSATION_UDP, 0, false);
+    /* Find (and extend) an existing conversation, or create a new one.
+     * Don't try finding at all costs (NO_GREEDY)
+     */
+    conv = find_conversation_strat(pinfo, CONVERSATION_UDP, NO_GREEDY, false);
     if(!conv) {
         conv=conversation_new_strat(pinfo, CONVERSATION_UDP, 0);
+    }
+    else {
+        /* Explicitly and immediately move forward the conversation last_frame */
+        if (!(pinfo->fd->visited) && (pinfo->num > conv->last_frame)) {
+            conv->last_frame = pinfo->num;
+        }
     }
 
     udpd = get_udp_conversation_data(conv, pinfo);
@@ -1238,6 +1256,31 @@ dissect(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t ip_proto)
          */
         pinfo->stream_id = udpd->stream;
 
+        /* Follow-up of the conversation over ICMP errors.
+         * When coming over an error packet (typically ICMP), we want to save the
+         * conversation type, and have a specific tracking then we can match with
+         * ordinary, non error packets.
+         */
+        if (pinfo->flags.in_error_pkt) {
+            /* Save the conversation type */
+            pinfo->track_ctype = CONVERSATION_UDP;
+
+            conversation_t *err_conv = NULL;
+            err_conv = find_conversation_err_pkts(pinfo->num, CONVERSATION_UDP, udpd->stream, conv->conv_index);
+            if(!err_conv) {
+                /* Create the conversation tracking the ordinary UDP conversation */
+                err_conv = conversation_new_err_pkts(pinfo->num, CONVERSATION_UDP, udpd->stream, conv->conv_index);
+
+                /* Align the setup_frame with the UDP conversation's one */
+                err_conv->setup_frame = conv->setup_frame;
+            }
+            else if (pinfo->num > err_conv->last_frame) {
+                /* If we have multiple error packets related to this same UDP conversation,
+                 * extend the tracker conversation.
+                 */
+                err_conv->last_frame = pinfo->num;
+            }
+        }
     }
 
     tap_queue_packet(udp_tap, pinfo, udph);
@@ -1451,7 +1494,7 @@ proto_register_udp(void)
     static build_valid_func udp_da_both_values[2] = {udp_src_value, udp_dst_value};
     static decode_as_value_t udp_da_values[3] = {{udp_src_prompt, 1, udp_da_src_values}, {udp_dst_prompt, 1, udp_da_dst_values}, {udp_both_prompt, 2, udp_da_both_values}};
     static decode_as_t udp_da = {"udp", "udp.port", 3, 2, udp_da_values, "UDP", "port(s) as",
-                     decode_as_default_populate_list, decode_as_default_reset, decode_as_default_change, NULL};
+                     decode_as_default_populate_list, decode_as_default_reset, decode_as_default_change, NULL, NULL, NULL };
 
     module_t *udp_module;
     module_t *udplite_module;

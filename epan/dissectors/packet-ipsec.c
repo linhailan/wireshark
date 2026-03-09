@@ -62,7 +62,6 @@ ADD: Additional generic (non-checked) ICV length of 128, 192 and 256.
 
 #include <epan/packet.h>
 #include <epan/addr_resolv.h>
-#include <epan/ipproto.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
 #include <epan/tap.h>
@@ -70,9 +69,11 @@ ADD: Additional generic (non-checked) ICV length of 128, 192 and 256.
 #include <epan/proto_data.h>
 #include <epan/decode_as.h>
 #include <epan/capture_dissectors.h>
-
+#include <epan/secrets.h>
+#include <wiretap/secrets-types.h>
 #include <stdio.h>    /* for sscanf() */
-#include <epan/uat.h>
+#include <epan/uat-int.h>
+#include <epan/iana-info.h>
 #include <wsutil/str_util.h>
 #include <wsutil/wsgcrypt.h>
 #include <wsutil/pint.h>
@@ -129,6 +130,8 @@ static capture_dissector_handle_t ah_cap_handle;
 static dissector_handle_t data_handle;
 
 static dissector_table_t ip_dissector_table;
+
+static wmem_map_t *esp_used_sa_map;
 
 /* Encryption algorithms defined in RFC 4305 */
 #define IPSEC_ENCRYPT_NULL 0
@@ -792,7 +795,7 @@ static int get_ipv6_suffix(char* ipv6_suffix, char *ipv6_address)
             will be "3FFE000000000000000000000000****" and the function will return 0
 */
 static int
-get_full_ipv6_addr(char* ipv6_addr_expanded, char *ipv6_addr)
+get_full_ipv6_addr(wmem_allocator_t* scope, char* ipv6_addr_expanded, char *ipv6_addr)
 {
   char suffix[IPSEC_STRLEN_IPV6 + 1];
   char prefix[IPSEC_STRLEN_IPV6 + 1];
@@ -836,7 +839,7 @@ get_full_ipv6_addr(char* ipv6_addr_expanded, char *ipv6_addr)
 
   if(suffix_len <  IPSEC_STRLEN_IPV6)
     {
-      prefix_addr = wmem_strndup(wmem_packet_scope(), ipv6_addr,strlen(ipv6_addr) - suffix_cpt);
+      prefix_addr = wmem_strndup(scope, ipv6_addr,strlen(ipv6_addr) - suffix_cpt);
       prefix_remaining = get_ipv6_suffix(prefix,prefix_addr);
       prefix_len = (int) strlen(prefix);
       memcpy(ipv6_addr_expanded,prefix,prefix_len);
@@ -890,8 +893,8 @@ get_full_ipv6_addr(char* ipv6_addr_expanded, char *ipv6_addr)
 static bool
 get_full_ipv4_addr(char* ipv4_address_expanded, char *ipv4_address)
 {
-  char addr_byte_string_tmp[4];
-  char addr_byte_string[4];
+  char addr_byte_string_tmp[12];
+  char addr_byte_string[12];
 
   unsigned addr_byte = 0;
   unsigned i = 0;
@@ -945,9 +948,9 @@ get_full_ipv4_addr(char* ipv4_address_expanded, char *ipv4_address)
             return false;
 
           if(addr_byte < 16)
-            snprintf(addr_byte_string,4,"0%X",addr_byte);
+            snprintf(addr_byte_string,11,"0%X",addr_byte);
           else
-            snprintf(addr_byte_string,4,"%X",addr_byte);
+            snprintf(addr_byte_string,11,"%X",addr_byte);
           for(i = 0; i < strlen(addr_byte_string); i++)
           {
             ipv4_address_expanded[cpt] = addr_byte_string[i];
@@ -974,9 +977,9 @@ get_full_ipv4_addr(char* ipv4_address_expanded, char *ipv4_address)
             return false;
 
           if(addr_byte < 16)
-            snprintf(addr_byte_string,4,"0%X",addr_byte);
+            snprintf(addr_byte_string,11,"0%X",addr_byte);
           else
-            snprintf(addr_byte_string,4,"%X",addr_byte);
+            snprintf(addr_byte_string,11,"%X",addr_byte);
           for(i = 0; i < strlen(addr_byte_string); i++)
           {
             ipv4_address_expanded[cpt] = addr_byte_string[i];
@@ -1036,7 +1039,7 @@ get_full_ipv4_addr(char* ipv4_address_expanded, char *ipv4_address)
       - int typ : the Address type : either IPv6 or IPv4 (IPSEC_SA_IPV6, IPSEC_SA_IPV4)
 */
 static bool
-filter_address_match(char *addr, char *filter, int typ)
+filter_address_match(wmem_allocator_t* scope, char *addr, char *filter, int typ)
 {
   unsigned i;
   char addr_hex[IPSEC_STRLEN_IPV6 + 1];
@@ -1054,9 +1057,9 @@ filter_address_match(char *addr, char *filter, int typ)
             return false;
         break;
       case IPSEC_SA_IPV6:
-        if (get_full_ipv6_addr(addr_hex, addr))
+        if (get_full_ipv6_addr(scope, addr_hex, addr))
             return false;
-        if (get_full_ipv6_addr(filter_hex, filter))
+        if (get_full_ipv6_addr(scope, filter_hex, filter))
             return false;
         break;
       case IPSEC_SA_UNKNOWN:
@@ -1165,7 +1168,8 @@ filter_spi_match(unsigned spi, char *filter)
 
 */
 static bool
-get_esp_sa(int protocol_typ, char *src,  char *dst,  unsigned spi,
+get_esp_sa(wmem_allocator_t* scope,
+           int protocol_typ, char *src,  char *dst,  unsigned spi,
            int *encryption_algo,
            int *authentication_algo,
            char **encryption_key,
@@ -1199,8 +1203,8 @@ get_esp_sa(int protocol_typ, char *src,  char *dst,  unsigned spi,
     }
 
     if((protocol_typ == record->protocol || record->protocol == IPSEC_SA_ANY)
-       && (filter_address_match(src, record->srcIP, protocol_typ) || record->protocol == IPSEC_SA_ANY)
-       && (filter_address_match(dst, record->dstIP, protocol_typ) || record->protocol == IPSEC_SA_ANY)
+       && (filter_address_match(scope, src, record->srcIP, protocol_typ) || record->protocol == IPSEC_SA_ANY)
+       && (filter_address_match(scope, dst, record->dstIP, protocol_typ) || record->protocol == IPSEC_SA_ANY)
        && filter_spi_match(spi, record->spi))
     {
       found = true;
@@ -1237,6 +1241,9 @@ get_esp_sa(int protocol_typ, char *src,  char *dst,  unsigned spi,
 
       *sn_length = record->sn_length;
       *sn_upper = record->sn_upper;
+
+      if (found && !wmem_map_lookup(esp_used_sa_map, record))
+        wmem_map_insert(esp_used_sa_map, record, NULL);
     }
   }
 
@@ -1266,6 +1273,27 @@ export_ipsec_pdu(dissector_handle_t dissector_handle, packet_info *pinfo, tvbuff
 
     tap_queue_packet(exported_pdu_tap, pinfo, exp_pdu_data);
   }
+}
+
+static bool
+esp_padding_override(tvbuff_t *tvb, int offset, int esp_pad_len) {
+
+  switch (g_esp_padding_type) {
+  case PADDING_RFC:
+    return false;
+  case PADDING_ZERO:
+    for (int j=0; j < esp_pad_len; j++) {
+      if (tvb_get_uint8(tvb, offset - (j + 1)) != 0) {
+        return false;
+      }
+    }
+  /* FALLTHROUGH */
+  case PADDING_ANY:
+    return true;
+  default:
+    return false;
+  }
+  return false;
 }
 
 /**
@@ -1302,9 +1330,12 @@ esp_null_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *esp_tree)
     /* Make sure the packet is not truncated before the fields
      * we need to read to determine the encapsulated protocol.
      */
-    if (tvb_bytes_exist(tvb, -(esp_icv_len + 2), 2))
+    if (esp_packet_len >= (esp_icv_len + 2))
     {
       offset = esp_packet_len - (esp_icv_len + 2);
+      if (!tvb_bytes_exist(tvb, offset, 2)) {
+        continue;
+      }
       esp_pad_len = tvb_get_uint8(tvb, offset);
       encapsulated_protocol = tvb_get_uint8(tvb, offset + 1);
       dissector_handle = dissector_get_uint_handle(ip_dissector_table, encapsulated_protocol);
@@ -1321,22 +1352,8 @@ esp_null_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *esp_tree)
           break;
         }
       }
-      if (!heur_ok) {
-        switch (g_esp_padding_type) {
-        case PADDING_RFC:
-          continue;
-        case PADDING_ZERO:
-          for (int j=0; j < esp_pad_len; j++) {
-            if (tvb_get_uint8(tvb, offset - (j + 1)) != 0) {
-              continue;
-            }
-          }
-        /* FALLTHROUGH */
-        case PADDING_ANY:
-          break;
-        default:
-          continue;
-        }
+      if (!heur_ok && !esp_padding_override(tvb, offset, esp_pad_len)) {
+        continue;
       }
 
       saved_match_uint  = pinfo->match_uint;
@@ -1519,7 +1536,7 @@ dissect_esp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
   int esp_pad_len = 0;
 
 
-  /* Variables for decryption and authentication checking used for libgrypt */
+  /* Variables for decryption and authentication checking used for libgcrypt */
   gcry_md_hd_t md_hd;
   int md_len = 0;
   gcry_error_t err = 0;
@@ -1605,7 +1622,7 @@ dissect_esp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
       be called every times an ESP Payload is found.
     */
 
-    if((sad_is_present = get_esp_sa(protocol_typ, ip_src, ip_dst, spi,
+    if((sad_is_present = get_esp_sa(pinfo->pool, protocol_typ, ip_src, ip_dst, spi,
                                     &esp_encr_algo, &esp_auth_algo,
                                     &esp_encr_key, &esp_encr_key_len, &esp_auth_key, &esp_auth_key_len,
                                     &cipher_hd, &cipher_hd_created, &sn_length, &sn_upper)))
@@ -1809,7 +1826,7 @@ dissect_esp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 
               if (sn_length == IPSEC_SA_ESN) {
                 uint8_t sn_bytes[4];
-                phton32(sn_bytes, sn_upper);
+                phtonu32(sn_bytes, sn_upper);
                 for (int i = 0; i < 4; i++) {
                   gcry_md_putc(md_hd, sn_bytes[i]);
                 }
@@ -2339,7 +2356,7 @@ dissect_esp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
             } else {
               uint8_t *aad = wmem_alloc(pinfo->pool, ESP_HEADER_LEN + 4);
               tvb_memcpy(tvb, aad, 0, 4);
-              phton32(&aad[4], sn_upper);
+              phtonu32(&aad[4], sn_upper);
               tvb_memcpy(tvb, &aad[ESP_HEADER_LEN], 4, ESP_HEADER_LEN);
               err = gcry_cipher_authenticate(*cipher_hd, aad, ESP_HEADER_LEN + 4);
             }
@@ -2491,9 +2508,11 @@ dissect_esp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
   */
   if(!g_esp_enable_encryption_decode && g_esp_enable_authentication_check && sad_is_present)
   {
-    next_tvb = tvb_new_subset_length_caplen(tvb, ESP_HEADER_LEN, esp_packet_len - ESP_HEADER_LEN - esp_icv_len, -1);
-    export_ipsec_pdu(data_handle, pinfo, next_tvb);
-    call_dissector(data_handle, next_tvb, pinfo, esp_tree);
+    if ((esp_packet_len - ESP_HEADER_LEN) > esp_icv_len) {
+      next_tvb = tvb_new_subset_length(tvb, ESP_HEADER_LEN, esp_packet_len - ESP_HEADER_LEN - esp_icv_len);
+      export_ipsec_pdu(data_handle, pinfo, next_tvb);
+      call_dissector(data_handle, next_tvb, pinfo, esp_tree);
+    }
   }
   /* The packet does not belong to a security association and the field g_esp_enable_null_encryption_decode_heuristic is set */
   else if(null_encryption_decode_heuristic)
@@ -2594,7 +2613,7 @@ dissect_ipcomp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dissec
     proto_tree_add_item(ipcomp_tree, hf_ipcomp_flags, tvb, 1, 1, ENC_NA);
     proto_tree_add_item_ret_uint(ipcomp_tree, hf_ipcomp_cpi, tvb, 2, 2, ENC_BIG_ENDIAN, &comp_cpi);
 
-    col_add_fstr(pinfo->cinfo, COL_INFO, "IPComp (CPI=%s)", val_to_str(comp_cpi, cpi2val, "0x%04x"));
+    col_add_fstr(pinfo->cinfo, COL_INFO, "IPComp (CPI=%s)", val_to_str(pinfo->pool, comp_cpi, cpi2val, "0x%04x"));
 
     data = tvb_new_subset_remaining(tvb, 4);
     export_ipsec_pdu(data_handle, pinfo, data);
@@ -2635,6 +2654,54 @@ static void ipsec_cleanup_protocol(void)
   g_free(extra_esp_sa_records.records);
   extra_esp_sa_records.records = NULL;
   extra_esp_sa_records.num_records = 0;
+}
+
+static void
+esp_secrets_block_callback(const void *secrets, unsigned size _U_)
+{
+  char *err;
+
+  if (!uat_load_str(esp_uat, (const char *)secrets, &err))
+    g_free(err);
+}
+
+static void
+esp_print_record(void *key, void *value _U_, void *user_data)
+{
+  char *str = uat_record_tostr(esp_uat, key);
+
+  wmem_strbuf_append_printf((wmem_strbuf_t *)user_data, "%s\n", str);
+  g_free(str);
+}
+
+static unsigned
+esp_export_secret_count(void)
+{
+  return wmem_map_size(esp_used_sa_map);
+}
+
+static bool
+esp_export_dsb(wtap* wth)
+{
+  wtap_block_t block;
+  wtapng_dsb_mandatory_t *dsb;
+  wmem_strbuf_t *secrets;
+
+  if (!wmem_map_size(esp_used_sa_map))
+    return false;
+
+  secrets = wmem_strbuf_create(NULL);
+  wmem_map_foreach(esp_used_sa_map, esp_print_record, secrets);
+
+  block = wtap_block_create(WTAP_BLOCK_DECRYPTION_SECRETS);
+  dsb = (wtapng_dsb_mandatory_t *)wtap_block_get_mandatory_data(block);
+
+  dsb->secrets_type = SECRETS_TYPE_ESP;
+  dsb->secrets_data = (uint8_t*)wmem_strbuf_finalize(secrets);
+  dsb->secrets_len = (uint32_t)strlen((char*)dsb->secrets_data);
+
+  wtap_file_add_decryption_secrets(wth, block);
+  return true;
 }
 
 void
@@ -2761,7 +2828,7 @@ proto_register_ipsec(void)
   static build_valid_func ah_da_build_value[1] = {ah_value};
   static decode_as_value_t ah_da_values = {ah_prompt, 1, ah_da_build_value};
   static decode_as_t ah_da = {"ah", "ip.proto", 1, 0, &ah_da_values, NULL, NULL,
-                                  decode_as_default_populate_list, decode_as_default_reset, decode_as_default_change, NULL};
+                                  decode_as_default_populate_list, decode_as_default_reset, decode_as_default_change, NULL, NULL, NULL };
 
   module_t *ah_module;
   module_t *esp_module;
@@ -2858,6 +2925,11 @@ proto_register_ipsec(void)
   ah_cap_handle = register_capture_dissector("ah", capture_ah, proto_ah);
 
   register_decode_as(&ah_da);
+
+  secrets_register_type(SECRETS_TYPE_ESP, esp_secrets_block_callback);
+  secrets_register_inject_type("ESP", esp_export_secret_count, esp_export_dsb, NULL);
+
+  esp_used_sa_map = wmem_map_new_autoreset(wmem_epan_scope(), wmem_file_scope(), g_direct_hash, g_direct_equal);
 }
 
 void

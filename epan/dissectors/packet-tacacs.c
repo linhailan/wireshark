@@ -22,6 +22,8 @@
 
 #include "config.h"
 
+#define WS_LOG_DOMAIN "tacacs"
+
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
@@ -41,7 +43,7 @@ void proto_reg_handoff_tacplus(void);
 void proto_register_tacplus(void);
 static dissector_handle_t tacplus_handle;
 
-static void md5_xor( uint8_t *data, const char *key, int data_len, uint8_t *session_id, uint8_t version, uint8_t seq_no );
+static void md5_xor(wmem_allocator_t* allocator, uint8_t *data, const char *key, int data_len, uint8_t *session_id, uint8_t version, uint8_t seq_no );
 static int  dissect_tacplus_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data);
 
 static int proto_tacacs;
@@ -143,7 +145,7 @@ dissect_tacacs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _
 
 	type = tvb_get_uint8(tvb,1);
 	col_add_str(pinfo->cinfo, COL_INFO,
-		    val_to_str(type, tacacs_type_vals, "Unknown (0x%02x)"));
+		    val_to_str(pinfo->pool, type, tacacs_type_vals, "Unknown (0x%02x)"));
 
 	/* if (tree) */
 	{
@@ -373,7 +375,7 @@ tacplus_decrypted_tvb_setup( tvbuff_t *tvb, tvbuff_t **dst_tvb, packet_info *pin
 	buff = (uint8_t *)tvb_memdup(pinfo->pool, tvb, TAC_PLUS_HDR_SIZE, len);
 
 
-	md5_xor( buff, key, len, session_id,version, tvb_get_uint8(tvb,2) );
+	md5_xor(pinfo->pool, buff, key, len, session_id,version, tvb_get_uint8(tvb,2) );
 
 	/* Allocate a new tvbuff, referring to the decrypted data. */
 	*dst_tvb = tvb_new_child_real_data(tvb,  buff, len, len );
@@ -384,16 +386,16 @@ tacplus_decrypted_tvb_setup( tvbuff_t *tvb, tvbuff_t **dst_tvb, packet_info *pin
 	return 0;
 }
 static void
-dissect_tacplus_args_list( tvbuff_t *tvb, proto_tree *tree, int data_off, int len_off, int arg_cnt )
+dissect_tacplus_args_list( tvbuff_t *tvb, packet_info* pinfo, proto_tree *tree, int data_off, int len_off, int arg_cnt )
 {
 	int i;
 	int len;
-	uint8_t *value;
+	char *value;
 	for(i=0;i<arg_cnt;i++){
 		len=tvb_get_uint8(tvb,len_off+i);
 		proto_tree_add_uint_format(tree, hf_tacplus_arg_length, tvb, len_off+i, 1, len,
 									"Arg[%d] length: %d", i, len);
-		value=tvb_get_string_enc(wmem_packet_scope(), tvb, data_off, len, ENC_ASCII|ENC_NA);
+		value=(char*)tvb_get_string_enc(pinfo->pool, tvb, data_off, len, ENC_ASCII|ENC_NA);
 		proto_tree_add_string_format(tree, hf_tacplus_arg_value, tvb, data_off, len, value,
 									"Arg[%d] value: %s", i, value);
 		data_off+=len;
@@ -472,7 +474,7 @@ dissect_tacplus_body_authen_req_login( tvbuff_t* tvb, proto_tree *tree, int var_
 			proto_tree_add_item(tree, hf_tacplus_chap_data_length, tvb, AUTHEN_S_DATA_LEN_OFF, 1, ENC_BIG_ENDIAN);
 			if( val ) {
 				proto_tree *pt;
-				uint8_t chal_len=val-(1+16); /* Response field alwayes 16 octets */
+				uint8_t chal_len=val-(1+16); /* Response field always 16 octets */
 				pt = proto_tree_add_subtree(tree, tvb, var_off, val, ett_tacplus_body_chap, NULL, "CHAP Data" );
 				proto_tree_add_item(pt, hf_tacplus_chap_id, tvb, var_off, 1, ENC_BIG_ENDIAN);
 				var_off++;
@@ -485,7 +487,7 @@ dissect_tacplus_body_authen_req_login( tvbuff_t* tvb, proto_tree *tree, int var_
 			proto_tree_add_item(tree, hf_tacplus_mschap_data_length, tvb, AUTHEN_S_DATA_LEN_OFF, 1, ENC_BIG_ENDIAN);
 			if( val ) {
 				proto_tree *pt;
-				uint8_t chal_len=val-(1+49);  /* Response field alwayes 49 octets */
+				uint8_t chal_len=val-(1+49);  /* Response field always 49 octets */
 				pt = proto_tree_add_subtree(tree, tvb, var_off, val, ett_tacplus_body_chap, NULL, "MSCHAP Data" );
 				proto_tree_add_item(pt, hf_tacplus_mschap_id, tvb, var_off, 1, ENC_BIG_ENDIAN);
 				var_off++;
@@ -593,7 +595,7 @@ dissect_tacplus_body_authen_rep( tvbuff_t *tvb, proto_tree *tree )
 }
 
 static void
-dissect_tacplus_body_author_req( tvbuff_t* tvb, proto_tree *tree )
+dissect_tacplus_body_author_req( tvbuff_t* tvb, packet_info *pinfo, proto_tree *tree )
 {
 	int val;
 	int var_off;
@@ -609,11 +611,11 @@ dissect_tacplus_body_author_req( tvbuff_t* tvb, proto_tree *tree )
 
 /* var_off points after rem_addr */
 
-	dissect_tacplus_args_list( tvb, tree, var_off, AUTHOR_Q_VARDATA_OFF, val );
+	dissect_tacplus_args_list( tvb, pinfo, tree, var_off, AUTHOR_Q_VARDATA_OFF, val );
 }
 
 static void
-dissect_tacplus_body_author_rep( tvbuff_t* tvb, proto_tree *tree )
+dissect_tacplus_body_author_rep( tvbuff_t* tvb, packet_info* pinfo, proto_tree *tree )
 {
 	int offset=AUTHOR_R_VARDATA_OFF;
 	int val;
@@ -632,11 +634,11 @@ dissect_tacplus_body_author_rep( tvbuff_t* tvb, proto_tree *tree )
 	offset+=val;
 	proto_tree_add_item(tree, hf_tacplus_body_author_rep_arg_count, tvb, AUTHOR_R_ARGC_OFF, 1, ENC_BIG_ENDIAN);
 
-	dissect_tacplus_args_list( tvb, tree, offset, AUTHOR_R_VARDATA_OFF, val );
+	dissect_tacplus_args_list( tvb, pinfo, tree, offset, AUTHOR_R_VARDATA_OFF, val );
 }
 
 static void
-dissect_tacplus_body_acct_req( tvbuff_t* tvb, proto_tree *tree )
+dissect_tacplus_body_acct_req( tvbuff_t* tvb, packet_info* pinfo, proto_tree *tree )
 {
 	int val, var_off;
 
@@ -662,7 +664,7 @@ dissect_tacplus_body_acct_req( tvbuff_t* tvb, proto_tree *tree )
 
 	proto_tree_add_item(tree, hf_tacplus_acct_arg_count, tvb, ACCT_Q_ARG_CNT_OFF, 1, ENC_BIG_ENDIAN);
 
-	dissect_tacplus_args_list( tvb, tree, var_off, ACCT_Q_VARDATA_OFF, val );
+	dissect_tacplus_args_list( tvb, pinfo, tree, var_off, ACCT_Q_VARDATA_OFF, val );
 
 
 }
@@ -712,23 +714,23 @@ dissect_tacplus_body(tvbuff_t * hdr_tvb, packet_info *pinfo, tvbuff_t * tvb, pro
 		break;
 	  case TAC_PLUS_AUTHOR:
 		if ( seq_no & 0x01)
-			dissect_tacplus_body_author_req( tvb, tree );
+			dissect_tacplus_body_author_req( tvb, pinfo, tree );
 		else
-			dissect_tacplus_body_author_rep( tvb, tree );
+			dissect_tacplus_body_author_rep( tvb, pinfo, tree );
 		break;
 	  case TAC_PLUS_ACCT:
 		if ( seq_no & 0x01)
-			dissect_tacplus_body_acct_req( tvb, tree );
+			dissect_tacplus_body_acct_req( tvb, pinfo, tree );
 		else
 			dissect_tacplus_body_acct_rep( tvb, tree );
 		break;
 	  default:
-		proto_tree_add_expert( tree, pinfo, &ei_tacplus_bogus_data, tvb, 0, -1);
+		proto_tree_add_expert_remaining( tree, pinfo, &ei_tacplus_bogus_data, tvb, 0);
 		break;
 	}
 }
 
-#ifdef DEB_TACPLUS
+#ifdef WS_DEBUG
 static void
 tacplus_print_key_entry( void *data, void *user_data )
 {
@@ -738,9 +740,9 @@ tacplus_print_key_entry( void *data, void *user_data )
 	s_str = address_to_str( NULL, tacplus_data->s );
 	c_str = address_to_str( NULL, tacplus_data->c );
 	if( user_data ) {
-		ws_debug_printf("%s:%s=%s\n", s_str, c_str, tacplus_data->k );
+		ws_debug("%s:%s=%s\n", s_str, c_str, tacplus_data->k );
 	} else {
-		ws_debug_printf("%s:%s\n", s_str, c_str );
+		ws_debug("%s:%s\n", s_str, c_str );
 	}
 	wmem_free(NULL, s_str);
 	wmem_free(NULL, c_str);
@@ -753,9 +755,9 @@ cmp_conv_address( const void *p1, const void *p2 )
 	const tacplus_key_entry *a2=(const tacplus_key_entry *)p2;
 	int32_t	ret;
 	/*
-	ws_debug_printf("p1=>");
+	ws_debug("p1=>");
 	tacplus_print_key_entry( p1, NULL );
-	ws_debug_printf("p2=>");
+	ws_debug("p2=>");
 	tacplus_print_key_entry( p2, NULL );
 	*/
 	ret=cmp_address( a1->s, a2->s );
@@ -763,9 +765,9 @@ cmp_conv_address( const void *p1, const void *p2 )
 		ret=cmp_address( a1->c, a2->c );
 		/*
 		if(ret)
-			ws_debug_printf("No Client found!"); */
+			ws_debug("No Client found!"); */
 	} else {
-		/* ws_debug_printf("No Server found!"); */
+		/* ws_debug("No Server found!"); */
 	}
 	return ret;
 }
@@ -778,10 +780,10 @@ find_key( address *srv, address *cln )
 
 	data.s=srv;
 	data.c=cln;
-/*	ws_debug_printf("Looking for: ");
+/*	ws_debug("Looking for: ");
 	tacplus_print_key_entry( (const void *)&data, NULL ); */
 	match=g_slist_find_custom( tacplus_keys, (void *)&data, cmp_conv_address );
-/*	ws_debug_printf("Finished (%p)\n", match);  */
+/*	ws_debug("Finished (%p)\n", match);  */
 	if( match )
 		return ((tacplus_key_entry*)match->data)->k;
 
@@ -810,7 +812,7 @@ parse_tuple( char *key_from_option )
 	char *client,*key;
 	tacplus_key_entry *tacplus_data=g_new(tacplus_key_entry, 1);
 	/*
-	ws_debug_printf("keys: %s\n", key_from_option );
+	ws_debug("keys: %s\n", key_from_option );
 	*/
 	client=strchr(key_from_option,'/');
 	if(!client) {
@@ -825,7 +827,7 @@ parse_tuple( char *key_from_option )
 	}
 	*key++='\0';
 	/*
-	ws_debug_printf("%s %s => %s\n", key_from_option, client, key );
+	ws_debug("%s %s => %s\n", key_from_option, client, key );
 	*/
 	mkipv4_address( &tacplus_data->s, key_from_option );
 	mkipv4_address( &tacplus_data->c, client );
@@ -858,7 +860,7 @@ parse_tacplus_keys( const char *keys_from_option )
 		s=s1;
 	}
 	g_free( key_copy );
-#ifdef DEB_TACPLUS
+#ifdef WS_DEBUG
 	g_slist_foreach( tacplus_keys, tacplus_print_key_entry, GINT_TO_POINTER(1) );
 #endif
 }
@@ -901,7 +903,7 @@ dissect_tacplus_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 
 	col_add_fstr( pinfo->cinfo, COL_INFO, "%s: %s",
 				request ? "Q" : "R",
-				val_to_str(tvb_get_uint8(tvb,1), tacplus_type_vals, "Unknown (0x%02x)"));
+				val_to_str(pinfo->pool, tvb_get_uint8(tvb,1), tacplus_type_vals, "Unknown (0x%02x)"));
 
 	/* if (tree) */
 	{
@@ -1278,7 +1280,7 @@ proto_reg_handoff_tacplus(void)
 }
 
 static void
-md5_xor( uint8_t *data, const char *key, int data_len, uint8_t *session_id, uint8_t version, uint8_t seq_no )
+md5_xor(wmem_allocator_t* allocator, uint8_t *data, const char *key, int data_len, uint8_t *session_id, uint8_t version, uint8_t seq_no )
 {
 	int i,j;
 	size_t md5_len;
@@ -1289,7 +1291,7 @@ md5_xor( uint8_t *data, const char *key, int data_len, uint8_t *session_id, uint
 	md5_len = 4 /* sizeof(session_id) */ + strlen(key)
 			+ sizeof(version) + sizeof(seq_no);
 
-	md5_buff = (uint8_t*)wmem_alloc(wmem_packet_scope(), md5_len + HASH_MD5_LENGTH);
+	md5_buff = (uint8_t*)wmem_alloc(allocator, md5_len + HASH_MD5_LENGTH);
 
 
 	mdp = md5_buff;

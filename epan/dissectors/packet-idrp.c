@@ -22,7 +22,7 @@
 
 #include <epan/packet.h>
 #include <epan/expert.h>
-#include <epan/nlpid.h>
+#include "packet-osi.h"
 
 #define IDRP_PROTO "ISO/IEC 10747 (1993): Inter Domain Routing Protocol "
 
@@ -951,8 +951,7 @@ static int dissect_BISPDU_ERROR(tvbuff_t * tvb, int offset, proto_tree * tree)
     int    data_length;
 
     /* Error Code (1 octet) */
-    error_code = tvb_get_uint8(tvb, offset);
-    proto_tree_add_item(tree, hf_idrp_error_code, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint8(tree, hf_idrp_error_code, tvb, offset, 1, ENC_BIG_ENDIAN, &error_code);
     offset += 1;
 
     switch (error_code) {
@@ -1212,7 +1211,7 @@ dissect_idrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     }
 
     col_append_str(pinfo->cinfo, COL_INFO,
-            val_to_str(pdu_type, idrp_pdu_types, "Unknown (%u)"));
+            val_to_str(pinfo->pool, pdu_type, idrp_pdu_types, "Unknown (%u)"));
 
     return offset;
 }

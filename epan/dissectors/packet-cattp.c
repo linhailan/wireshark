@@ -20,7 +20,6 @@
 #include <epan/in_cksum.h>
 #include <epan/unit_strings.h>
 
-#define CATTP_SHORTNAME "CAT-TP"
 #define CATTP_HBLEN 18
 
 #define F_SYN 0x80
@@ -200,7 +199,7 @@ dissect_cattp_rstpdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *cattp_tree, 
     const char *rc_str;
 
     rc = tvb_get_uint8(tvb, offset); /* reason code of RST */
-    rc_str = val_to_str(rc, cattp_reset_reason, "Unknown reason code: 0x%02x");
+    rc_str = val_to_str(pinfo->pool, rc, cattp_reset_reason, "Unknown reason code: 0x%02x");
     col_append_fstr(pinfo->cinfo, COL_INFO, " Reason=\"%s\" ", rc_str);
 
     proto_tree_add_item(cattp_tree, hf_cattp_rc, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -220,7 +219,7 @@ dissect_cattp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
     uint8_t     flags, first_byte, hlen, ver;
     uint16_t    plen, ackno, seqno, wsize, sport, dport;
 
-    col_set_str(pinfo->cinfo, COL_PROTOCOL, CATTP_SHORTNAME);
+    col_set_str(pinfo->cinfo, COL_PROTOCOL, "CAT-TP");
 
     /* Clear out stuff in the info column */
     col_clear(pinfo->cinfo, COL_INFO);
@@ -547,11 +546,7 @@ proto_register_cattp(void)
     module_t *cattp_module;
     expert_module_t* expert_cattp;
 
-    proto_cattp = proto_register_protocol (
-                      "ETSI Card Application Toolkit Transport Protocol",    /* name */
-                      CATTP_SHORTNAME, /* short name */
-                      "cattp"          /* abbrev */
-                  );
+    proto_cattp = proto_register_protocol ("ETSI Card Application Toolkit Transport Protocol", "CAT-TP", "cattp");
 
     proto_register_field_array(proto_cattp, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));

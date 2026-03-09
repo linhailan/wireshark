@@ -15,9 +15,9 @@
     Creating a protocol tree is done in a two stage process:
     A static part at program startup, and a dynamic part when the dissection with the real packet data is done.<BR>
     The "static" information is provided by creating a hf_register_info hf[] array, and register it using the
-    proto_register_field_array() function. This is usually done at dissector registering.<BR>
+    proto_register_field_array() function. This is usually done when registering the dissector.<BR>
     The "dynamic" information is added to the protocol tree by calling one of the proto_tree_add_...() functions,
-    e.g. proto_tree_add_bytes().
+    e.g. proto_tree_add_bytes(). In most cases, you'll want to use proto_tree_add_item().
 */
 
 #ifndef __PROTO_H__
@@ -25,7 +25,7 @@
 
 #include "wsutil/nstime.h"
 #include "tvbuff.h"
-#include "value_string.h"
+#include <wsutil/value_string.h>
 #include "packet_info.h"
 #include "ftypes/ftypes.h"
 #include "register.h"
@@ -65,6 +65,9 @@ struct expert_field;
 
 /** Something to satisfy checkAPIs when you have a pointer to a value_string_ext (e.g., one built with value_string_ext_new()) */
 #define VALS_EXT_PTR(x) (cast_same(value_string_ext*, (x)))
+
+/** Make a const time_value_string[] look like a _value_string pointer, used to set header_field_info.strings */
+#define TIME_VALS(x)     (cast_same(const struct _time_value_string*, (x)))
 
 /** Make a const true_false_string[] look like a _true_false_string pointer, used to set header_field_info.strings */
 #define TFS(x)      (cast_same(const struct true_false_string*, (x)))
@@ -518,7 +521,7 @@ void proto_report_dissector_bug(const char *format, ...)
 
 /* Encodings for BCD strings
  * Depending if the BCD string has even or odd number of digits
- * we may need to strip of the last digit/High nibble
+ * we may need to strip off the last digit/High nibble.
  */
 #define ENC_BCD_ODD_NUM_DIG     0x00010000
 #define ENC_BCD_SKIP_FIRST      0x00020000
@@ -812,8 +815,8 @@ typedef struct _item_label_t {
 /** Contains the field information for the proto_item. */
 typedef struct field_info {
     const header_field_info *hfinfo;      /**< pointer to registered field information */
-    int                  start;           /**< current start of data in field_info.ds_tvb */
-    int                  length;          /**< current data length of item in field_info.ds_tvb */
+    unsigned             start;           /**< current start of data in field_info.ds_tvb */
+    unsigned             length;          /**< current data length of item in field_info.ds_tvb */
     int                  appendix_start;  /**< start of appendix data */
     int                  appendix_length; /**< length of appendix data */
     int                  tree_type;       /**< one of ETT_ or -1 */
@@ -861,13 +864,13 @@ typedef struct
 #define FI_LITTLE_ENDIAN        0x00000008
 /** The protocol field value is in big endian */
 #define FI_BIG_ENDIAN           0x00000010
-/** Field value start from nth bit (values from 0x20 - 0x100) */
-#define FI_BITS_OFFSET(n)       (((n) & 7) << 5)
-/** Field value takes n bits (values from 0x100 - 0x4000) */
+/** Field value start from nth bit (values from 0x20 - 0x1000) */
+#define FI_BITS_OFFSET(n)       (((n) & 63) << 5)
+/** Field value takes n bits (values from 0x1000 - 0x40000) */
 /* if 0, it means that field takes fi->length * 8 */
-#define FI_BITS_SIZE(n)         (((n) & 63) << 8)
+#define FI_BITS_SIZE(n)         (((n) & 63) << 12)
 /** The protocol field value is a varint */
-#define FI_VARINT               0x00004000
+#define FI_VARINT               0x00040000
 
 /** convenience macro to get field_info.flags */
 #define FI_GET_FLAG(fi, flag)   ((fi) ? ((fi)->flags & (flag)) : 0)
@@ -884,8 +887,8 @@ typedef struct
         (fi)->flags = (fi)->flags & ~(flag); \
     } while(0)
 
-#define FI_GET_BITS_OFFSET(fi) (FI_GET_FLAG(fi, FI_BITS_OFFSET(7)) >> 5)
-#define FI_GET_BITS_SIZE(fi)   (FI_GET_FLAG(fi, FI_BITS_SIZE(63)) >> 8)
+#define FI_GET_BITS_OFFSET(fi) (FI_GET_FLAG(fi, FI_BITS_OFFSET(63)) >> 5)
+#define FI_GET_BITS_SIZE(fi)   (FI_GET_FLAG(fi, FI_BITS_SIZE(63)) >> 12)
 
 /** One of these exists for the entire protocol tree. Each proto_node
  * in the protocol tree points to the same copy. */
@@ -895,7 +898,8 @@ typedef struct {
     bool                 fake_protocols;
     unsigned             count;
     struct _packet_info *pinfo;
-    int                  max_start;
+    tvbuff_t            *idle_count_ds_tvb;
+    unsigned             max_start;
     unsigned             start_idle_count;
 } tree_data_t;
 
@@ -1006,7 +1010,7 @@ typedef proto_node proto_item;
  * @param ti The item to check. May be NULL.
  * @return true if the item is hidden, false otherwise.
  */
-static inline bool proto_item_is_hidden(proto_item *ti) {
+static inline bool proto_item_is_hidden(const proto_item *ti) {
     if (ti && PITEM_FINFO(ti)) {
         return FI_GET_FLAG(PITEM_FINFO(ti), FI_HIDDEN);
     }
@@ -1040,7 +1044,8 @@ static inline void proto_item_set_visible(proto_item *ti) {
  * @param ti The item to check. May be NULL.
  * @return true if the item is generated, false otherwise.
  */
-static inline bool proto_item_is_generated(proto_item *ti) {
+static inline bool proto_item_is_generated(const proto_item *ti)
+{
     if (ti) {
         return FI_GET_FLAG(PITEM_FINFO(ti), FI_GENERATED);
     }
@@ -1063,7 +1068,8 @@ static inline void proto_item_set_generated(proto_item *ti) {
  * @param ti The item to check. May be NULL.
  * @return true if the item is a URL, false otherwise.
  */
-static inline bool proto_item_is_url(proto_item *ti) {
+static inline bool proto_item_is_url(const proto_item *ti)
+{
     if (ti) {
         return FI_GET_FLAG(PITEM_FINFO(ti), FI_URL);
     }
@@ -1095,12 +1101,32 @@ typedef struct {
 /** Register dissector plugin with the plugin system. */
 WS_DLL_PUBLIC void proto_register_plugin(const proto_plugin *plugin);
 
+/** Pre-initializes memory used by proto routines. Called very early at program startup */
+void proto_pre_init(void);
+
 /** Sets up memory used by proto routines. Called at program startup */
 void proto_init(GSList *register_all_plugin_protocols_list,
-    GSList *register_all_plugin_handoffs_list, register_cb cb, void *client_data);
+    GSList *register_all_plugin_handoffs_list,
+    register_entity_func register_func, register_entity_func handoff_func,
+    register_cb cb, void *client_data);
 
 /** Frees memory used by proto routines. Called at program shutdown */
 extern void proto_cleanup(void);
+
+typedef void (*proto_execute_in_directory_func)(void* param);
+
+/** Execute a function for a protocol in a specific directory.
+ * This will change the current working directory, then execute
+ * the function and then restore the current working directory to
+ * its previous value.  This is intended to be called during protocol
+ * initialization (i.e. not thread safe)
+ *
+ * @param dir The new current working directory
+ * @param func Function to be called once the directory has been successfully changed
+ * @param param Optional parameter to be passed into the handling function
+ */
+WS_DLL_PUBLIC void proto_execute_in_directory(const char* dir, proto_execute_in_directory_func func, void* param);
+
 
 /** This function takes a tree and a protocol id as parameter and
     will return true/false for whether the protocol or any of the filterable
@@ -1183,7 +1209,7 @@ WS_DLL_PUBLIC void proto_item_set_len(proto_item *pi, const int length);
  @param end this end offset is relative to the beginning of tvb
  @todo make usage clearer, I don't understand it!
  */
-WS_DLL_PUBLIC void proto_item_set_end(proto_item *pi, tvbuff_t *tvb, int end);
+WS_DLL_PUBLIC void proto_item_set_end(proto_item *pi, tvbuff_t *tvb, unsigned end);
 
 /** Get length of a proto_item. Useful after using proto_tree_add_item()
  * to add a variable-length field (e.g., FT_UINT_STRING).
@@ -1214,7 +1240,7 @@ WS_DLL_PUBLIC char *proto_item_get_display_repr(wmem_allocator_t *scope, proto_i
 
 /** Creates a new proto_tree root.
  @return the new tree root */
-extern proto_tree* proto_tree_create_root(struct _packet_info *pinfo);
+WS_DLL_PUBLIC proto_tree* proto_tree_create_root(packet_info* pinfo);
 
 void proto_tree_reset(proto_tree *tree);
 
@@ -1298,6 +1324,27 @@ WS_DLL_PUBLIC proto_item *
 proto_tree_add_item_new(proto_tree *tree, header_field_info *hfinfo, tvbuff_t *tvb,
     const int start, int length, const unsigned encoding);
 
+/**
+ * @brief Append a decoded field to a protocol tree using a registered header-field index.
+ *
+ * This routine extracts `length` bytes starting at `start` from the given
+ * `tvb`, decodes them according to the header-field’s registered type/base
+ * and `encoding` flags, highlights the corresponding bytes in the packet
+ * bytes pane, and adds the resulting value and label into `tree`.
+ * The field’s data value will be available to display filters, statistics
+ * dialogs, and export engines.
+ *
+ * @param tree      The proto_tree to which the new item will be added.
+ * @param hfindex   The header-field index (as registered in hf_register_info)
+ *                  identifying the field name, type, and description.
+ * @param tvb       The tvbuff_t containing the packet data buffer.
+ * @param start     The byte offset in `tvb` where the field’s data begins.
+ * @param length    The number of bytes to read from `tvb` for this field.
+ * @param encoding  One or more ENC_* flags controlling byte‐order,
+ *                  string encoding, or special value handling.
+ * @return          A pointer to the newly created proto_item.  You may
+ *                  append additional text or set expert info on this item.
+ */
 WS_DLL_PUBLIC proto_item *
 proto_tree_add_item(proto_tree *tree, int hfindex, tvbuff_t *tvb,
     const int start, int length, const unsigned encoding);
@@ -1366,6 +1413,18 @@ proto_tree_add_item_ret_uint(proto_tree *tree, int hfindex, tvbuff_t *tvb,
     const int start, int length, const unsigned encoding, uint32_t *retval);
 
 WS_DLL_PUBLIC proto_item *
+proto_tree_add_item_ret_uint32(proto_tree *tree, int hfindex, tvbuff_t *tvb,
+    const int start, int length, const unsigned encoding, uint32_t *retval);
+
+WS_DLL_PUBLIC proto_item *
+proto_tree_add_item_ret_uint8(proto_tree *tree, int hfindex, tvbuff_t *tvb,
+    const int start, int length, const unsigned encoding, uint8_t *retval);
+
+WS_DLL_PUBLIC proto_item *
+proto_tree_add_item_ret_uint16(proto_tree *tree, int hfindex, tvbuff_t *tvb,
+    const int start, int length, const unsigned encoding, uint16_t *retval);
+
+WS_DLL_PUBLIC proto_item *
 proto_tree_add_item_ret_uint64(proto_tree *tree, int hfindex, tvbuff_t *tvb,
     const int start, int length, const unsigned encoding, uint64_t *retval);
 
@@ -1390,8 +1449,8 @@ proto_tree_add_item_ret_ipv4(proto_tree *tree, int hfindex, tvbuff_t *tvb,
  * @param hfindex the field
  * @param tvb the tv buffer
  * @param start the start index of data in tvb
- * @param length the length of data. calls REPORT_DISSECTOR_BUG if not equal to FT_IPv6_LEN
- * @param encoding encodings not yet supported. calls REPORT_DISSECTOR_BUG if not equal to 0
+ * @param length the length of data. Calls REPORT_DISSECTOR_BUG if not equal to FT_IPv6_LEN
+ * @param encoding encodings not yet supported. Calls REPORT_DISSECTOR_BUG if not equal to 0
  * @param retval where the address should be written, must not be null
  * @return the newly created item
  */
@@ -1589,7 +1648,7 @@ proto_tree_add_item_ret_time_string(proto_tree *tree, int hfindex,
 	const int start, int length, const unsigned encoding,
 	wmem_allocator_t *scope, char **retval);
 
-/** (INTERNAL USE ONLY) Add a text-only node to a proto_tree.
+/** (INTERNAL USE ONLY - DO NOT USE IN DISSECTORS!) Add a text-only node to a proto_tree.
  @param tree the tree to append this item to
  @param tvb the tv buffer of the current data
  @param start start of data in tvb
@@ -1641,11 +1700,11 @@ proto_tree_add_subtree_format(proto_tree *tree, tvbuff_t *tvb, int start, int le
     proto_item **tree_item, const char *format, ...) G_GNUC_PRINTF(7,8);
 
 /** Add a text-only node to a proto_tree with tvb_format_text() string. */
-proto_item *
+WS_DLL_PUBLIC proto_item *
 proto_tree_add_format_text(proto_tree *tree, tvbuff_t *tvb, int start, int length);
 
 /** Add a text-only node to a proto_tree with tvb_format_text_wsp() string. */
-proto_item *
+WS_DLL_PUBLIC proto_item *
 proto_tree_add_format_wsp_text(proto_tree *tree, tvbuff_t *tvb, int start, int length);
 
 /** Add a FT_NONE field to a proto_tree.
@@ -1735,8 +1794,8 @@ proto_tree_add_bytes_with_length(proto_tree *tree, int hfindex, tvbuff_t *tvb, i
  */
 WS_DLL_PUBLIC proto_item *
 proto_tree_add_bytes_item(proto_tree *tree, int hfindex, tvbuff_t *tvb,
-    const int start, int length, const unsigned encoding,
-    GByteArray *retval, int *endoff, int *err);
+    const unsigned start, unsigned length, const unsigned encoding,
+    GByteArray *retval, unsigned *endoff, int *err);
 
 /** Add a formatted FT_BYTES to a proto_tree, with the format generating
     the string for the value and with the field name being included
@@ -1746,7 +1805,8 @@ proto_tree_add_bytes_item(proto_tree *tree, int hfindex, tvbuff_t *tvb,
  @param tvb the tv buffer of the current data
  @param start start of data in tvb
  @param length length of data in tvb
- @param start_ptr pointer to the data to display
+ @param start_ptr pointer to the data to display (can be NULL, in which
+        case length bytes are retrieved from the tvb starting at offset)
  @param format printf like format string
  @param ... printf like parameters
  @return the newly created item */
@@ -1762,7 +1822,8 @@ proto_tree_add_bytes_format_value(proto_tree *tree, int hfindex, tvbuff_t *tvb,
  @param tvb the tv buffer of the current data
  @param start start of data in tvb
  @param length length of data in tvb
- @param start_ptr pointer to the data to display
+ @param start_ptr pointer to the data to display (can be NULL, in which
+        case length bytes are retrieved from the tvb starting at offset)
  @param format printf like format string
  @param ... printf like parameters
  @return the newly created item */
@@ -1814,8 +1875,8 @@ proto_tree_add_time(proto_tree *tree, int hfindex, tvbuff_t *tvb, int start,
  */
 WS_DLL_PUBLIC proto_item *
 proto_tree_add_time_item(proto_tree *tree, int hfindex, tvbuff_t *tvb,
-    const int start, int length, const unsigned encoding,
-    nstime_t *retval, int *endoff, int *err);
+    const unsigned start, const unsigned length, const unsigned encoding,
+    nstime_t *retval, unsigned *endoff, int *err);
 
 
 /** Add a formatted FT_ABSOLUTE_TIME or FT_RELATIVE_TIME to a proto_tree, with
@@ -2660,7 +2721,7 @@ proto_add_deregistered_data (void *data);
  @prefix a prefix to select which fields to deregister
 */
 WS_DLL_PUBLIC void
-proto_deregister_all_fields_with_prefix(const int parent, const gchar *prefix);
+proto_deregister_all_fields_with_prefix(const int parent, const char *prefix);
 
 /** Add a memory slice to be freed when deregistered fields are freed.
  @param block_size the size of the block
@@ -2738,8 +2799,18 @@ WS_DLL_PUBLIC bool proto_registrar_is_protocol(const int n);
 /** Get length of registered field according to field type.
  @param n item # n (0-indexed)
  @return 0 means undeterminable at registration time, -1 means unknown field */
-extern int proto_registrar_get_length(const int n);
+WS_DLL_PUBLIC int proto_registrar_get_length(const int n);
 
+struct proto_registrar_stats {
+    size_t protocol_count;
+    size_t deregistered_count;
+    size_t same_name_count;
+};
+
+/** Get protocol and field registration counts.
+ @param stats structure to fill in
+ @return Count of all registered fields. */
+WS_DLL_PUBLIC size_t proto_registrar_get_count(struct proto_registrar_stats *stats);
 
 /** Routines to use to iterate over the protocols and their fields;
  * they return the item number of the protocol in question or the
@@ -2857,6 +2928,15 @@ WS_DLL_PUBLIC bool proto_is_frame_protocol(const wmem_list_t *layers, const char
  */
 WS_DLL_PUBLIC char * proto_list_layers(const packet_info *pinfo);
 
+/** Retrieve the layer number for a given protocol, i.e. the number of
+ * times a dissector for that protocol has been called for the current
+ * frame.
+ * @param pinfo Pointer to packet info
+ * @param proto_id protocol id (0-indexed)
+ * @return The layer number for proto_id in the current frame.
+ */
+WS_DLL_PUBLIC uint8_t proto_get_layer_num(const packet_info *pinfo, const int proto_id);
+
 /** Mark protocol with the given item number as disabled by default.
  @param proto_id protocol id (0-indexed) */
 WS_DLL_PUBLIC void proto_disable_by_default(const int proto_id);
@@ -2921,7 +3001,7 @@ proto_get_finfo_ptr_array because it has to search through the tree.
     g_ptr_array_free(<array>, true). */
 WS_DLL_PUBLIC GPtrArray* proto_find_first_finfo(proto_tree *tree, const int hfindex);
 
-/** Return GPtrArray* of field_info pointers containg all hfindexes that appear
+/** Return GPtrArray* of field_info pointers containing all hfindexes that appear
     in tree.
  @param tree tree of interest
  @return GPtrArry pointer
@@ -3308,7 +3388,7 @@ proto_tree_add_split_bits_item_ret_val(proto_tree *tree, const int hf_index, tvb
  @param bit_offset of the first crumb in tvb expressed in bits
  @param crumb_spec pointer to crumb_spec array
  @param crumb_index into the crumb_spec array for this crumb */
-void
+WS_DLL_PUBLIC void
 proto_tree_add_split_bits_crumb(proto_tree *tree, const int hf_index, tvbuff_t *tvb,
     const unsigned bit_offset, const crumb_spec_t *crumb_spec, uint16_t crumb_index);
 
@@ -3375,7 +3455,7 @@ proto_tree_add_uint64_bits_format_value(proto_tree *tree, const int hf_index, tv
  @param format printf like format string
  @param ... printf like parameters
  @return the newly created item */
-proto_item *
+WS_DLL_PUBLIC proto_item *
 proto_tree_add_boolean_bits_format_value(proto_tree *tree, const int hf_index, tvbuff_t *tvb,
     const unsigned bit_offset, const int no_of_bits, uint64_t value, const unsigned encoding,
     const char *format, ...)
@@ -3394,7 +3474,7 @@ proto_tree_add_boolean_bits_format_value(proto_tree *tree, const int hf_index, t
  @param format printf like format string
  @param ... printf like parameters
  @return the newly created item */
-proto_item *
+WS_DLL_PUBLIC proto_item *
 proto_tree_add_int_bits_format_value(proto_tree *tree, const int hf_index, tvbuff_t *tvb,
     const unsigned bit_offset, const int no_of_bits, int32_t value, const unsigned encoding,
     const char *format, ...)
@@ -3413,7 +3493,7 @@ proto_tree_add_int_bits_format_value(proto_tree *tree, const int hf_index, tvbuf
  @param format printf like format string
  @param ... printf like parameters
  @return the newly created item */
-proto_item *
+WS_DLL_PUBLIC proto_item *
 proto_tree_add_int64_bits_format_value(proto_tree *tree, const int hf_index, tvbuff_t *tvb,
     const unsigned bit_offset, const int no_of_bits, int64_t value, const unsigned encoding,
     const char *format, ...)
@@ -3432,7 +3512,7 @@ proto_tree_add_int64_bits_format_value(proto_tree *tree, const int hf_index, tvb
  @param format printf like format string
  @param ... printf like parameters
  @return the newly created item */
-proto_item *
+WS_DLL_PUBLIC proto_item *
 proto_tree_add_float_bits_format_value(proto_tree *tree, const int hf_index, tvbuff_t *tvb,
     const unsigned bit_offset, const int no_of_bits, float value, const unsigned encoding,
     const char *format, ...)
@@ -3524,9 +3604,12 @@ typedef enum
 
 WS_DLL_PUBLIC const value_string proto_checksum_vals[];
 
-/** Check if given string is a valid field name
- @param field_name the field name to check
- @return 0 if valid, else first illegal character */
+/**
+ * @brief Check if a given string is a valid protocol field name.
+ *
+ * @param field_name  The field name to validate.
+ * @return            0 if the name is valid; otherwise, returns the first illegal character.
+ */
 WS_DLL_PUBLIC unsigned char
 proto_check_field_name(const char *field_name);
 
@@ -3538,7 +3621,8 @@ WS_DLL_PUBLIC unsigned char
 proto_check_field_name_lower(const char *field_name);
 
 
-/** Set the column text for a custom column
+/**
+ @brief Set the column text for a custom column
  @param tree the tree to append this item to
  @param field_id the field ids used for custom column
  @param occurrence the occurrence of the field used for custom column
@@ -3553,18 +3637,16 @@ proto_custom_set(proto_tree* tree, GSList *field_id,
                              char *result,
                              char *expr, const int size );
 
-/** Construct a display filter string for a custom column
- @param edt epan dissecting
- @param field_id the field ids used for custom column
- @param occurrence the occurrence of the field used for custom column
- @return allocated display filter string.  Needs to be freed with g_free(...) */
+/**
+ * @brief Construct a display filter string for a custom column.
+ *
+ * @param edt         The epan_dissect context.
+ * @param field_id    The field IDs used for the custom column.
+ * @param occurrence  The occurrence of the field used for the custom column.
+ * @return            Allocated display filter string. Needs to be freed with g_free(...).
+ */
 char *
 proto_custom_get_filter(struct epan_dissect *edt, GSList *field_id, int occurrence);
-
-/** @} */
-
-const char *
-hfinfo_char_value_format_display(int display, char buf[7], uint32_t value);
 
 #ifdef __cplusplus
 }

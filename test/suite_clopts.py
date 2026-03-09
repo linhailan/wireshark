@@ -14,7 +14,6 @@ import os.path
 import subprocess
 import subprocesstest
 from subprocesstest import ExitCodes, grep_output, count_output
-import shutil
 import pytest
 
 #glossaries = ('fields', 'protocols', 'values', 'decodes', 'defaultprefs', 'currentprefs')
@@ -282,14 +281,14 @@ class TestTsharkZExpert:
         proc = subprocesstest.run((cmd_tshark, '-q', '-z', 'expert,' + invalid_filter,
             '-r', capture_file('http-ooo.pcap')), capture_output=True, env=test_env)
         assert proc.returncode == ExitCodes.COMMAND_LINE
-        assert grep_output(proc.stdout, 'Filter "' + invalid_filter + '" is invalid')
+        assert grep_output(proc.stderr, 'Filter "' + invalid_filter + '" is invalid')
 
     def test_tshark_z_expert_error_invalid_filter(self, cmd_tshark, capture_file, test_env):
         invalid_filter = '__invalid_protocol'
         proc = subprocesstest.run((cmd_tshark, '-q', '-z', 'expert,error,' + invalid_filter,
             '-r', capture_file('http-ooo.pcap')), capture_output=True, env=test_env)
         assert proc.returncode == ExitCodes.COMMAND_LINE
-        assert grep_output(proc.stdout, 'Filter "' + invalid_filter + '" is invalid')
+        assert grep_output(proc.stderr, 'Filter "' + invalid_filter + '" is invalid')
 
     def test_tshark_z_expert_filter(self, cmd_tshark, capture_file, test_env):
         proc = subprocesstest.run((cmd_tshark, '-q', '-z', 'expert,udp',
@@ -358,3 +357,41 @@ class TestTsharkExtcap:
         # Ensure tshark lists 2 interfaces in the preferences
         proc = subprocesstest.run((cmd_tshark, '-G', 'currentprefs'), capture_output=True, env=test_env)
         assert count_output(proc.stdout, 'extcap.sampleif.test') == 2
+
+class TestStratoOptions:
+    # XXX Should we generate individual test functions instead of looping?
+    def test_strato_invalid_chars(self, cmd_strato, test_env):
+        '''Invalid tshark parameters'''
+        # Most of these are valid but require a mandatory parameter
+        for char_arg in 'ABCEFGHJKMNORTUWXYZabcdefijkmorstuwyz':
+            process = subprocesstest.run((cmd_strato, '-' + char_arg), env=test_env)
+            assert process.returncode == ExitCodes.COMMAND_LINE
+
+    # XXX Should we generate individual test functions instead of looping?
+    def test_strato_valid_chars(self, cmd_strato, test_env):
+        for char_arg in 'hv':
+            process = subprocesstest.run((cmd_strato, '-' + char_arg), env=test_env)
+            assert process.returncode == ExitCodes.OK
+
+    # # XXX Should we generate individual test functions instead of looping?
+    # def test_tshark_interface_chars(self, cmd_tshark, cmd_dumpcap, test_env):
+    #     '''Valid tshark parameters requiring capture permissions'''
+    #     # These options require dumpcap, but may fail with a pcap error
+    #     # if Npcap is not present
+    #     valid_returns = [ExitCodes.OK, ExitCodes.PCAP_ERROR, ExitCodes.INVALID_CAPABILITY, ExitCodes.INVALID_INTERFACE]
+    #     for char_arg in 'DL':
+    #         process = subprocesstest.run((cmd_tshark, '-' + char_arg), env=test_env)
+    #         assert process.returncode in valid_returns
+
+    # def test_tshark_disable_protos(self, cmd_tshark, capture_file, test_env):
+    #     '''--disable-protocol/--enable-protocol from !16923'''
+    #     process = subprocesstest.run((cmd_tshark, "-r", capture_file("http.pcap"),
+    #                 "--disable-protocol", "ALL",
+    #                 "--enable-protocol", "eth,ip",
+    #                 "-Tjson", "-eeth.type", "-eip.proto", "-ehttp.host",
+    #                 ), capture_output=True, env=test_env)
+    #     assert process.returncode == ExitCodes.OK
+    #     obj = json.loads(process.stdout)[0]['_source']['layers']
+    #     assert obj.get('eth.type', 'NOT FOUND') == ['0x0800']
+    #     assert obj.get('ip.proto', 'NOT FOUND') == ['6']
+    #     assert obj.get('http.host', 'NOT FOUND') == 'NOT FOUND'

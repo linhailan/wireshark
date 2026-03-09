@@ -9,7 +9,6 @@
 
 #include "config.h"
 
-#include <wsutil/application_flavor.h>
 #include <wsutil/filesystem.h>
 
 #include <ui/qt/utils/qt_ui_utils.h>
@@ -74,9 +73,6 @@ ProfileDialog::ProfileDialog(QWidget *parent) :
 
     QString as_tooltip = pd_ui_->autoSwitchLimitLabel->toolTip();
     pd_ui_->autoSwitchSpinBox->setToolTip(as_tooltip);
-    if (application_flavor_is_stratoshark()) {
-        pd_ui_->autoSwitchLimitLabel->setText(tr("Auto switch event limit"));
-    }
     pd_ui_->autoSwitchSpinBox->setValue(recent.gui_profile_switch_check_count);
 
     import_button_ = pd_ui_->buttonBox->addButton(tr("Import", "noun"), QDialogButtonBox::ActionRole);
@@ -85,17 +81,17 @@ ProfileDialog::ProfileDialog(QWidget *parent) :
     export_button_ = pd_ui_->buttonBox->addButton(tr("Export", "noun"), QDialogButtonBox::ActionRole);
 
     QMenu * importMenu = new QMenu(import_button_);
-    QAction * entry = importMenu->addAction(tr("From Zip File..."));
+    QAction * entry = importMenu->addAction(tr("From Zip File…"));
     connect(entry, &QAction::triggered, this, &ProfileDialog::importFromZip, Qt::QueuedConnection);
-    entry = importMenu->addAction(tr("From Directory..."));
+    entry = importMenu->addAction(tr("From Directory…"));
     connect(entry, &QAction::triggered, this, &ProfileDialog::importFromDirectory, Qt::QueuedConnection);
     import_button_->setMenu(importMenu);
 
     QMenu * exportMenu = new QMenu(export_button_);
-    export_selected_entry_ = exportMenu->addAction(tr("%Ln Selected Personal Profile(s)...", "", 0));
+    export_selected_entry_ = exportMenu->addAction(tr("%Ln Selected Personal Profile(s)…", "", 0));
     export_selected_entry_->setProperty(PROFILE_EXPORT_PROPERTY, PROFILE_EXPORT_SELECTED);
     connect(export_selected_entry_, &QAction::triggered, this, &ProfileDialog::exportProfiles, Qt::QueuedConnection);
-    entry = exportMenu->addAction(tr("All Personal Profiles..."));
+    entry = exportMenu->addAction(tr("All Personal Profiles…"));
     entry->setProperty(PROFILE_EXPORT_PROPERTY, PROFILE_EXPORT_ALL);
     connect(entry, &QAction::triggered, this, &ProfileDialog::exportProfiles, Qt::QueuedConnection);
     export_button_->setMenu(exportMenu);
@@ -134,6 +130,11 @@ ProfileDialog::~ProfileDialog()
 {
     delete pd_ui_;
     empty_profile_list (true);
+}
+
+QLabel* ProfileDialog::autoSwitchLimitLabel() const
+{
+    return pd_ui_->autoSwitchLimitLabel;
 }
 
 void ProfileDialog::keyPressEvent(QKeyEvent *evt)
@@ -307,7 +308,7 @@ void ProfileDialog::updateWidgets()
         /* multiple profiles are being selected, copy is no longer allowed */
         pd_ui_->copyToolButton->setEnabled(false);
 
-        msg = tr("%Ln Selected Personal Profile(s)...", "", user_profiles);
+        msg = tr("%Ln Selected Personal Profile(s)…", "", user_profiles);
         pd_ui_->hintLabel->setText(msg);
 #if defined(HAVE_MINIZIP) || defined(HAVE_MINIZIPNG)
         export_selected_entry_->setText(msg);
@@ -325,7 +326,7 @@ void ProfileDialog::updateWidgets()
             pd_ui_->hintLabel->setToolTip(index.data(Qt::ToolTipRole).toString());
 
             if (! index.data(ProfileModel::DATA_IS_GLOBAL).toBool() && ! index.data(ProfileModel::DATA_IS_DEFAULT).toBool())
-                msg = tr("%Ln Selected Personal Profile(s)...", "", 1);
+                msg = tr("%Ln Selected Personal Profile(s)…", "", 1);
         }
 
         pd_ui_->copyToolButton->setEnabled(true);
@@ -335,7 +336,7 @@ void ProfileDialog::updateWidgets()
     }
 
     /* Ensure, that the ok button is disabled, if an invalid name is used or if duplicate global profiles exist */
-    if (model_ && model_->rowCount() > 0)
+    if (model_->rowCount() > 0)
     {
         msg.clear();
         for (int row = 0; row < model_->rowCount() && enable_ok; row++)

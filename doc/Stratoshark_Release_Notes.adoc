@@ -27,7 +27,45 @@ If you or your organization would like to contribute or become a sponsor, please
 // Many other improvements have been made.
 // See the “New and Updated Features” section below for more details.
 
-// The following changes have been made since version 0.9.1:
+The following changes have been made since version 0.9.3:
+
+* Stratoshark can now read https://learn.microsoft.com/en-us/sysinternals/downloads/procmon[Process Monitor] (Procmon) files.
+
+* The keyboard shortcuts dialog (About Wireshark → Keyboard Shortcuts) has been moved out of of the About dialog to the menu View → Internals → Keyboard Shortcuts and now has a button to print the list of keyboard shortcuts to an HTML file.
+
+* The application icon has been updated to support Liquid Glass on macOS Tahoe.
+
+* Stratoshark and strato can now read plain Kubernetes Audit logs and Google Cloud Audit logs, and CloudTrail logs.
+
+The following changes have been made since version 0.9.2:
+
+* The Windows installers now ship with Qt 6.8.3.
+  They previously shipped with Qt 6.8.1.
+
+* Stratoshark now ships with “strato”, a command line tool similar to tshark.
+
+* The Windows and macOS packages now ship with the gcpaudit and k8saudit plugins.
+
+* The Falco Events dissector now adds IP geolocation fields alongside IPv4 and IPv6 address fields.
+
+The following changes have been made since version 0.9.1:
+
+* A new “Plots” dialog has been added, which provides scatter plots in contrast to the “I/O Graphs” dialog, which provides histograms.
+  The Plots dialog window supports multiple plots, markers, and automatic scrolling.
+
+* The Falco Bridge dissector has been renamed to Falco Events.
+  Filter fields now have a "falcoevents" protocol prefix, but a "falcobridge" protocol alias has been added for backward compatibility.
+  wsbuglink:20397[]
+
+* Stratoshark can now show field offsets for supported plugins.
+
+* Cloudtrail log messages can now be viewed as formatted JSON data.
+
+* The system call dissector now has a "falcoevents.fd.stream" field, which provides a unique number for each file descriptor.
+  The "Follow File Descriptor Stream" feature now uses this field to track streams. wsbuglink:20538[]
+
+* We now ship universal macOS installers instead of separate packages
+for Arm64 and Intel. wsbuglink:17294[]
 
 The following changes have been made since version 0.9.0:
 
@@ -41,11 +79,22 @@ The following changes have been made since version 0.9.0:
 //* cveidlink:2014-2486[]
 //* Stratoshark grabs your ID at 3 am, goes to Waffle House, and insults people.
 
+The following bugs have been fixed since version 0.9.3:
+
+In order to work around wsbuglink:20869[issue 20869], the macOS package ships with the gcpaudit and k8saudit plugins disabled.
+In order to enable them, you can rename them from *Stratoshark.app/Contents/PlugIns/stratoshark/falco/_plugin_.so.disabled* to *Stratoshark.app/Contents/PlugIns/stratoshark/falco/_plugin_.so*.
+
+The following bugs have been fixed since version 0.9.2:
+
+* .scap file extension wrongly associated with Wireshark. wsbuglink:20583[].
+* sshdig should have a snaplen option. wsbuglink:20586[].
+
 The following bugs have been fixed since version 0.9.1:
 
 * Stratoshark help message has Wiresharkisms in it. wsbuglink:20229[].
-
 * Stratoshark and editcap could write incorrect block types. https://gitlab.com/wireshark/wireshark/-/merge_requests/19238[Merge request 19238].
+* Stratoshark says I can't capture on local interfaces. wsbuglink:20494[].
+* Stratoshark: Crash While Sorting on evt.buflen column. wsbuglink:20571[].
 
 The following bugs have been fixed since version 0.9.0:
 

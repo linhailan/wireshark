@@ -31,10 +31,10 @@
 #include <epan/exceptions.h>
 #include <epan/addr_resolv.h>
 #include <epan/prefs.h>
-#include <epan/afn.h>
 #include <epan/expert.h>
 #include <epan/show_exception.h>
 #include <epan/tfs.h>
+#include <epan/iana-info.h>
 #include <wsutil/array.h>
 
 #include "packet-diffserv-mpls-common.h"
@@ -1160,11 +1160,11 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, unsigned offset, proto_tree *
 
             implemented=1;
             switch(family) {
-            case AFNUM_INET: /*IPv4*/
+            case AFNUM_IP: /*IPv4*/
                 addr_size=4;
                 addr_type = AT_IPv4;
                 break;
-            case AFNUM_INET6: /*IPv6*/
+            case AFNUM_IP6: /*IPv6*/
                 addr_size=16;
                 addr_type = AT_IPv6;
                 break;
@@ -1236,11 +1236,11 @@ dissect_tlv_fec(tvbuff_t *tvb, packet_info *pinfo, unsigned offset, proto_tree *
 
             implemented=1;
             switch(family) {
-            case AFNUM_INET: /*IPv4*/
+            case AFNUM_IP: /*IPv4*/
                 addr_size=4;
                 addr_type = AT_IPv4;
                 break;
-            case AFNUM_INET6: /*IPv6*/
+            case AFNUM_IP6: /*IPv6*/
                 addr_size=16;
                 addr_type = AT_IPv6;
                 break;
@@ -1665,11 +1665,11 @@ dissect_tlv_address_list(tvbuff_t *tvb, packet_info *pinfo, unsigned offset, pro
     proto_tree_add_item(tree, hf_ldp_tlv_addrl_addr_family, tvb,
                         offset, 2, ENC_BIG_ENDIAN);
     switch(family) {
-    case AFNUM_INET: /*IPv4*/
+    case AFNUM_IP: /*IPv4*/
         addr_size=4;
         addr_type = AT_IPv4;
         break;
-    case AFNUM_INET6: /*IPv6*/
+    case AFNUM_IP6: /*IPv6*/
         addr_size=16;
         addr_type = AT_IPv6;
         break;
@@ -2635,7 +2635,7 @@ dissect_tlv(tvbuff_t *tvb, packet_info *pinfo, unsigned offset, proto_tree *tree
         } else {
             typebak=0;
             tlv_tree = proto_tree_add_subtree(tree, tvb, offset, length + 4, ett_ldp_tlv, NULL,
-                                     val_to_str(type, tlv_type_names, "Unknown TLV type (0x%04X)"));
+                                     val_to_str(pinfo->pool, type, tlv_type_names, "Unknown TLV type (0x%04X)"));
         }
 
         proto_tree_add_item(tlv_tree, hf_ldp_tlv_unknown, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -3063,7 +3063,7 @@ dissect_msg(tvbuff_t *tvb, unsigned offset, packet_info *pinfo, proto_tree *tree
         col_append_fstr(pinfo->cinfo, COL_INFO, "Experimental Message (0x%04X) ", typebak);
         break;
     default:
-        col_append_fstr(pinfo->cinfo, COL_INFO, "%s ", val_to_str(type, ldp_message_types, "Unknown Message (0x%04X)"));
+        col_append_fstr(pinfo->cinfo, COL_INFO, "%s ", val_to_str(pinfo->pool, type, ldp_message_types, "Unknown Message (0x%04X)"));
     }
 
     if (tree) {
@@ -3077,7 +3077,7 @@ dissect_msg(tvbuff_t *tvb, unsigned offset, packet_info *pinfo, proto_tree *tree
             break;
         default:
             msg_tree = proto_tree_add_subtree(tree, tvb, offset, length + 4, ett_ldp_message, NULL,
-                                     val_to_str(type, ldp_message_types, "Unknown Message type (0x%04X)"));
+                                     val_to_str(pinfo->pool, type, ldp_message_types, "Unknown Message type (0x%04X)"));
         }
 
         proto_tree_add_item(msg_tree, hf_ldp_msg_ubit, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -3394,7 +3394,6 @@ dissect_ldp_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data 
     volatile int        offset = 0;
     int                 length_remaining;
     uint16_t            plen;
-    int                 length;
     tvbuff_t *volatile  next_tvb;
     while (tvb_reported_length_remaining(tvb, offset) != 0) {
         length_remaining = tvb_captured_length_remaining(tvb, offset);
@@ -3480,23 +3479,8 @@ dissect_ldp_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data 
          * Construct a tvbuff containing the amount of the payload
          * we have available.  Make its reported length the
          * amount of data in the DNS-over-TCP packet.
-         *
-         * XXX - if reassembly isn't enabled. the subdissector
-         * will throw a BoundsError exception, rather than a
-         * ReportedBoundsError exception.  We really want
-         * a tvbuff where the length is "length", the reported
-         * length is "plen + 4", and the "if the snapshot length
-         * were infinite" length is the minimum of the
-         * reported length of the tvbuff handed to us and "plen+4",
-         * with a new type of exception thrown if the offset is
-         * within the reported length but beyond that third length,
-         * with that exception getting the "Unreassembled Packet"
-         * error.
          */
-        length = length_remaining;
-        if (length > plen + 4)
-            length = plen + 4;
-        next_tvb = tvb_new_subset_length_caplen(tvb, offset, length, plen + 4);
+        next_tvb = tvb_new_subset_length(tvb, offset, plen + 4);
 
         /*
          * Dissect the LDP packet.

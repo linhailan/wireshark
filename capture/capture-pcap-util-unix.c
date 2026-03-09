@@ -31,6 +31,7 @@
 #ifdef HAVE_PCAP_REMOTE
 GList *
 get_remote_interface_list(const char *hostname, const char *port,
+			  bool wireshark_remote _U_,
 			  int auth_type, const char *username,
 			  const char *passwd, int *err, char **err_str)
 {
@@ -40,9 +41,15 @@ get_remote_interface_list(const char *hostname, const char *port,
 #endif
 
 GList *
-get_interface_list(int *err, char **err_str)
+get_interface_list_ws(int *err, char **err_str)
 {
-	return get_interface_list_findalldevs(err, err_str);
+	return get_interface_list_findalldevs(true, err, err_str);
+}
+
+GList*
+get_interface_list_ss(int* err, char** err_str)
+{
+	return get_interface_list_findalldevs(false, err, err_str);
 }
 
 /*
@@ -133,11 +140,7 @@ gather_caplibs_compile_info(feature_list l)
 #ifdef __linux__
 	/* This is a Linux-specific library. */
 	/* LIBNL */
-#if defined(HAVE_LIBNL1)
-	with_feature(l, "libnl 1");
-#elif defined(HAVE_LIBNL2)
-	with_feature(l, "libnl 2");
-#elif defined(HAVE_LIBNL3)
+#if defined(HAVE_LIBNL3)
 	with_feature(l, "libnl 3");
 #else /* no libnl */
 	without_feature(l, "libnl");

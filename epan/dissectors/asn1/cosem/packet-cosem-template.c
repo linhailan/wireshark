@@ -29,10 +29,6 @@
 #include "packet-ber.h"
 #include "packet-x509if.h"
 
-#define PNAME  "DLMS/COSEM"
-#define PSNAME "COSEM"
-#define PFNAME "cosem"
-
 void proto_register_cosem(void);
 void proto_reg_handoff_cosem(void);
 
@@ -171,6 +167,8 @@ static int ett_dlms_fragments;
 static expert_field ei_dlms_no_success;
 static expert_field ei_dlms_not_implemented;
 static expert_field ei_dlms_check_sequence;
+static expert_field ei_dlms_access_req_choice;
+static expert_field ei_dlms_planar_type;
 
 static dissector_handle_t cosem_handle;
 static dissector_handle_t dlms_handle;
@@ -904,7 +902,7 @@ dlms_dissect_invoke_id_and_priority(proto_tree* tree, tvbuff_t* tvb, int offset)
     subtree = proto_tree_add_subtree(tree, tvb, offset, 1, ett_dlms_invoke_id_and_priority, NULL, "Invoke Id And Priority");
     proto_tree_add_item(subtree, hf_dlms_invoke_id, tvb, offset, 1, ENC_NA);
     proto_tree_add_item(subtree, hf_dlms_service_class, tvb, offset, 1, ENC_NA);
-    proto_tree_add_item(subtree, hf_dlms_priority, tvb, offset, 1, ENC_NA);
+    proto_tree_add_item(subtree, hf_dlms_priority, tvb, offset, 1, ENC_BIG_ENDIAN);
     offset += 1;
 
     return offset;
@@ -1027,10 +1025,9 @@ static int
 dlms_dissect_data_access_result(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, int offset)
 {
     proto_item* item;
-    int result;
+    uint8_t     result;
 
-    item = proto_tree_add_item(tree, hf_dlms_data_access_result, tvb, offset, 1, ENC_NA);
-    result = tvb_get_uint8(tvb, offset);
+    item = proto_tree_add_item_ret_uint8(tree, hf_dlms_data_access_result, tvb, offset, 1, ENC_NA, &result);
     offset += 1;
     if (result != 0) {
         const char* str = val_to_str_const(result, dlms_data_access_result_names, "unknown result");
@@ -1113,115 +1110,139 @@ dlms_append_date_time_maybe(tvbuff_t* tvb, proto_item* item, int offset, unsigne
 
 /* Set the value of an item with a planar data type (not array nor structure) */
 static int
-dlms_set_data_value(tvbuff_t* tvb, proto_item* item, int choice, int offset)
+dlms_set_data_value(tvbuff_t* tvb, packet_info *pinfo, proto_item* item, int choice, int offset)
 {
-    if (choice == 0) {
-        proto_item_set_text(item, "Null");
-    }
-    else if (choice == 3) {
-        bool value = tvb_get_uint8(tvb, offset);
-        proto_item_set_text(item, "Boolean: %s", value ? "true" : "false");
-        offset += 1;
-    }
-    else if (choice == 4) {
-        unsigned bits = dlms_get_length(tvb, &offset);
-        unsigned bytes = (bits + 7) / 8;
-        proto_item_set_text(item, "Bit-string (bits: %u, bytes: %u):", bits, bytes);
-        offset += bytes;
-    }
-    else if (choice == 5) {
-        int32_t value = tvb_get_ntohl(tvb, offset);
-        proto_item_set_text(item, "Double Long: %d", value);
-        offset += 4;
-    }
-    else if (choice == 6) {
-        uint32_t value = tvb_get_ntohl(tvb, offset);
-        proto_item_set_text(item, "Double Long Unsigned: %u", value);
-        offset += 4;
-    }
-    else if (choice == 9) {
-        unsigned length = dlms_get_length(tvb, &offset);
-        proto_item_set_text(item, "Octet String (length %u)", length);
-        dlms_append_date_time_maybe(tvb, item, offset, length);
-        offset += length;
-    }
-    else if (choice == 10) {
-        unsigned length = dlms_get_length(tvb, &offset);
-        proto_item_set_text(item, "Visible String (length %u)", length);
-        offset += length;
-    }
-    else if (choice == 12) {
-        unsigned length = dlms_get_length(tvb, &offset);
-        proto_item_set_text(item, "UTF8 String (length %u)", length);
-        offset += length;
-    }
-    else if (choice == 13) {
-        unsigned value = tvb_get_uint8(tvb, offset);
-        proto_item_set_text(item, "BCD: 0x%02x", value);
-        offset += 1;
-    }
-    else if (choice == 15) {
-        int8_t value = tvb_get_uint8(tvb, offset);
-        proto_item_set_text(item, "Integer: %d", value);
-        offset += 1;
-    }
-    else if (choice == 16) {
-        int16_t value = tvb_get_ntohs(tvb, offset);
-        proto_item_set_text(item, "Long: %d", value);
-        offset += 2;
-    }
-    else if (choice == 17) {
-        uint8_t value = tvb_get_uint8(tvb, offset);
-        proto_item_set_text(item, "Unsigned: %u", value);
-        offset += 1;
-    }
-    else if (choice == 18) {
-        uint16_t value = tvb_get_ntohs(tvb, offset);
-        proto_item_set_text(item, "Long Unsigned: %u", value);
-        offset += 2;
-    }
-    else if (choice == 20) {
-        int64_t value = tvb_get_ntoh64(tvb, offset);
-        proto_item_set_text(item, "Long64: %" PRIu64 "", value);
-        offset += 8;
-    }
-    else if (choice == 21) {
-        uint64_t value = tvb_get_ntoh64(tvb, offset);
-        proto_item_set_text(item, "Long64 Unsigned: %" PRId64 "", value);
-        offset += 8;
-    }
-    else if (choice == 22) {
-        uint8_t value = tvb_get_uint8(tvb, offset);
-        proto_item_set_text(item, "Enum: %u", value);
-        offset += 1;
-    }
-    else if (choice == 23) {
-        float value = tvb_get_ntohieee_float(tvb, offset);
-        proto_item_set_text(item, "Float32: %f", value);
-        offset += 4;
-    }
-    else if (choice == 24) {
-        double value = tvb_get_ntohieee_double(tvb, offset);
-        proto_item_set_text(item, "Float64: %f", value);
-        offset += 8;
-    }
-    else if (choice == 25) {
-        proto_item_set_text(item, "Date Time");
-        offset += 12;
-    }
-    else if (choice == 26) {
-        proto_item_set_text(item, "Date");
-        offset += 5;
-    }
-    else if (choice == 27) {
-        proto_item_set_text(item, "Time");
-        offset += 4;
-    }
-    else if (choice == 255) {
-        proto_item_set_text(item, "Don't Care");
-    }
-    else {
-        DISSECTOR_ASSERT_HINT(choice, "Invalid data type");
+    switch (choice) {
+        case 0: {
+            proto_item_set_text(item, "Null");
+            break;
+        }
+        case 3: {
+            bool value = tvb_get_uint8(tvb, offset);
+            proto_item_set_text(item, "Boolean: %s", value ? "true" : "false");
+            offset += 1;
+            break;
+        }
+        case 4: {
+            unsigned bits = dlms_get_length(tvb, &offset);
+            unsigned bytes = (bits + 7) / 8;
+            proto_item_set_text(item, "Bit-string (bits: %u, bytes: %u):", bits, bytes);
+            offset += bytes;
+            break;
+        }
+        case 5: {
+            int32_t value = tvb_get_ntohl(tvb, offset);
+            proto_item_set_text(item, "Double Long: %d", value);
+            offset += 4;
+            break;
+        }
+        case 6: {
+            uint32_t value = tvb_get_ntohl(tvb, offset);
+            proto_item_set_text(item, "Double Long Unsigned: %u", value);
+            offset += 4;
+            break;
+        }
+        case 9: {
+            unsigned length = dlms_get_length(tvb, &offset);
+            proto_item_set_text(item, "Octet String (length %u)", length);
+            dlms_append_date_time_maybe(tvb, item, offset, length);
+            offset += length;
+            break;
+        }
+        case 10: {
+            unsigned length = dlms_get_length(tvb, &offset);
+            proto_item_set_text(item, "Visible String (length %u)", length);
+            offset += length;
+            break;
+        }
+        case 12: {
+            unsigned length = dlms_get_length(tvb, &offset);
+            proto_item_set_text(item, "UTF8 String (length %u)", length);
+            offset += length;
+            break;
+        }
+        case 13: {
+            unsigned value = tvb_get_uint8(tvb, offset);
+            proto_item_set_text(item, "BCD: 0x%02x", value);
+            offset += 1;
+            break;
+        }
+        case 15: {
+            int8_t value = tvb_get_uint8(tvb, offset);
+            proto_item_set_text(item, "Integer: %d", value);
+            offset += 1;
+            break;
+        }
+        case 16: {
+            int16_t value = tvb_get_ntohs(tvb, offset);
+            proto_item_set_text(item, "Long: %d", value);
+            offset += 2;
+            break;
+        }
+        case 17: {
+            uint8_t value = tvb_get_uint8(tvb, offset);
+            proto_item_set_text(item, "Unsigned: %u", value);
+            offset += 1;
+            break;
+        }
+        case 18: {
+            uint16_t value = tvb_get_ntohs(tvb, offset);
+            proto_item_set_text(item, "Long Unsigned: %u", value);
+            offset += 2;
+            break;
+        }
+        case 20: {
+            int64_t value = tvb_get_ntoh64(tvb, offset);
+            proto_item_set_text(item, "Long64: %" PRIu64 "", value);
+            offset += 8;
+            break;
+        }
+        case 21: {
+            uint64_t value = tvb_get_ntoh64(tvb, offset);
+            proto_item_set_text(item, "Long64 Unsigned: %" PRId64 "", value);
+            offset += 8;
+            break;
+        }
+        case 22: {
+            uint8_t value = tvb_get_uint8(tvb, offset);
+            proto_item_set_text(item, "Enum: %u", value);
+            offset += 1;
+            break;
+        }
+        case 23: {
+            float value = tvb_get_ntohieee_float(tvb, offset);
+            proto_item_set_text(item, "Float32: %f", value);
+            offset += 4;
+            break;
+        }
+        case 24: {
+            double value = tvb_get_ntohieee_double(tvb, offset);
+            proto_item_set_text(item, "Float64: %f", value);
+            offset += 8;
+            break;
+        }
+        case 25: {
+            proto_item_set_text(item, "Date Time");
+            offset += 12;
+            break;
+        }
+        case 26: {
+            proto_item_set_text(item, "Date");
+            offset += 5;
+            break;
+        }
+        case 27: {
+            proto_item_set_text(item, "Time");
+            offset += 4;
+            break;
+        }
+        case 255: {
+            proto_item_set_text(item, "Don't Care");
+            break;
+        }
+        default: {
+            expert_add_info(pinfo, item, &ei_dlms_planar_type);
+        }
     }
 
     return offset;
@@ -1243,9 +1264,10 @@ static int dlms_get_type_description_length(tvbuff_t* tvb, packet_info* pinfo, i
     }
     else if (choice == 2) { // structure
         int end_offset = offset + 1;
-        int sequence_of = dlms_get_length(tvb, &end_offset);
-        while (sequence_of--) {
+        unsigned sequence_of = dlms_get_length(tvb, &end_offset);
+        while (sequence_of != 0) {
             end_offset += dlms_get_type_description_length(tvb, pinfo, end_offset);
+            sequence_of--;
         }
         pinfo->dissection_depth -= 2;
         decrement_dissection_depth(pinfo);
@@ -1282,16 +1304,17 @@ static proto_item* dlms_dissect_compact_array_content(tvbuff_t* tvb, packet_info
         }
     }
     else if (choice == 2) { /* structure */
-        uint32_t elements = dlms_get_length(tvb, &description_offset);
+        unsigned elements = dlms_get_length(tvb, &description_offset);
         proto_item_set_text(item, "Structure");
         subtree = proto_item_add_subtree(item, ett_dlms_composite_data);
-        while (elements--) {
+        while (elements != 0) {
             dlms_dissect_compact_array_content(tvb, pinfo, subtree, description_offset, content_offset);
             description_offset += dlms_get_type_description_length(tvb, pinfo, description_offset);
+            elements--;
         }
     }
     else { /* planar type */
-        *content_offset = dlms_set_data_value(tvb, item, choice, *content_offset);
+        *content_offset = dlms_set_data_value(tvb, pinfo, item, choice, *content_offset);
     }
     proto_item_set_end(item, tvb, *content_offset);
 
@@ -1350,7 +1373,7 @@ static proto_item* dlms_dissect_data(tvbuff_t* tvb, packet_info* pinfo, proto_tr
         proto_item_set_text(item, "Compact Array (%u elements)", elements);
     }
     else { /* planar type */
-        *offset = dlms_set_data_value(tvb, item, choice, *offset);
+        *offset = dlms_set_data_value(tvb, pinfo, item, choice, *offset);
     }
     proto_item_set_end(item, tvb, *offset);
     pinfo->dissection_depth -= 2;
@@ -1480,8 +1503,8 @@ dlms_dissect_access_request_specification(tvbuff_t* tvb, packet_info* pinfo, pro
     subtree = proto_tree_add_subtree(tree, tvb, offset, 0, ett_dlms_access_request_specification, &item, "Access Request Specification");
     sequence_of = dlms_get_length(tvb, &offset);
     for (i = 0; i < sequence_of; i++) {
-        int choice = tvb_get_uint8(tvb, offset);
-        subitem = proto_tree_add_item(subtree, hf_dlms_access_request, tvb, offset, 1, ENC_NA);
+        uint32_t choice;
+        subitem = proto_tree_add_item_ret_uint(subtree, hf_dlms_access_request, tvb, offset, 1, ENC_NA, &choice);
         proto_item_prepend_text(subitem, "[%u] ", i + 1);
         subsubtree = proto_item_add_subtree(subitem, ett_dlms_access_request);
         offset += 1;
@@ -1499,7 +1522,8 @@ dlms_dissect_access_request_specification(tvbuff_t* tvb, packet_info* pinfo, pro
             offset = dlms_dissect_selective_access_descriptor(tvb, pinfo, subsubtree, offset);
             break;
         default:
-            DISSECTOR_ASSERT_HINT(choice, "Invalid Access-Request-Specification CHOICE");
+            expert_add_info(pinfo, subitem, &ei_dlms_access_req_choice);
+            break;
         }
     }
     proto_item_set_end(item, tvb, offset);
@@ -2062,6 +2086,14 @@ dlms_dissect_hdlc_information(tvbuff_t* tvb, proto_tree* tree, int offset)
 }
 
 
+static unsigned dlms_dissect_hdlc_calc_address_len(tvbuff_t* tvb, const int start)
+{
+	if (tvb_get_uint8(tvb, start) & 1) return 1;
+	if (tvb_get_uint8(tvb, start + 1) & 1) return 2;
+	if (tvb_get_uint8(tvb, start + 2) & 1) return 3;
+	return 4;
+}
+
 /* Dissect a DLMS APDU in an HDLC frame */
 static void
 dissect_dlms_hdlc(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree)
@@ -2070,7 +2102,7 @@ dissect_dlms_hdlc(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree)
     proto_item* item;
     fragment_head* frags;
     tvbuff_t* rtvb; /* reassembled tvb */
-    unsigned length, segmentation, control;
+    unsigned length, segmentation, control, da_len, sa_len, control_off;
 
     subtree = proto_tree_add_subtree(tree, tvb, 0, 0, ett_dlms_hdlc, 0, "HDLC");
 
@@ -2086,33 +2118,36 @@ dissect_dlms_hdlc(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree)
     length = tvb_get_ntohs(tvb, 1) & 0x7ff; /* length of HDLC frame excluding the opening and closing flag fields */
 
     /* Destination address field */
-    subsubtree = proto_tree_add_subtree(subtree, tvb, 3, 1, ett_dlms_hdlc_address, 0, "Destination Address");
-    proto_tree_add_item(subsubtree, hf_dlms_hdlc_address, tvb, 3, 1, ENC_NA);
+    da_len = dlms_dissect_hdlc_calc_address_len(tvb, 3);
+    subsubtree = proto_tree_add_subtree(subtree, tvb, 3, da_len, ett_dlms_hdlc_address, 0, "Destination Address");
+    proto_tree_add_item(subsubtree, hf_dlms_hdlc_address, tvb, 3, da_len, ENC_NA);
 
     /* Source address field */
-    subsubtree = proto_tree_add_subtree(subtree, tvb, 4, 1, ett_dlms_hdlc_address, 0, "Source Address");
-    proto_tree_add_item(subsubtree, hf_dlms_hdlc_address, tvb, 4, 1, ENC_NA);
+    sa_len = dlms_dissect_hdlc_calc_address_len(tvb, 3 + da_len);
+    subsubtree = proto_tree_add_subtree(subtree, tvb, 3 + da_len, sa_len, ett_dlms_hdlc_address, 0, "Source Address");
+    proto_tree_add_item(subsubtree, hf_dlms_hdlc_address, tvb, 3 + da_len, sa_len, ENC_NA);
 
     /* Control field */
-    subsubtree = proto_tree_add_subtree(subtree, tvb, 5, 1, ett_dlms_hdlc_control, 0, "Control");
-    control = tvb_get_uint8(tvb, 5);
+    control_off = 3 + da_len + sa_len;
+    subsubtree = proto_tree_add_subtree(subtree, tvb, control_off, 1, ett_dlms_hdlc_control, 0, "Control");
+    control = tvb_get_uint8(tvb, control_off);
 
     /* Header check sequence field */
-    if (length > 7) {
-        dlms_dissect_hdlc_check_sequence(tvb, pinfo, subtree, 1, 5, hf_dlms_hdlc_hcs);
+    if (length > 6 + da_len + sa_len) {
+        dlms_dissect_hdlc_check_sequence(tvb, pinfo, subtree, 1, control_off, hf_dlms_hdlc_hcs);
     }
 
     /* Control sub-fields and information field */
     if ((control & 0x01) == 0x00) {
         col_set_str(pinfo->cinfo, COL_INFO, "HDLC I"); /* Information */
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_i, tvb, 5, 1, ENC_NA);
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, 5, 1, ENC_NA);
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_rsn, tvb, 5, 1, ENC_NA);
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_ssn, tvb, 5, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_i, tvb, control_off, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, control_off, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_rsn, tvb, control_off, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_ssn, tvb, control_off, 1, ENC_NA);
 
-        subsubtree = proto_tree_add_subtree_format(subtree, tvb, 8, length - 9, ett_dlms_hdlc_information, 0, "Information Field (length %u)", length - 9);
-        frags = fragment_add_seq_next(&dlms_reassembly_table, tvb, 8, pinfo, DLMS_REASSEMBLY_ID_HDLC, 0, length - 9, segmentation);
-        rtvb = process_reassembled_data(tvb, 8, pinfo, "Reassembled", frags, &dlms_fragment_items, 0, tree);
+        subsubtree = proto_tree_add_subtree_format(subtree, tvb, 6 + da_len + sa_len, length - 7 - da_len - sa_len, ett_dlms_hdlc_information, 0, "Information Field (length %u)", length - 7 - da_len - sa_len);
+        frags = fragment_add_seq_next(&dlms_reassembly_table, tvb, 6 + da_len + sa_len, pinfo, DLMS_REASSEMBLY_ID_HDLC, 0, length - 7 - da_len - sa_len, segmentation);
+        rtvb = process_reassembled_data(tvb, 6 + da_len + sa_len, pinfo, "Reassembled", frags, &dlms_fragment_items, 0, tree);
         if (rtvb) {
             proto_tree_add_item(subsubtree, hf_dlms_hdlc_llc, rtvb, 0, 3, ENC_NA);
             dlms_dissect_apdu(rtvb, pinfo, tree, 3);
@@ -2120,54 +2155,54 @@ dissect_dlms_hdlc(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree)
     }
     else if ((control & 0x0f) == 0x01) {
         col_set_str(pinfo->cinfo, COL_INFO, "HDLC RR"); /* Receive Ready */
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_rr_rnr, tvb, 5, 1, ENC_NA);
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, 5, 1, ENC_NA);
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_rsn, tvb, 5, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_rr_rnr, tvb, control_off, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, control_off, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_rsn, tvb, control_off, 1, ENC_NA);
     }
     else if ((control & 0x0f) == 0x05) {
         col_set_str(pinfo->cinfo, COL_INFO, "HDLC RNR"); /* Receive Not Ready */
-        item = proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_rr_rnr, tvb, 5, 1, ENC_NA);
+        item = proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_rr_rnr, tvb, control_off, 1, ENC_NA);
         expert_add_info(pinfo, item, &ei_dlms_no_success);
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, 5, 1, ENC_NA);
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_rsn, tvb, 5, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, control_off, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_rsn, tvb, control_off, 1, ENC_NA);
     }
     else if ((control & 0xef) == 0x83) { /* Set Normal Response Mode */
         col_set_str(pinfo->cinfo, COL_INFO, "HDLC SNRM");
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_other, tvb, 5, 1, ENC_NA);
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, 5, 1, ENC_NA);
-        if (length > 7) {
-            dlms_dissect_hdlc_information(tvb, subtree, 8);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_other, tvb, control_off, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, control_off, 1, ENC_NA);
+        if (length > 6 + da_len + sa_len) {
+            dlms_dissect_hdlc_information(tvb, subtree, 6 + da_len + sa_len);
         }
     }
     else if ((control & 0xef) == 0x43) {
         col_set_str(pinfo->cinfo, COL_INFO, "HDLC DISC"); /* Disconnect */
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_other, tvb, 5, 1, ENC_NA);
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, 5, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_other, tvb, control_off, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, control_off, 1, ENC_NA);
     }
     else if ((control & 0xef) == 0x63) {
         col_set_str(pinfo->cinfo, COL_INFO, "HDLC UA"); /* Unnumbered Acknowledge */
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_other, tvb, 5, 1, ENC_NA);
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, 5, 1, ENC_NA);
-        if (length > 7) {
-            dlms_dissect_hdlc_information(tvb, subtree, 8);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_other, tvb, control_off, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, control_off, 1, ENC_NA);
+        if (length >  6 + da_len + sa_len) {
+            dlms_dissect_hdlc_information(tvb, subtree, 6 + da_len + sa_len);
         }
     }
     else if ((control & 0xef) == 0x0f) {
         col_set_str(pinfo->cinfo, COL_INFO, "HDLC DM"); /* Disconnected Mode */
-        item = proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_other, tvb, 5, 1, ENC_NA);
+        item = proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_other, tvb, control_off, control_off, ENC_NA);
         expert_add_info(pinfo, item, &ei_dlms_no_success);
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, 5, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, control_off, control_off, ENC_NA);
     }
     else if ((control & 0xef) == 0x87) {
         col_set_str(pinfo->cinfo, COL_INFO, "HDLC FRMR"); /* Frame Reject */
-        item = proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_other, tvb, 5, 1, ENC_NA);
+        item = proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_other, tvb, control_off, 1, ENC_NA);
         expert_add_info(pinfo, item, &ei_dlms_no_success);
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, 5, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, control_off, 1, ENC_NA);
     }
     else if ((control & 0xef) == 0x03) {
         col_set_str(pinfo->cinfo, COL_INFO, "HDLC UI"); /* Unnumbered Information */
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_other, tvb, 5, 1, ENC_NA);
-        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, 5, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_frame_other, tvb, control_off, 1, ENC_NA);
+        proto_tree_add_item(subsubtree, hf_dlms_hdlc_pf, tvb, control_off, 1, ENC_NA);
     }
     else {
         col_set_str(pinfo->cinfo, COL_INFO, "Unknown HDLC frame");
@@ -2242,10 +2277,10 @@ void proto_register_cosem(void) {
     };
 
     /* Register protocol */
-    proto_cosem = proto_register_protocol(PNAME, PSNAME, PFNAME);
+    proto_cosem = proto_register_protocol("DLMS/COSEM", "COSEM", "cosem");
     proto_dlms = proto_register_protocol("Device Language Message Specification", "DLMS", "dlms");
 
-    cosem_handle = register_dissector(PFNAME, dissect_cosem, proto_cosem);
+    cosem_handle = register_dissector("cosem", dissect_cosem, proto_cosem);
 
     proto_register_field_array(proto_cosem, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
@@ -2437,6 +2472,8 @@ void proto_register_cosem(void) {
         { &ei_dlms_no_success, { "dlms.no_success", PI_RESPONSE_CODE, PI_NOTE, "No success response", EXPFILL } },
         { &ei_dlms_not_implemented, { "dlms.not_implemented", PI_UNDECODED, PI_WARN, "Not implemented in the DLMS dissector", EXPFILL } },
         { &ei_dlms_check_sequence, { "dlms.check_sequence", PI_CHECKSUM, PI_WARN, "Bad HDLC check sequence field value", EXPFILL } },
+        { &ei_dlms_access_req_choice, { "dlms.access_request_choice", PI_PROTOCOL, PI_WARN, "Invalid Access-Request-Specification CHOICE", EXPFILL } },
+        { &ei_dlms_planar_type, { "dlms.planar_type", PI_PROTOCOL, PI_WARN, "Invalid planar data type", EXPFILL } },
     };
 
     expert_module_t* expert_dlms = expert_register_protocol(proto_dlms);

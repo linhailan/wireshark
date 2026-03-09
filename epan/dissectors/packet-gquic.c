@@ -1401,7 +1401,7 @@ static uint32_t
 dissect_gquic_tag(tvbuff_t *tvb, packet_info *pinfo, proto_tree *gquic_tree, unsigned offset, uint32_t tag_number){
     uint32_t tag_offset_start = offset + tag_number*4*2;
     uint32_t tag_offset = 0, total_tag_len = 0;
-    int32_t tag_len;
+    uint32_t tag_len;
 
     while(tag_number){
         proto_tree *tag_tree, *ti_len, *ti_tag, *ti_type;
@@ -1416,8 +1416,7 @@ dissect_gquic_tag(tvbuff_t *tvb, packet_info *pinfo, proto_tree *gquic_tree, uns
         proto_item_append_text(ti_tag, ": %s (%s)", tag_str, val_to_str_const(tag, tag_vals, "Unknown"));
         offset += 4;
 
-        proto_tree_add_item(tag_tree, hf_gquic_tag_offset_end, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-        offset_end = tvb_get_uint32(tvb, offset, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item_ret_uint(tag_tree, hf_gquic_tag_offset_end, tvb, offset, 4, ENC_LITTLE_ENDIAN, &offset_end);
 
         tag_len = offset_end - tag_offset;
         ti_len = proto_tree_add_uint(tag_tree, hf_gquic_tag_length, tvb, offset, 4, tag_len);
@@ -1458,7 +1457,7 @@ dissect_gquic_tag(tvbuff_t *tvb, packet_info *pinfo, proto_tree *gquic_tree, uns
             break;
             case TAG_CCS:
                 while(offset_end - tag_offset >= 8){
-                    proto_tree_add_item(tag_tree, hf_gquic_tag_ccs, tvb, tag_offset_start + tag_offset, 8, ENC_NA);
+                    proto_tree_add_item(tag_tree, hf_gquic_tag_ccs, tvb, tag_offset_start + tag_offset, 8, ENC_BIG_ENDIAN);
                     tag_offset += 8;
                 }
             break;
@@ -1634,7 +1633,7 @@ dissect_gquic_tag(tvbuff_t *tvb, packet_info *pinfo, proto_tree *gquic_tree, uns
                 tag_offset += 2;
                 switch(addr_type){
                     case 2: /* IPv4 */
-                    proto_tree_add_item(tag_tree, hf_gquic_tag_cadr_addr_ipv4, tvb, tag_offset_start + tag_offset, 4, ENC_NA);
+                    proto_tree_add_item(tag_tree, hf_gquic_tag_cadr_addr_ipv4, tvb, tag_offset_start + tag_offset, 4, ENC_BIG_ENDIAN);
                     tag_offset += 4;
                     break;
                     case 10: /* IPv6 */
@@ -1739,8 +1738,7 @@ uint32_t
 dissect_gquic_tags(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ft_tree, unsigned offset){
     uint32_t tag_number;
 
-    proto_tree_add_item(ft_tree, hf_gquic_tag_number, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-    tag_number = tvb_get_uint16(tvb, offset, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item_ret_uint(ft_tree, hf_gquic_tag_number, tvb, offset, 2, ENC_LITTLE_ENDIAN, &tag_number);
     offset += 2;
 
     proto_tree_add_item(ft_tree, hf_gquic_padding, tvb, offset, 2, ENC_NA);
@@ -1795,7 +1793,7 @@ dissect_gquic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *gquic_tr
                 offset += 8;
                 proto_tree_add_item_ret_uint(ft_tree, hf_gquic_frame_type_rsts_error_code, tvb, offset, 4, gquic_info->encoding, &error_code);
                 offset += 4;
-                proto_item_append_text(ti_ft, " Stream ID: %u, Error code: %s", stream_id, val_to_str_ext(error_code, &rststream_error_code_vals_ext, "Unknown (%d)"));
+                proto_item_append_text(ti_ft, " Stream ID: %u, Error code: %s", stream_id, val_to_str_ext(pinfo->pool, error_code, &rststream_error_code_vals_ext, "Unknown (%d)"));
                 col_set_str(pinfo->cinfo, COL_INFO, "RST STREAM");
                 }
             break;
@@ -1810,7 +1808,7 @@ dissect_gquic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *gquic_tr
                 offset += 2;
                 proto_tree_add_item(ft_tree, hf_gquic_frame_type_cc_reason_phrase, tvb, offset, len_reason, ENC_ASCII);
                 offset += len_reason;
-                proto_item_append_text(ti_ft, " Error code: %s", val_to_str_ext(error_code, &error_code_vals_ext, "Unknown (%d)"));
+                proto_item_append_text(ti_ft, " Error code: %s", val_to_str_ext(pinfo->pool, error_code, &error_code_vals_ext, "Unknown (%d)"));
                 col_set_str(pinfo->cinfo, COL_INFO, "Connection Close");
                 }
             break;
@@ -1827,7 +1825,7 @@ dissect_gquic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *gquic_tr
                 offset += 2;
                 proto_tree_add_item(ft_tree, hf_gquic_frame_type_goaway_reason_phrase, tvb, offset, len_reason, ENC_ASCII);
                 offset += len_reason;
-                proto_item_append_text(ti_ft, " Stream ID: %u, Error code: %s", last_good_stream_id, val_to_str_ext(error_code, &error_code_vals_ext, "Unknown (%d)"));
+                proto_item_append_text(ti_ft, " Stream ID: %u, Error code: %s", last_good_stream_id, val_to_str_ext(pinfo->pool, error_code, &error_code_vals_ext, "Unknown (%d)"));
                 col_set_str(pinfo->cinfo, COL_INFO, "GOAWAY");
                 }
             break;
@@ -1852,8 +1850,7 @@ dissect_gquic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *gquic_tr
             case FT_STOP_WAITING:{
                 uint8_t send_entropy;
                 if(gquic_info->version_valid && gquic_info->version < 34){ /* No longer Entropy after Q034 */
-                    proto_tree_add_item(ft_tree, hf_gquic_frame_type_sw_send_entropy, tvb, offset, 1, ENC_NA);
-                    send_entropy = tvb_get_uint8(tvb, offset);
+                    proto_tree_add_item_ret_uint8(ft_tree, hf_gquic_frame_type_sw_send_entropy, tvb, offset, 1, ENC_NA, &send_entropy);
                     proto_item_append_text(ti_ft, " Send Entropy: %u", send_entropy);
                     offset += 1;
                 }
@@ -1955,6 +1952,7 @@ dissect_gquic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *gquic_tr
 
                     proto_item_append_text(ti_stream, " (Reserved for H2 HEADERS)");
 
+                    /* XXX - Set COL_PROTOCOL to "HTTP2"? */
                     col_set_str(pinfo->cinfo, COL_INFO, "H2");
 
                     tvb_h2 = tvb_new_subset_remaining(tvb, offset);
@@ -2029,8 +2027,7 @@ dissect_gquic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *gquic_tr
                 }
 
                 if(frame_type & FTFLAGS_ACK_N){
-                    proto_tree_add_item(ft_tree, hf_gquic_frame_type_ack_num_ranges, tvb, offset, 1, ENC_NA);
-                    num_ranges = tvb_get_uint8(tvb, offset);
+                    proto_tree_add_item_ret_uint8(ft_tree, hf_gquic_frame_type_ack_num_ranges, tvb, offset, 1, ENC_NA, &num_ranges);
                     offset += 1;
                     while(num_ranges){
 
@@ -2042,8 +2039,7 @@ dissect_gquic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *gquic_tr
                         num_ranges--;
                     }
 
-                    proto_tree_add_item(ft_tree, hf_gquic_frame_type_ack_num_revived, tvb, offset, 1, ENC_NA);
-                    num_revived = tvb_get_uint8(tvb, offset);
+                    proto_tree_add_item_ret_uint8(ft_tree, hf_gquic_frame_type_ack_num_revived, tvb, offset, 1, ENC_NA, &num_revived);
                     offset += 1;
                     while(num_revived){
 
@@ -2067,8 +2063,7 @@ dissect_gquic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *gquic_tr
 
                 /* Ack Block */
                 if(frame_type & FTFLAGS_ACK_N){
-                    proto_tree_add_item(ft_tree, hf_gquic_frame_type_ack_num_blocks, tvb, offset, 1, ENC_NA);
-                    num_blocks = tvb_get_uint8(tvb, offset);
+                    proto_tree_add_item_ret_uint8(ft_tree, hf_gquic_frame_type_ack_num_blocks, tvb, offset, 1, ENC_NA, &num_blocks);
                     offset += 1;
                 }
 
@@ -2089,8 +2084,7 @@ dissect_gquic_frame_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *gquic_tr
                 }
 
                 /* Timestamp */
-                proto_tree_add_item(ft_tree, hf_gquic_frame_type_ack_num_timestamp, tvb, offset, 1, ENC_NA);
-                num_timestamp = tvb_get_uint8(tvb, offset);
+                proto_tree_add_item_ret_uint8(ft_tree, hf_gquic_frame_type_ack_num_timestamp, tvb, offset, 1, ENC_NA, &num_timestamp);
                 offset += 1;
 
                 if(num_timestamp){
@@ -2199,7 +2193,7 @@ dissect_gquic_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     }
     /* check and get (and store) version */
     if(puflags & PUFLAGS_VRSN){
-        gquic_info->version_valid = ws_strtou8(tvb_get_string_enc(pinfo->pool, tvb,
+        gquic_info->version_valid = ws_strtou8((char*)tvb_get_string_enc(pinfo->pool, tvb,
             offset + 1 + len_cid + 1, 3, ENC_ASCII), NULL, &gquic_info->version);
         if (!gquic_info->version_valid)
             expert_add_info(pinfo, gquic_tree, &ei_gquic_version_invalid);
@@ -2257,8 +2251,7 @@ dissect_gquic_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         proto_item_append_text(ti, " (%s)", val_to_str_const(message_tag, message_tag_vals, "Unknown Tag"));
         offset += 4;
 
-        proto_tree_add_item(gquic_tree, hf_gquic_tag_number, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-        tag_number = tvb_get_uint16(tvb, offset, ENC_LITTLE_ENDIAN);
+        proto_tree_add_item_ret_uint(gquic_tree, hf_gquic_tag_number, tvb, offset, 2, ENC_LITTLE_ENDIAN, &tag_number);
         offset += 2;
 
         proto_tree_add_item(gquic_tree, hf_gquic_padding, tvb, offset, 2, ENC_NA);
@@ -2349,7 +2342,7 @@ dissect_gquic_q046(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     if((first_byte & PUFLAGS_MPTH) && (first_byte & PUFLAGS_RSV)) {
         /* Long Header. We handle only Q046 */
 
-	gquic_info->version_valid = ws_strtou8(tvb_get_string_enc(pinfo->pool, tvb,
+	gquic_info->version_valid = ws_strtou8((char*)tvb_get_string_enc(pinfo->pool, tvb,
             offset + 2, 3, ENC_ASCII), NULL, &gquic_info->version);
         if (!gquic_info->version_valid) {
             expert_add_info(pinfo, gquic_tree, &ei_gquic_version_invalid);

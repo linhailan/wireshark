@@ -12,7 +12,10 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
-#include "wtap-int.h"
+
+#include <wsutil/pint.h>
+
+#include "wtap_module.h"
 #include "pcapng_module.h"
 #include "file_wrappers.h"
 
@@ -202,7 +205,7 @@ static bool systemd_journal_read_export_entry(FILE_T fh, wtap_rec *rec,
             }
             memcpy(buf_ptr + fld_end, &le_data_len, 8);
             fld_end += 8;
-            data_len = pletoh64(&le_data_len);
+            data_len = pletohu64(&le_data_len);
             if (data_len < 1 || data_len - 1 >= MAX_EXPORT_ENTRY_LENGTH - fld_end) {
                 *err = WTAP_ERR_BAD_FILE;
                 *err_info = ws_strdup_printf("systemd: binary data too long");
@@ -227,7 +230,7 @@ static bool systemd_journal_read_export_entry(FILE_T fh, wtap_rec *rec,
         return false;
     }
 
-    rec->rec_type = REC_TYPE_SYSTEMD_JOURNAL_EXPORT;
+    wtap_setup_systemd_journal_export_rec(rec);
     rec->block = wtap_block_create(WTAP_BLOCK_SYSTEMD_JOURNAL_EXPORT);
     rec->presence_flags = WTAP_HAS_TS|WTAP_HAS_CAP_LEN;
     rec->rec_header.systemd_journal_export_header.record_len = (uint32_t) fld_end;

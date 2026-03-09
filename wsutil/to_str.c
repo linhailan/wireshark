@@ -224,11 +224,14 @@ bytes_to_str_punct_maxlen(wmem_allocator_t *scope,
 	char *buf_ptr;
 	int truncated = 0;
 
-	ws_return_str_if(!src, scope);
-
+	/* src is an array of bytes, not necessarily null-terminated,
+	 * so check for a zero length first and allow it even with a
+	 * NULL src. */
 	if (!src_size) {
 		return wmem_strdup(scope, "");
 	}
+
+	ws_return_str_if(!src, scope);
 
 	if (!punct)
 		return bytes_to_str_maxlen(scope, src, src_size, max_bytes_len);
@@ -266,11 +269,14 @@ bytes_to_str_maxlen(wmem_allocator_t *scope,
 	char *buf_ptr;
 	int truncated = 0;
 
-	ws_return_str_if(!src, scope);
-
+	/* src is an array of bytes, not necessarily null-terminated,
+	 * so check for a zero length first and allow it even with a
+	 * NULL src. */
 	if (!src_size) {
 		return wmem_strdup(scope, "");
 	}
+
+	ws_return_str_if(!src, scope);
 
 	if (max_bytes_len == 0 || max_bytes_len > src_size) {
 		max_bytes_len = src_size;
@@ -667,7 +673,7 @@ eui64_to_str(wmem_allocator_t *scope, const uint64_t ad) {
 	buf=(char *)wmem_alloc(scope, WS_EUI64_STRLEN);
 
 	/* Copy and convert the address to network byte order. */
-	*(uint64_t *)(void *)(p_eui64) = pntoh64(&(ad));
+	*(uint64_t *)(void *)(p_eui64) = pntohu64(&(ad));
 
 	tmp = bytes_to_hexstr_punct(buf, p_eui64, 8, ':');
 	*tmp = '\0'; /* NULL terminate */
@@ -698,9 +704,9 @@ format_fractional_part_nsecs(char *buf, size_t buflen, uint32_t nsecs, const cha
 	int num_bytes;
 	size_t decimal_point_len;
 	uint32_t frac_part;
-	int8_t num_buf[CHARS_NANOSECONDS];
-	int8_t *num_end = &num_buf[CHARS_NANOSECONDS];
-	int8_t *num_ptr;
+	char num_buf[CHARS_NANOSECONDS];
+	char *num_end = &num_buf[CHARS_NANOSECONDS];
+	char *num_ptr;
 	size_t num_len;
 
 	ws_assert(precision != WS_TSPREC_SEC);
@@ -768,7 +774,7 @@ format_fractional_part_nsecs(char *buf, size_t buflen, uint32_t nsecs, const cha
 	 * and gets rid of some divisions and remainders by 100
 	 * done to generate the digits.
 	 *
-	 * We pass preciions as the last argument to
+	 * We pass precision as the last argument to
 	 * uint_to_str_back_len(), as that might mean that
 	 * all of the cases end up using common code to
 	 * do part of the call to uint_to_str_back_len().
@@ -889,9 +895,9 @@ display_signed_time(char *buf, size_t buflen, const nstime_t *ns, int precision)
 {
 	int nsecs;
 	/* this buffer is not NUL terminated */
-	int8_t num_buf[CHARS_64_BIT_SIGNED];
-	int8_t *num_end = &num_buf[CHARS_64_BIT_SIGNED];
-	int8_t *num_ptr;
+	char num_buf[CHARS_64_BIT_SIGNED];
+	char *num_end = &num_buf[CHARS_64_BIT_SIGNED];
+	char *num_ptr;
 	size_t num_len;
 
 	if (buflen < 1)
@@ -1000,6 +1006,7 @@ format_nstime_as_iso8601(char *buf, size_t buflen, const nstime_t *ns,
 	ptr += num_bytes;
 	remaining -= num_bytes;
 
+	num_bytes = 0;
 	if (precision != 0) {
 		/*
 		 * Append the fractional part.

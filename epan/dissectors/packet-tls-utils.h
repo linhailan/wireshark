@@ -20,13 +20,9 @@
 #include <epan/wmem_scopes.h>
 #include <epan/expert.h>
 #include <epan/conversation.h>
+#include <epan/tap.h>
 #include <epan/unit_strings.h>
 #include <wsutil/wsgcrypt.h>
-
-#ifdef HAVE_LIBGNUTLS
-#include <gnutls/x509.h>
-#include <gnutls/pkcs12.h>
-#endif /* HAVE_LIBGNUTLS */
 
 /* TODO inline this now that Libgcrypt is mandatory? */
 #define SSL_CIPHER_CTX gcry_cipher_hd_t
@@ -138,7 +134,8 @@ typedef enum {
 #define SSL_HND_HELLO_EXT_GREASE_2A2A                   10794
 #define SSL_HND_HELLO_EXT_NPN                           13172 /* 0x3374 */
 #define SSL_HND_HELLO_EXT_GREASE_3A3A                   14906
-#define SSL_HND_HELLO_EXT_ALPS                          17513 /* draft-vvv-tls-alps-01, temporary value used in BoringSSL implementation */
+#define SSL_HND_HELLO_EXT_ALPS_OLD                      17513 /* draft-vvv-tls-alps-01, previous value used in BoringSSL implementation */
+#define SSL_HND_HELLO_EXT_ALPS                          17613 /* draft-vvv-tls-alps-01, current value used in BoringSSL implementation */
 #define SSL_HND_HELLO_EXT_GREASE_4A4A                   19018
 #define SSL_HND_HELLO_EXT_GREASE_5A5A                   23130
 #define SSL_HND_HELLO_EXT_GREASE_6A6A                   27242
@@ -201,6 +198,8 @@ typedef enum {
 #define SSL_HND_QUIC_TP_GOOGLE_CONNECTION_OPTIONS           0x3128
 /* https://github.com/facebookincubator/mvfst/blob/master/quic/QuicConstants.h */
 #define SSL_HND_QUIC_TP_FACEBOOK_PARTIAL_RELIABILITY        0xFF00
+#define SSL_HND_QUIC_TP_VERSION_INFORMATION_DRAFT           0xff73db /* https://datatracker.ietf.org/doc/draft-ietf-quic-version-negotiation/13/ */
+#define SSL_HND_QUIC_TP_ADDRESS_DISCOVERY                   0x9f81a176 /* https://tools.ietf.org/html/draft-ietf-quic-address-discovery-00 */
 #define SSL_HND_QUIC_TP_MIN_ACK_DELAY_DRAFT_V1              0xFF03DE1A /* https://tools.ietf.org/html/draft-ietf-quic-ack-frequency-01 */
 #define SSL_HND_QUIC_TP_MIN_ACK_DELAY_DRAFT05               0xff04de1a /* https://tools.ietf.org/html/draft-ietf-quic-ack-frequency-04 / draft-05 */
 #define SSL_HND_QUIC_TP_MIN_ACK_DELAY                       0xff04de1b /* https://tools.ietf.org/html/draft-ietf-quic-ack-frequency-07 */
@@ -252,6 +251,7 @@ extern const value_string tls13_key_update_request[];
 extern const value_string compress_certificate_algorithm_vals[];
 extern const val64_string quic_transport_parameter_id[];
 extern const range_string quic_version_vals[];
+extern const val64_string quic_address_discovery_vals[];
 extern const val64_string quic_enable_time_stamp_v2_vals[];
 extern const val64_string quic_enable_multipath_vals[];
 extern const value_string tls_hello_ext_ech_clienthello_types[];
@@ -431,14 +431,18 @@ typedef struct {
 
 typedef struct _SslRecordInfo {
     unsigned char *plain_data;     /**< Decrypted data. */
-    unsigned   data_len;       /**< Length of decrypted data. */
+    unsigned plain_data_len;       /**< Total length of decrypted data,
+                                        including the content type and padding
+                                        if the TLS version supports them. */
+    unsigned content_len;   /**< Length of the part of the decrypted data
+                                 corresponding to the record content. */
     int     id;             /**< Identifies the exact record within a frame
                                  (there can be multiple records in a frame). */
     ContentType type;       /**< Content type of the decrypted record data. */
     SslFlow *flow;          /**< Flow where this record fragment is a part of.
                                  Can be NULL if this record type may not be fragmented. */
+    uint64_t record_seq;    /**< Implicit (TLS) or explicit (DTLS) record sequence number. */
     uint32_t seq;            /**< Data offset within the flow. */
-    uint16_t dtls13_seq_suffix;   /* < decrypted dtlsv1.3 record number suffix */
     struct _SslRecordInfo* next;
 } SslRecordInfo;
 
@@ -488,6 +492,8 @@ typedef struct _SslSession {
     address srv_addr;
     port_type srv_ptype;
     unsigned srv_port;
+
+    uint32_t stream;
 
     /* The Application layer protocol if known (for STARTTLS support) */
     dissector_handle_t   app_handle;
@@ -744,6 +750,7 @@ extern void
 ssl_change_cipher(SslDecryptSession *ssl_session, bool server);
 
 /** Try to decrypt an ssl record
+ @param allocator scope allocation of the decrypted data
  @param ssl ssl_session the store all the session data
  @param decoder the stream decoder to be used
  @param ct the content type of this ssl record
@@ -758,7 +765,7 @@ ssl_change_cipher(SslDecryptSession *ssl_session, bool server);
  @param outl the decrypted data len
  @return 0 on success */
 extern int
-ssl_decrypt_record(SslDecryptSession *ssl, SslDecoder *decoder, uint8_t ct, uint16_t record_version,
+ssl_decrypt_record(wmem_allocator_t* allocator, SslDecryptSession *ssl, SslDecoder *decoder, uint8_t ct, uint16_t record_version,
         bool ignore_mac_failed,
         const unsigned char *in, uint16_t inl, const unsigned char *cid, uint8_t cidl,
         StringInfo *comp_str, StringInfo *out_str, unsigned *outl);
@@ -782,7 +789,10 @@ tls_add_packet_info(int proto, packet_info *pinfo, uint8_t curr_layer_num_ssl);
 
 /* add to packet data a copy of the specified real data */
 extern void
-ssl_add_record_info(int proto, packet_info *pinfo, const unsigned char *data, int data_len, int record_id, SslFlow *flow, ContentType type, uint8_t curr_layer_num_ssl);
+ssl_add_record_info(int proto, packet_info *pinfo,
+                    const unsigned char *plain_data, int plain_data_len, int content_len,
+                    int record_id, SslFlow *flow, ContentType type, uint8_t curr_layer_num_ssl,
+                    uint64_t record_seq);
 
 /* search in packet data for the specified id; return a newly created tvb for the associated data */
 extern tvbuff_t*
@@ -1102,6 +1112,7 @@ typedef struct ssl_common_dissect {
         int hs_ext_quictp_parameter_cibir_encoding_length;
         int hs_ext_quictp_parameter_cibir_encoding_offset;
         int hs_ext_quictp_parameter_loss_bits;
+        int hs_ext_quictp_parameter_address_discovery;
         int hs_ext_quictp_parameter_enable_time_stamp_v2;
         int hs_ext_quictp_parameter_min_ack_delay;
         int hs_ext_quictp_parameter_google_user_agent_id;
@@ -1313,7 +1324,7 @@ ssl_dissect_change_cipher_spec(ssl_common_dissect_t *hf, tvbuff_t *tvb,
                                bool is_from_server,
                                const SslDecryptSession *ssl);
 
-extern gint
+extern int
 ssl_dissect_hnd_cli_hello(ssl_common_dissect_t *hf, tvbuff_t *tvb,
                           packet_info *pinfo, proto_tree *tree, uint32_t offset,
                           uint32_t offset_end, SslSession *session,
@@ -1405,9 +1416,13 @@ ssl_dissect_hnd_compress_certificate(ssl_common_dissect_t *hf, tvbuff_t *tvb, pr
                                      uint32_t offset, uint32_t offset_end, packet_info *pinfo,
                                      SslSession *session _U_, SslDecryptSession *ssl _U_,
                                      bool is_from_server _U_, bool is_dtls _U_);
+
+extern tap_packet_status
+ssl_follow_tap_listener(void *tapdata, packet_info *pinfo, epan_dissect_t *edt _U_, const void *ssl, tap_flags_t flags _U_);
+
 /* {{{ */
 #define SSL_COMMON_LIST_T(name) \
-ssl_common_dissect_t name;
+ssl_common_dissect_t name
 /* }}} */
 
 /* {{{ */
@@ -2136,7 +2151,7 @@ ssl_common_dissect_t name;
     },                                                                  \
     { & name .hf.hs_finished,                                           \
       { "Verify Data", prefix ".handshake.verify_data",                 \
-        FT_NONE, BASE_NONE, NULL, 0x0,                                  \
+        FT_BYTES, BASE_NONE, NULL, 0x0,                                 \
         "Opaque verification data", HFILL }                             \
     },                                                                  \
     { & name .hf.hs_client_cert_vrfy_sig_len,                           \
@@ -2512,6 +2527,11 @@ ssl_common_dissect_t name;
     { & name .hf.hs_ext_quictp_parameter_loss_bits,                     \
       { "loss_bits", prefix ".quic.parameter.loss_bits",                \
         FT_UINT64, BASE_DEC, NULL, 0x00,                                \
+        NULL, HFILL }                                                   \
+    },                                                                  \
+    { & name .hf.hs_ext_quictp_parameter_address_discovery,             \
+      { "address_discovery", prefix ".quic.parameter.address_discovery",  \
+        FT_UINT64, BASE_DEC|BASE_VAL64_STRING, VALS64(quic_address_discovery_vals), 0x00,  \
         NULL, HFILL }                                                   \
     },                                                                  \
     { & name .hf.hs_ext_quictp_parameter_enable_time_stamp_v2,          \
@@ -2931,11 +2951,11 @@ ssl_common_dissect_t name;
     }, \
     { & name .ei.hs_ext_cert_status_undecoded, \
         { prefix ".handshake.status_request.undecoded", PI_UNDECODED, PI_NOTE, \
-        "Responder ID list or Request Extensions are not implemented, contact Wireshark developers if you want this to be supported", EXPFILL } \
+        "Responder ID list or Request Extensions are not implemented", EXPFILL } \
     }, \
     { & name .ei.hs_ciphersuite_undecoded, \
         { prefix ".handshake.ciphersuite.undecoded", PI_UNDECODED, PI_NOTE, \
-        "Ciphersuite not implemented, contact Wireshark developers if you want this to be supported", EXPFILL } \
+        "Ciphersuite not implemented", EXPFILL } \
     }, \
     { & name .ei.hs_srv_keyex_illegal, \
         { prefix ".handshake.server_keyex_illegal", PI_PROTOCOL, PI_WARN, \

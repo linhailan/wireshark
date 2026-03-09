@@ -124,29 +124,29 @@ dissect_btmesh_beacon_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
 
     switch(beacon_type) {
         case BEACON_UNPROVISION:
-            proto_tree_add_item(sub_tree, hf_btmesh_beacon_uuid, tvb, offset, 16, ENC_NA);
+            proto_tree_add_item(sub_tree, hf_btmesh_beacon_uuid, tvb, offset, 16, ENC_BIG_ENDIAN);
             offset += 16;
 
             oob_item = proto_tree_add_item(sub_tree, hf_btmesh_beacon_oob, tvb, offset, 2, ENC_BIG_ENDIAN);
             oob_tree = proto_item_add_subtree(oob_item, ett_btmesh_beacon_oob);
 
-            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_other, tvb, offset, 2, ENC_NA);
-            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_electronic, tvb, offset, 2, ENC_NA);
-            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_2d_code, tvb, offset, 2, ENC_NA);
-            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_bar_code, tvb, offset, 2, ENC_NA);
-            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_nfc, tvb, offset, 2, ENC_NA);
-            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_number, tvb, offset, 2, ENC_NA);
-            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_string, tvb, offset, 2, ENC_NA);
-            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_rfu, tvb, offset, 2, ENC_NA);
-            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_on_box, tvb, offset, 2, ENC_NA);
-            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_inside_box, tvb, offset, 2, ENC_NA);
-            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_on_paper, tvb, offset, 2, ENC_NA);
-            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_inside_manual, tvb, offset, 2, ENC_NA);
-            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_on_device, tvb, offset, 2, ENC_NA);
+            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_other, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_electronic, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_2d_code, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_bar_code, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_nfc, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_number, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_string, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_rfu, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_on_box, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_inside_box, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_on_paper, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_inside_manual, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(oob_tree, hf_btmesh_beacon_oob_on_device, tvb, offset, 2, ENC_BIG_ENDIAN);
             rfu_bits16 = (tvb_get_uint16(tvb, offset, ENC_BIG_ENDIAN) & 0x0780) >> 7;
             if (rfu_bits16 != 0) {
                 //RFU bits should be 0
-                proto_tree_add_expert(oob_tree, pinfo, &ei_btmesh_beacon_rfu_not_zero, tvb, offset, -1);
+                proto_tree_add_expert_remaining(oob_tree, pinfo, &ei_btmesh_beacon_rfu_not_zero, tvb, offset);
             }
             offset += 2;
 
@@ -167,12 +167,12 @@ dissect_btmesh_beacon_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
             rfu_bits8 = tvb_get_uint8(tvb, offset) >> 2;
             if (rfu_bits8 != 0) {
                 //RFU bits should be 0
-                proto_tree_add_expert(flags_tree, pinfo, &ei_btmesh_beacon_rfu_not_zero, tvb, offset, -1);
+                proto_tree_add_expert_remaining(flags_tree, pinfo, &ei_btmesh_beacon_rfu_not_zero, tvb, offset);
             }
             offset += 1;
             proto_tree_add_item(sub_tree, hf_btmesh_beacon_network_id, tvb, offset, 8, ENC_NA);
             offset += 8;
-            proto_tree_add_item(sub_tree, hf_btmesh_beacon_ivindex, tvb, offset, 4, ENC_NA);
+            proto_tree_add_item(sub_tree, hf_btmesh_beacon_ivindex, tvb, offset, 4, ENC_BIG_ENDIAN);
             offset += 4;
             proto_tree_add_item(sub_tree, hf_btmesh_beacon_authentication_value, tvb, offset, 8, ENC_NA);
             offset += 8;
@@ -180,13 +180,13 @@ dissect_btmesh_beacon_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
         default:
             //Unknown mesh beacon type, display data and flag it
             proto_tree_add_item(sub_tree, hf_btmesh_beacon_unknown_data, tvb, offset, -1, ENC_NA);
-            proto_tree_add_expert(sub_tree, pinfo, &ei_btmesh_beacon_unknown_beacon_type, tvb, offset, -1);
+            proto_tree_add_expert_remaining(sub_tree, pinfo, &ei_btmesh_beacon_unknown_beacon_type, tvb, offset);
             offset += tvb_captured_length_remaining(tvb, offset);
         break;
     }
     //There is still some data but all data should be already disssected
     if (tvb_captured_length_remaining(tvb, offset) != 0) {
-        proto_tree_add_expert(sub_tree, pinfo, &ei_btmesh_beacon_unknown_payload, tvb, offset, -1);
+        proto_tree_add_expert_remaining(sub_tree, pinfo, &ei_btmesh_beacon_unknown_payload, tvb, offset);
     }
 
     return tvb_reported_length(tvb);

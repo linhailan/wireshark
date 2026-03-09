@@ -697,9 +697,10 @@ static int dissect_mac_header_type_2_decoder(tvbuff_t *tvb, packet_info *pinfo, 
 			case CINR_FB:
 				/* Decode and display the CINRC feedback */
 				/* CINR Mean */
-				proto_tree_add_item(ti_tree, hf_mac_header_type_2_cinr_mean, tvb, offset, 2, ENC_BIG_ENDIAN);
+				proto_tree_add_item(ti_tree, hf_mac_header_type_2_cinr_mean, tvb, offset, 1, ENC_BIG_ENDIAN);
+				offset += 1;
 				/* CINR Standard Deviation */
-				proto_tree_add_item(ti_tree, hf_mac_header_type_2_cinr_devi, tvb, offset, 2, ENC_BIG_ENDIAN);
+				proto_tree_add_item(ti_tree, hf_mac_header_type_2_cinr_devi, tvb, offset, 1, ENC_BIG_ENDIAN);
 				/* check the CII field */
 				if(cii_bit)
 				{	/* with CID */
@@ -714,6 +715,7 @@ static int dissect_mac_header_type_2_decoder(tvbuff_t *tvb, packet_info *pinfo, 
 			break;
 			case CL_MIMO_FB:
 				/* Get the MIMO type */
+				/* TODO: mask is 0xc000, so shifting by 6 doesn't look right.. can't possibly get 1 or 2.. */
 				mimo_type = ((tvb_get_uint8(tvb, offset) & 0xC0) >> 6);
 				/* Decode and display the MIMO type */
 				proto_tree_add_item(ti_tree, hf_mac_header_type_2_cl_mimo_type, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -1080,7 +1082,7 @@ void wimax_proto_register_mac_header_type_2(void)
 		{
 			&hf_mac_header_type_2_lt_rsv,
 			{
-				"Reserved", "wmx.type2LtFbId",
+				"Reserved", "wmx.type2LtRsv",
 				FT_UINT16, BASE_DEC, NULL, WIMAX_MAC_HEADER_TYPE_2_LT_RSV,
 				NULL, HFILL
 			}

@@ -6,6 +6,21 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
+/*
+ * VMS TCPTRACE
+ *
+ * DEC/Compaq/HP/VMS Software VMS's TCPIPTRACE/TCPTRACE format is supported.
+ * This is the capture program that comes with TCP/IP or UCX as supplied by
+ * VMS Software, Hewlett Packard Enterprise/HP, Compaq, or Digital Equipment
+ * Corporation.
+ *
+ * Under UCX 4.x, it is invoked as TCPIPTRACE.  Under TCPIP 5.x, it is invoked
+ * as TCPTRACE.
+ *
+ * TCPTRACE produces an ASCII text based format that has changed slightly over
+ * time.
+*/
+
 /* Notes:
  *   TCPIPtrace TCP fragments don't have the header line.  So, we are never
  *   to look for that line for the first line of a packet except the first
@@ -15,7 +30,7 @@
  */
 #include "config.h"
 #include "vms.h"
-#include "wtap-int.h"
+#include "wtap_module.h"
 #include "file_wrappers.h"
 
 #include <wsutil/strtoi.h>
@@ -132,7 +147,7 @@ static bool vms_seek_read(wtap *wth, int64_t seek_off, wtap_rec *rec,
     int *err, char **err_info);
 static bool parse_single_hex_dump_line(char* rec, uint8_t *buf,
     long byte_offset, int in_off, int remaining_bytes);
-static bool parse_vms_packet(FILE_T fh, wtap_rec *rec, int *err,
+static bool parse_vms_packet(wtap *wth, FILE_T fh, wtap_rec *rec, int *err,
     char **err_info);
 
 static int vms_file_type_subtype = -1;
@@ -272,7 +287,7 @@ static bool vms_read(wtap *wth, wtap_rec *rec, int *err,
     *data_offset = offset;
 
     /* Parse the packet */
-    return parse_vms_packet(wth->fh, rec, err, err_info);
+    return parse_vms_packet(wth, wth->fh, rec, err, err_info);
 }
 
 /* Used to read packets in random-access fashion */
@@ -282,7 +297,7 @@ static bool vms_seek_read(wtap *wth, int64_t seek_off, wtap_rec *rec,
     if (file_seek(wth->random_fh, seek_off - 1, SEEK_SET, err) == -1)
         return false;
 
-    if (!parse_vms_packet(wth->random_fh, rec, err, err_info)) {
+    if (!parse_vms_packet(wth, wth->random_fh, rec, err, err_info)) {
         if (*err == 0)
             *err = WTAP_ERR_SHORT_READ;
         return false;
@@ -317,7 +332,7 @@ isdumpline( char *line )
 
 /* Parses a packet record. */
 static bool
-parse_vms_packet(FILE_T fh, wtap_rec *rec, int *err, char **err_info)
+parse_vms_packet(wtap *wth, FILE_T fh, wtap_rec *rec, int *err, char **err_info)
 {
     char    line[VMS_LINE_LENGTH + 1];
     int     num_items_scanned;
@@ -421,7 +436,7 @@ parse_vms_packet(FILE_T fh, wtap_rec *rec, int *err, char **err_info)
     tm.tm_year -= 1900;
     tm.tm_isdst = -1;
 
-    rec->rec_type = REC_TYPE_PACKET;
+    wtap_setup_packet_rec(rec, wth->file_encap);
     rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
     rec->presence_flags = WTAP_HAS_TS;
     rec->ts.secs = mktime(&tm);

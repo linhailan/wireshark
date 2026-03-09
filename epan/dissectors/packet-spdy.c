@@ -249,7 +249,7 @@ static bool spdy_decompress_headers;
 #endif /* USE_ZLIB_OR_ZLIBNG */
 
 #ifdef USE_ZLIB_OR_ZLIBNG
-static const char spdy_dictionary[] = {
+static const uint8_t spdy_dictionary[] = {
   0x00, 0x00, 0x00, 0x07, 0x6f, 0x70, 0x74, 0x69,  /* - - - - o p t i */
   0x6f, 0x6e, 0x73, 0x00, 0x00, 0x00, 0x04, 0x68,  /* o n s - - - - h */
   0x65, 0x61, 0x64, 0x00, 0x00, 0x00, 0x04, 0x70,  /* e a d - - - - p */
@@ -1224,8 +1224,8 @@ static int dissect_spdy_header_payload(
     proto_item *header;
     int header_name_offset;
     int header_value_offset;
-    int header_name_length;
-    int header_value_length;
+    unsigned header_name_length;
+    unsigned header_value_length;
 
     /* Get header name details. */
     if (tvb_reported_length_remaining(header_tvb, hdr_offset) < 4) {
@@ -1358,7 +1358,7 @@ static int dissect_spdy_rst_stream_payload(
                            "Invalid status code for RST_STREAM: %u", rst_status);
   }
 
-  str = val_to_str(rst_status, rst_stream_status_names, "Unknown (%d)");
+  str = val_to_str(pinfo->pool, rst_status, rst_stream_status_names, "Unknown (%d)");
 
   proto_item_append_text(frame_tree, ", Status: %s", str);
 
@@ -1414,7 +1414,7 @@ static int dissect_spdy_settings_payload(
     offset += 1;
 
     /* Set ID. */
-    setting_id_str = val_to_str(tvb_get_ntoh24(tvb, offset), setting_id_names, "Unknown(%d)");
+    setting_id_str = val_to_str(pinfo->pool, tvb_get_ntoh24(tvb, offset), setting_id_names, "Unknown(%d)");
 
     proto_tree_add_item(setting_tree, hf_spdy_setting_id, tvb, offset, 3, ENC_BIG_ENDIAN);
     offset += 3;
@@ -1471,7 +1471,7 @@ static int dissect_spdy_goaway_payload(tvbuff_t *tvb,
 
   /* Add status to info column. */
   proto_item_append_text(frame_tree, " Status=%s)",
-                  val_to_str(goaway_status, rst_stream_status_names, "Unknown (%d)"));
+                  val_to_str(pinfo->pool, goaway_status, rst_stream_status_names, "Unknown (%d)"));
 
   return frame->length;
 }
@@ -1523,7 +1523,7 @@ static int dissect_spdy_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 
   /* Add control bit. */
   control_bit = tvb_get_uint8(tvb, offset) & 0x80;
-  proto_tree_add_item(spdy_tree, hf_spdy_control_bit, tvb, offset, 2, ENC_NA);
+  proto_tree_add_item(spdy_tree, hf_spdy_control_bit, tvb, offset, 2, ENC_BIG_ENDIAN);
 
   /* Process first four bytes of frame, formatted depending on control bit. */
   if (control_bit) {
@@ -1553,7 +1553,7 @@ static int dissect_spdy_frame(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
   }
 
   /* Add frame info. */
-  frame_type_name = val_to_str(frame.type, frame_type_names, "Unknown(%d)");
+  frame_type_name = val_to_str(pinfo->pool, frame.type, frame_type_names, "Unknown(%d)");
   col_append_sep_str(pinfo->cinfo, COL_INFO, ", ", frame_type_name);
 
   proto_item_append_text(spdy_tree, ": %s", frame_type_name);

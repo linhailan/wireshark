@@ -19,7 +19,6 @@
 #include <epan/proto.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
-#include <epan/ws_printf.h>
 #include "packet-transum.h"
 #include "preferences.h"
 #include "extractors.h"
@@ -888,7 +887,7 @@ static void write_rte(RRPD *in_rrpd, tvbuff_t *tvb, packet_info *pinfo, proto_tr
         pi = proto_tree_add_string(rte_tree, hf_tsum_clip_filter, tvb, 0, 0, wmem_strbuf_get_str(temp_string));
         proto_item_set_generated(pi);
 
-        pi = proto_tree_add_string(rte_tree, hf_tsum_calculation, tvb, 0, 0, val_to_str(in_rrpd->calculation, rrdp_calculation_vals, "Unknown calculation type: %d"));
+        pi = proto_tree_add_string(rte_tree, hf_tsum_calculation, tvb, 0, 0, val_to_str(pinfo->pool, in_rrpd->calculation, rrdp_calculation_vals, "Unknown calculation type: %d"));
         proto_item_set_generated(pi);
 
         if (in_rrpd->rsp_first_frame)

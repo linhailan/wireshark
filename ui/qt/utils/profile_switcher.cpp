@@ -15,6 +15,7 @@
 
 #include <ui/qt/capture_file.h>
 #include <ui/qt/models/packet_list_model.h>
+#include <ui/qt/utils/qt_ui_utils.h>
 
 #include "profile_switcher.h"
 
@@ -54,7 +55,7 @@ void ProfileSwitcher::captureEventHandler(CaptureEvent ev)
     // track that via the filename.
     switch (ev.eventType()) {
     case CaptureEvent::Opened:
-        if (previous_cap_file_ != capture_file->filePath()) {
+        if (!filePathsMatch(previous_cap_file_, capture_file->filePath())) {
             capture_file_changed_ = true;
             profile_changed_ = false;
         }
@@ -93,7 +94,7 @@ void ProfileSwitcher::checkPacket(capture_file *cap_file, frame_data *fdata, qsi
 
     QString new_profile;
     wtap_rec rec;
-    wtap_rec_init(&rec, 1514);
+    wtap_rec_init(&rec, DEFAULT_INIT_BUFFER_SIZE_2048);
     epan_dissect_t edt;
 
     for (auto &cur_filter : profile_filters_) {

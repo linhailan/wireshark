@@ -73,6 +73,9 @@ PATH_SPECIFIC_ALLOWED_LICENSES = {
     'resources/protocols/diameter/dictionary.dtd': [
         'UNKNOWN',
     ],
+    'resources/protocols/qualcomm': [
+        'UNKNOWN',
+    ],
     'resources/protocols/wimaxasncp/dictionary.dtd': [
         'UNKNOWN',
     ],
@@ -151,6 +154,10 @@ PATH_SPECIFIC_ALLOWED_LICENSES = {
     ],
     'wsutil/safe-math.h': [ # Public domain (CC0)
         'UNKNOWN',
+    ],
+    # Bachmann M-module file example module
+    'test/captures/mfile_testapplication.m': [
+            'UNKNOWN',
     ],
 }
 

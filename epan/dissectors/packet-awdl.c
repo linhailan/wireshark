@@ -888,7 +888,7 @@ awdl_tag_election_params(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
 
   proto_tree_add_item(tree, hf_awdl_electionparams_flags, tvb, offset, 1, ENC_NA);
   offset += 1;
-  proto_tree_add_item(tree, hf_awdl_electionparams_id, tvb, offset, 2, ENC_NA);
+  proto_tree_add_item(tree, hf_awdl_electionparams_id, tvb, offset, 2, ENC_LITTLE_ENDIAN);
   offset += 2;
   proto_tree_add_item(tree, hf_awdl_electionparams_distance, tvb, offset, 1, ENC_NA);
   offset += 1;
@@ -1085,7 +1085,7 @@ awdl_tag_ieee80211_container(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
 }
 
 static int
-awdl_tag_ht_capabilities(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void* data _U_) {
+awdl_tag_ht_capabilities(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_) {
   proto_item *ti, *cap_item;
   proto_tree *mcs_tree, *bit_tree, *cap_tree;
   uint8_t streams; /* 0-4 for HT and 0-8 for VHT*/
@@ -1151,7 +1151,7 @@ awdl_tag_ht_capabilities(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
     offset += 1;
   }
 
-  proto_item_append_text(ti, ": %s", val_to_str(streams - 1, mcsset_tx_max_spatial_streams_flags, "Reserved: %d" ) );
+  proto_item_append_text(ti, ": %s", val_to_str(pinfo->pool, streams - 1, mcsset_tx_max_spatial_streams_flags, "Reserved: %d" ) );
 
   // Some padding at the end
   proto_tree_add_item(tree, hf_awdl_ht_unknown, tvb, offset, 2, ENC_LITTLE_ENDIAN);
@@ -1171,7 +1171,7 @@ add_awdl_dns_name(proto_tree *tree, int hfindex_regular, int hfindex_compressed,
                   tvbuff_t *tvb, int offset, int len, wmem_allocator_t *scope, const char **name) {
   int start_offset = offset;
   uint8_t component_len;
-  const unsigned char *component;
+  const char *component;
   wmem_strbuf_t *strbuf;
 
   strbuf = wmem_strbuf_new_sized(scope, MAX_DNAME_LEN);
@@ -1191,8 +1191,8 @@ add_awdl_dns_name(proto_tree *tree, int hfindex_regular, int hfindex_compressed,
       offset += 2;
     } else {
       /* regular label */
-      unsigned label_len;
-      proto_tree_add_item_ret_string_and_length(tree, hfindex_regular, tvb, offset, 1, ENC_ASCII, scope, &component, &label_len);
+      int label_len;
+      proto_tree_add_item_ret_string_and_length(tree, hfindex_regular, tvb, offset, 1, ENC_ASCII, scope, (const uint8_t**)&component, &label_len);
       offset += label_len;
     }
     if (component) {
@@ -1333,7 +1333,7 @@ awdl_add_tagged_field(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb, int o
 
   if (tree) {
     ti = proto_tree_add_item(orig_tree, hf_awdl_tag, tvb, offset, tag_len + hdr_len, ENC_NA);
-    proto_item_append_text(ti, ": %s", val_to_str_ext(tag_no, &tag_num_vals_ext, "Unknown (%d)"));
+    proto_item_append_text(ti, ": %s", val_to_str_ext(pinfo->pool, tag_no, &tag_num_vals_ext, "Unknown (%d)"));
     tree = proto_item_add_subtree(ti, ett_awdl_tag);
   }
 
@@ -1353,7 +1353,7 @@ awdl_add_tagged_field(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb, int o
     proto_tree_add_item(tree, hf_awdl_tag_data, tag_tvb, 0, tag_len, ENC_NA);
     expert_add_info_format(pinfo, ti_tag, &ei_awdl_tag_data,
                            "Dissector for AWDL tag (%s) code not implemented",
-                           val_to_str_ext(tag_no, &tag_num_vals_ext, "(%d)"));
+                           val_to_str_ext(pinfo->pool, tag_no, &tag_num_vals_ext, "(%d)"));
     proto_item_append_text(ti, ": Undecoded");
   }
   else if (parsed > 0 && (unsigned int) parsed < tag_len)
@@ -1411,16 +1411,13 @@ dissect_awdl_action(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *d
   offset += 1;
   add_awdl_version(tvb, offset, fixed_tree);
   offset += 1;
-  subtype = tvb_get_uint8(tvb, offset);
-  proto_tree_add_item(fixed_tree, hf_awdl_subtype, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+  proto_tree_add_item_ret_uint8(fixed_tree, hf_awdl_subtype, tvb, offset, 1, ENC_LITTLE_ENDIAN, &subtype);
   offset += 1;
   proto_tree_add_item(fixed_tree, hf_awdl_rsvd, tvb, offset, 1, ENC_LITTLE_ENDIAN);
   offset += 1;
-  proto_tree_add_item(fixed_tree, hf_awdl_phytime, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-  phytime = tvb_get_uint32(tvb, offset, ENC_LITTLE_ENDIAN);
+  proto_tree_add_item_ret_uint(fixed_tree, hf_awdl_phytime, tvb, offset, 4, ENC_LITTLE_ENDIAN, &phytime);
   offset += 4;
-  proto_tree_add_item(fixed_tree, hf_awdl_targettime, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-  targettime = tvb_get_uint32(tvb, offset, ENC_LITTLE_ENDIAN);
+  proto_tree_add_item_ret_uint(fixed_tree, hf_awdl_targettime, tvb, offset, 4, ENC_LITTLE_ENDIAN, &targettime);
   offset += 4;
   item = proto_tree_add_uint(fixed_tree, hf_awdl_txdelay, tvb, 0, 0, phytime - targettime);
   proto_item_set_generated(item);

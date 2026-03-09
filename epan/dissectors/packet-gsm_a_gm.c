@@ -87,7 +87,13 @@
  *   Mobile radio interface Layer 3 specification;
  *   Core network protocols;
  *   Stage 3
- *   (3GPP TS 24.008 version 18.6.0 Release 18)
+ *   (3GPP TS 24.008 version 18.8.0 Release 18)
+ *
+ *   Reference [19]
+ *   Mobile radio interface Layer 3 specification;
+ *   Core network protocols;
+ *   Stage 3
+ *   (3GPP TS 24.008 version 19.5.0 Release 19)
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -101,10 +107,10 @@
 
 #include <epan/packet.h>
 #include <epan/expert.h>
-#include <epan/ipproto.h>
 #include <epan/etypes.h>
 #include <epan/tfs.h>
 #include <epan/unit_strings.h>
+#include <epan/iana-info.h>
 #include <wsutil/array.h>
 #include "packet-ber.h"
 #include "packet-gsm_a_common.h"
@@ -637,6 +643,7 @@ static int hf_gsm_a_gm_sm_pco_eas_rediscovery_support_ind_with_impacted_eas_ipv6
 static int hf_gsm_a_gm_sm_pco_eas_rediscovery_support_ind_with_impacted_eas_ipv6_range_high;
 static int hf_gsm_a_gm_sm_pco_eas_rediscovery_support_ind_with_impacted_eas_fqdn;
 static int hf_gsm_a_gm_sm_pco_sdnaepc_dn_specific_id;
+static int hf_gsm_a_gm_sm_pco_s_nssai_sel_by_ms_s_nssai_len;
 static int hf_gsm_a_sm_pdp_type_number;
 static int hf_gsm_a_sm_pdp_address;
 static int hf_gsm_a_gm_ti_value;
@@ -4518,7 +4525,7 @@ de_sm_apn(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, 
 
 	curr_offset = offset;
 
-	proto_tree_add_item(tree, hf_gsm_a_gm_apn, tvb, curr_offset, len, ENC_APN_STR | ENC_NA);
+	proto_tree_add_item(tree, hf_gsm_a_gm_apn, tvb, curr_offset, len, ENC_APN_STR);
 	curr_offset += len;
 
 	EXTRANEOUS_DATA_CHECK(len, curr_offset - offset, pinfo, &ei_gsm_a_gm_extraneous_data);
@@ -4596,6 +4603,8 @@ static const range_string gsm_a_sm_pco_ms2net_prot_vals[] = {
 	{ 0x0051, 0x0051, "SDNAEPC EAP message with the length of two octets" },
 	{ 0x0052, 0x0052, "SDNAEPC DN-specific identity" },
 	{ 0x0056, 0x0056, "UE policy container with the length of two octets" },
+	{ 0x0057, 0x0057, "URSP provisioning in EPS support indicator" },
+	{ 0x0058, 0x0058, "S-NSSAI selected by MS" },
 	{ 0xff00, 0xffff, "Operator Specific Use" },
 	{ 0, 0, NULL }
 };
@@ -4663,6 +4672,7 @@ static const range_string gsm_a_sm_pco_net2ms_prot_vals[] = {
 	{ 0x004a, 0x004a, "Network support of MAC address range in 5GS indicator" },
 	{ 0x0051, 0x0051, "SDNAEPC EAP message with the length of two octets" },
 	{ 0x0056, 0x0056, "UE policy container with the length of two octets" },
+	{ 0x0057, 0x0057, "URSP provisioning in EPS support indicator" },
 	{ 0xff00, 0xffff, "Operator Specific Use" },
 	{ 0, 0, NULL }
 };
@@ -4881,7 +4891,7 @@ de_sm_pco(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, 
 				break;
 			case 0x000E:
 				if ((link_dir == P2P_DIR_DL) && (e_len > 0)) {
-					dissect_e164_msisdn(tvb, pco_tree, curr_offset, e_len, E164_ENC_BCD);
+					dissect_e164_msisdn(tvb, pinfo, pco_tree, curr_offset, e_len, E164_ENC_BCD);
 				}
 				break;
 			case 0x0010:
@@ -4983,7 +4993,7 @@ de_sm_pco(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, 
 				break;
 			case 0x0027:
 				if (link_dir == P2P_DIR_DL && e_len > 0) {
-					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_acs_info, tvb, curr_offset, e_len, ENC_NA|ENC_UTF_8);
+					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_acs_info, tvb, curr_offset, e_len, ENC_UTF_8);
 				}
 				break;
 			case 0x0028:
@@ -5013,7 +5023,7 @@ de_sm_pco(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, 
 							proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_dns_serv_sec_info_port_number, tvb, curr_offset+1, 2, ENC_BIG_ENDIAN);
 							break;
 						case 2:
-							proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_dns_serv_sec_info_auth_domain_name, tvb, curr_offset+1, e_len-1, ENC_APN_STR | ENC_NA);
+							proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_dns_serv_sec_info_auth_domain_name, tvb, curr_offset+1, e_len-1, ENC_APN_STR);
 							break;
 						case 3:
 							proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_dns_serv_sec_info_spki_pin_set, tvb, curr_offset+1, e_len-1, ENC_NA);
@@ -5050,7 +5060,7 @@ de_sm_pco(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, 
 						case 2:
 							proto_tree_add_item_ret_uint(pco_tree, hf_gsm_a_gm_sm_pco_ecs_addr_fqdn_len, tvb, ie_offset, 1, ENC_BIG_ENDIAN, &fqdn_len);
 							ie_offset++;
-							proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_ecs_addr_fqdn, tvb, ie_offset, fqdn_len, ENC_NA|ENC_APN_STR);
+							proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_ecs_addr_fqdn, tvb, ie_offset, fqdn_len, ENC_APN_STR);
 							ie_offset += fqdn_len;
 							break;
 						default:
@@ -5095,7 +5105,7 @@ de_sm_pco(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, 
 				break;
 			case 0x0035:
 				if (link_dir == P2P_DIR_DL && e_len > 1) {
-					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_ecsp_id, tvb, curr_offset, e_len, ENC_NA|ENC_UTF_8);
+					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_ecsp_id, tvb, curr_offset, e_len, ENC_UTF_8);
 				}
 				break;
 			case 0x0036:
@@ -5119,7 +5129,7 @@ de_sm_pco(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, 
 					} else {
 						proto_tree_add_item_ret_uint(pco_tree, hf_gsm_a_gm_sm_pco_pvs_name_len, tvb, ie_offset, 1, ENC_BIG_ENDIAN, &field_len);
 						ie_offset++;
-						proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_pvs_name, tvb, ie_offset, field_len, ENC_NA|ENC_APN_STR);
+						proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_pvs_name, tvb, ie_offset, field_len, ENC_APN_STR);
 						ie_offset += field_len;
 					}
 					proto_tree_add_bitmask_list_ret_uint64(pco_tree, tvb, ie_offset, 1, ind, ENC_BIG_ENDIAN, &flags);
@@ -5166,7 +5176,7 @@ de_sm_pco(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, 
 				break;
 			case 0x003d:
 				if (link_dir == P2P_DIR_DL && e_len > 0) {
-					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_eas_rediscovery_support_ind_with_impacted_eas_fqdn, tvb, curr_offset, e_len, ENC_NA|ENC_APN_STR);
+					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_eas_rediscovery_support_ind_with_impacted_eas_fqdn, tvb, curr_offset, e_len, ENC_APN_STR);
 				}
 				break;
 			 case 0x0041:
@@ -5185,12 +5195,20 @@ de_sm_pco(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, 
 				break;
 			case 0x0052:
 				if (link_dir == P2P_DIR_UL && e_len > 0) {
-					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_sdnaepc_dn_specific_id, tvb, curr_offset, e_len, ENC_NA|ENC_UTF_8);
+					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_sdnaepc_dn_specific_id, tvb, curr_offset, e_len, ENC_UTF_8);
 				}
 				break;
 			case 0x0056:
 				if (e_len > 0) {
 					dissect_nas_5gs_updp(tvb_new_subset_length(tvb, curr_offset, e_len), pinfo, pco_tree);
+				}
+				break;
+			case 0x0058:
+				if (link_dir == P2P_DIR_UL && e_len >= 2) {
+					uint8_t field_len;
+
+					proto_tree_add_item_ret_uint8(tree, hf_gsm_a_gm_sm_pco_pvs_s_nssai_len, tvb, curr_offset, 1, ENC_BIG_ENDIAN, &field_len);
+					de_nas_5gs_cmn_s_nssai(tvb, pco_tree, pinfo, curr_offset + 1, field_len, NULL, 0);
 				}
 				break;
 			default:
@@ -5254,14 +5272,12 @@ de_sm_pdp_addr(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t off
 {
 	uint32_t     curr_offset;
 	const char *str;
-	unsigned char       pdp_type_org, pdp_type_num;
+	unsigned char pdp_type_org, pdp_type_num;
 
 	curr_offset = offset;
 
 	proto_tree_add_bits_item(tree, hf_gsm_a_spare_bits, tvb, (curr_offset << 3), 4, ENC_BIG_ENDIAN);
-	proto_tree_add_item(tree, hf_gsm_a_sm_pdp_type_org, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
-
-	pdp_type_org = tvb_get_uint8(tvb, curr_offset) & 0x0f;
+	proto_tree_add_item_ret_uint8(tree, hf_gsm_a_sm_pdp_type_org, tvb, curr_offset, 1, ENC_BIG_ENDIAN, &pdp_type_org);
 	curr_offset += 1;
 	pdp_type_num = tvb_get_uint8(tvb, curr_offset);
 
@@ -6690,7 +6706,7 @@ de_sm_nbifom_cont(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, uint3
 	return len;
 }
 
-uint16_t (*gm_elem_fcn[])(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, uint32_t offset, unsigned len, char *add_string, int string_len) = {
+uint16_t (* const gm_elem_fcn[])(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, uint32_t offset, unsigned len, char *add_string, int string_len) = {
 	/* GPRS Mobility Management Information Elements 10.5.5 */
 	de_gmm_add_upd_type,               /* Additional Update Type */
 	de_gmm_attach_res,                 /* Attach Result */
@@ -8381,7 +8397,7 @@ dtap_sm_req_mbms_rej(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32
 
 #define	NUM_GSM_DTAP_MSG_GMM array_length(gsm_a_dtap_msg_gmm_strings)
 static int ett_gsm_dtap_msg_gmm[NUM_GSM_DTAP_MSG_GMM];
-static void (*dtap_msg_gmm_fcn[])(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, unsigned len) = {
+static void (* const dtap_msg_gmm_fcn[])(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, unsigned len) = {
 	dtap_gmm_attach_req,		/* Attach Request */
 	dtap_gmm_attach_acc,		/* Attach Accept */
 	dtap_gmm_attach_com,		/* Attach Complete */
@@ -8410,7 +8426,7 @@ static void (*dtap_msg_gmm_fcn[])(tvbuff_t *tvb, proto_tree *tree, packet_info *
 
 #define	NUM_GSM_DTAP_MSG_SM array_length(gsm_a_dtap_msg_sm_strings)
 static int ett_gsm_dtap_msg_sm[NUM_GSM_DTAP_MSG_SM];
-static void (*dtap_msg_sm_fcn[])(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, unsigned len) = {
+static void (* const dtap_msg_sm_fcn[])(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, unsigned len) = {
 	dtap_sm_act_pdp_req,		/* Activate PDP Context Request */
 	dtap_sm_act_pdp_acc,		/* Activate PDP Context Accept */
 	dtap_sm_act_pdp_rej,		/* Activate PDP Context Reject */
@@ -10084,6 +10100,11 @@ proto_register_gsm_a_gm(void)
 		    FT_STRING, BASE_NONE, NULL, 0x0,
 		    NULL, HFILL }
 		},
+		{ &hf_gsm_a_gm_sm_pco_s_nssai_sel_by_ms_s_nssai_len,
+		  { "S-NSSAI length", "gsm_a.gm.sm.pco.s_nssai_sel_by_ms.s_nssai_len",
+		    FT_UINT8, BASE_DEC, NULL, 0x0,
+		    NULL, HFILL }
+		},
 		/* Generated from convert_proto_tree_add_text.pl */
 		{ &hf_gsm_a_gm_presence, { "Presence", "gsm_a.gm.gmm.presence", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
 		{ &hf_gsm_a_gm_8psk_power_class, { "8PSK Power Class", "gsm_a.gm.8psk_power_class", FT_UINT8, BASE_DEC, VALS(gsm_a_gm_8psk_power_class_vals), 0x0, NULL, HFILL }},
@@ -10181,6 +10202,17 @@ proto_register_gsm_a_gm(void)
 	/* subdissector code */
 	gprs_sm_pco_subdissector_table = register_dissector_table("sm_pco.protocol",
 		"GPRS SM PCO PPP protocol", proto_a_gm, FT_UINT16, BASE_HEX);
+
+	register_external_value_string("gsm_a_bssmap_msg_strings", gsm_a_bssmap_msg_strings);
+	register_external_value_string("gsm_a_dtap_msg_mm_strings", gsm_a_dtap_msg_mm_strings);
+	register_external_value_string("gsm_a_dtap_msg_rr_strings", gsm_a_dtap_msg_rr_strings);
+	register_external_value_string("gsm_a_dtap_msg_cc_strings", gsm_a_dtap_msg_cc_strings);
+	register_external_value_string("gsm_a_dtap_msg_gmm_strings", gsm_a_dtap_msg_gmm_strings);
+	register_external_value_string("gsm_a_dtap_msg_sms_strings", gsm_a_dtap_msg_sms_strings);
+	register_external_value_string("gsm_a_dtap_msg_sm_strings", gsm_a_dtap_msg_sm_strings);
+	register_external_value_string("gsm_a_dtap_msg_ss_strings", gsm_a_dtap_msg_ss_strings);
+	register_external_value_string("gsm_a_dtap_msg_tp_strings", gsm_a_dtap_msg_tp_strings);
+	register_external_value_string("gsm_a_rr_short_pd_msg_strings", gsm_a_rr_short_pd_msg_strings);
 }
 
 void

@@ -1,4 +1,4 @@
-/* packet-bthci_vendor.c
+/* packet-bthci_vendor_broadcom.c
  * Routines for the Bluetooth HCI Vendors Commands/Events
  *
  * Copyright 2014, Michal Labedzki for Tieto Corporation
@@ -246,6 +246,7 @@ static dissector_handle_t btcommon_ad_handle;
     { (base) | 0x0001,  "Write BD ADDR" }, \
     { (base) | 0x0018,  "Update Baudrate" }, \
     { (base) | 0x001C,  "Write SCO PCM INT Parameter" }, \
+    { (base) | 0x001D,  "Read SCO PCM INT Parameter" }, \
     { (base) | 0x001E,  "Write PCM Data Format Parameter" }, \
     { (base) | 0x0027,  "Write Sleep Mode" }, \
     { (base) | 0x002E,  "Download MiniDriver" }, \
@@ -645,15 +646,14 @@ dissect_bthci_vendor_broadcom(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
             tap_queue_packet(bluetooth_hci_summary_tap, pinfo, tap_hci_summary);
         }
 
-        proto_tree_add_item(main_tree, hf_broadcom_parameter_length, tvb, offset, 1, ENC_NA);
-        length = tvb_get_uint8(tvb, offset);
+        proto_tree_add_item_ret_uint8(main_tree, hf_broadcom_parameter_length, tvb, offset, 1, ENC_NA, &length);
         offset += 1;
 
         switch(ocf) {
         case 0x0001: /* Write BDADDR */
             offset = dissect_bd_addr(hf_broadcom_bd_addr, pinfo, main_tree, tvb, offset, true, interface_id, adapter_id, bd_addr);
 
-/* TODO: This is command, but in respose (event Command Complete) there is a status for that,
+/* TODO: This is command, but in response (event Command Complete) there is a status for that,
          so write bdaddr can fail, but we store bdaddr as valid for now... */
             if (!pinfo->fd->visited && bluetooth_data) {
                 wmem_tree_key_t            key[4];
@@ -816,8 +816,7 @@ dissect_bthci_vendor_broadcom(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 
             break;
         case 0x007E: /* Enable WBS */
-            proto_tree_add_item(main_tree, hf_broadcom_codec_state, tvb, offset, 1, ENC_NA);
-            status = tvb_get_uint8(tvb, offset);
+            proto_tree_add_item_ret_uint8(main_tree, hf_broadcom_codec_state, tvb, offset, 1, ENC_NA, &status);
             offset += 1;
 
             if (status == 0x01) { /* Enable */
@@ -826,8 +825,7 @@ dissect_bthci_vendor_broadcom(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
             }
             break;
         case 0x0154: /* LE Multi Advertising */
-            proto_tree_add_item(main_tree, hf_broadcom_le_multi_advertising_subcode, tvb, offset, 1, ENC_NA);
-            subcode = tvb_get_uint8(tvb, offset);
+            proto_tree_add_item_ret_uint8(main_tree, hf_broadcom_le_multi_advertising_subcode, tvb, offset, 1, ENC_NA, &subcode);
             offset += 1;
 
             switch (subcode) {
@@ -893,8 +891,7 @@ dissect_bthci_vendor_broadcom(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 
             break;
         case 0x0156: /* LE Batch Scan */
-            proto_tree_add_item(main_tree, hf_broadcom_le_batch_scan_subcode, tvb, offset, 1, ENC_NA);
-            subcode = tvb_get_uint8(tvb, offset);
+            proto_tree_add_item_ret_uint8(main_tree, hf_broadcom_le_batch_scan_subcode, tvb, offset, 1, ENC_NA, &subcode);
             offset += 1;
 
             switch (subcode) {
@@ -940,12 +937,10 @@ dissect_bthci_vendor_broadcom(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 
             break;
         case 0x0157: /* LE Advertising Filter */
-            proto_tree_add_item(main_tree, hf_broadcom_le_advertising_filter_subcode, tvb, offset, 1, ENC_NA);
-            subcode = tvb_get_uint8(tvb, offset);
+            proto_tree_add_item_ret_uint8(main_tree, hf_broadcom_le_advertising_filter_subcode, tvb, offset, 1, ENC_NA, &subcode);
             offset += 1;
 
-            proto_tree_add_item(main_tree, hf_broadcom_le_scan_condition, tvb, offset, 1, ENC_NA);
-            condition = tvb_get_uint8(tvb, offset);
+            proto_tree_add_item_ret_uint8(main_tree, hf_broadcom_le_scan_condition, tvb, offset, 1, ENC_NA, &condition);
             offset += 1;
 
             proto_tree_add_item(main_tree, hf_broadcom_le_filter_index, tvb, offset, 1, ENC_NA);
@@ -999,8 +994,7 @@ dissect_bthci_vendor_broadcom(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
             }
             break;
         case 0x015D: /* A2DP Hardware Offload */
-            proto_tree_add_item(main_tree, hf_broadcom_a2dp_hardware_offload_subcode, tvb, offset, 1, ENC_NA);
-            subcode = tvb_get_uint8(tvb, offset);
+            proto_tree_add_item_ret_uint8(main_tree, hf_broadcom_a2dp_hardware_offload_subcode, tvb, offset, 1, ENC_NA, &subcode);
             offset += 1;
 
             switch (subcode) {
@@ -1144,7 +1138,7 @@ dissect_bthci_vendor_broadcom(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
                 if (cp_enable_scmst) {
                     proto_tree_add_item(main_tree, hf_broadcom_a2dp_hardware_offload_start_cp_header_scmst, tvb, offset, 1, ENC_NA);
                 } else {
-                    proto_tree_add_item(main_tree, hf_broadcom_a2dp_hardware_offload_start_cp_header_scmst_reserved, tvb, offset, 1, ENC_NA);
+                    proto_tree_add_item(main_tree, hf_broadcom_a2dp_hardware_offload_start_cp_header_scmst_reserved, tvb, offset, 1, ENC_BIG_ENDIAN);
                 }
                 offset += 1;
 
@@ -1194,7 +1188,7 @@ dissect_bthci_vendor_broadcom(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
         col_set_str(pinfo->cinfo, COL_INFO, "Rcvd Broadcom ");
 
         event_code = tvb_get_uint8(tvb, offset);
-        description = val_to_str_ext(event_code, &bthci_evt_evt_code_vals_ext, "Unknown 0x%08x");
+        description = val_to_str_ext(pinfo->pool, event_code, &bthci_evt_evt_code_vals_ext, "Unknown 0x%08x");
         col_append_str(pinfo->cinfo, COL_INFO, description);
         proto_tree_add_item(main_tree, hf_broadcom_event_code, tvb, offset, 1, ENC_NA);
         offset += 1;
@@ -1215,8 +1209,7 @@ dissect_bthci_vendor_broadcom(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
             tap_queue_packet(bluetooth_hci_summary_tap, pinfo, tap_hci_summary);
         }
 
-        proto_tree_add_item(main_tree, hf_broadcom_parameter_length, tvb, offset, 1, ENC_NA);
-        length = tvb_get_uint8(tvb, offset);
+        proto_tree_add_item_ret_uint8(main_tree, hf_broadcom_parameter_length, tvb, offset, 1, ENC_NA, &length);
         offset += 1;
 
         switch (event_code) {
@@ -1256,11 +1249,22 @@ dissect_bthci_vendor_broadcom(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
                 tap_queue_packet(bluetooth_hci_summary_tap, pinfo, tap_hci_summary);
             }
 
-            proto_tree_add_item(main_tree, hf_broadcom_status, tvb, offset, 1, ENC_NA);
-            status = tvb_get_uint8(tvb, offset);
+            proto_tree_add_item_ret_uint8(main_tree, hf_broadcom_status, tvb, offset, 1, ENC_NA, &status);
             offset += 1;
 
             switch (ocf) {
+            case 0x001D: /* Read SCO PCM INT Parameter */
+                proto_tree_add_item(main_tree, hf_broadcom_sco_pcm_routing, tvb, offset, 1, ENC_NA);
+                offset += 1;
+                proto_tree_add_item(main_tree, hf_broadcom_sco_pcm_interface_clock_rate, tvb, offset, 1, ENC_NA);
+                offset += 1;
+                proto_tree_add_item(main_tree, hf_broadcom_sco_pcm_interface_frame_type, tvb, offset, 1, ENC_NA);
+                offset += 1;
+                proto_tree_add_item(main_tree, hf_broadcom_sco_pcm_interface_sync_mode, tvb, offset, 1, ENC_NA);
+                offset += 1;
+                proto_tree_add_item(main_tree, hf_broadcom_sco_pcm_interface_clock_mode, tvb, offset, 1, ENC_NA);
+                offset += 1;
+                break;
             case 0x004D: /* Read Memory */
                 if (status == STATUS_SUCCESS) {
                     proto_tree_add_item(main_tree, hf_broadcom_mem_data, tvb, offset, length, ENC_NA);
@@ -1363,8 +1367,7 @@ dissect_bthci_vendor_broadcom(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 
                 break;
             case 0x0156: /* LE Batch Scan */
-                proto_tree_add_item(main_tree, hf_broadcom_le_batch_scan_subcode, tvb, offset, 1, ENC_NA);
-                subcode = tvb_get_uint8(tvb, offset);
+                proto_tree_add_item_ret_uint8(main_tree, hf_broadcom_le_batch_scan_subcode, tvb, offset, 1, ENC_NA, &subcode);
                 offset += 1;
 
                 if (subcode == 0x04 && status == STATUS_SUCCESS) { /* Read Results*/
@@ -1392,16 +1395,16 @@ dissect_bthci_vendor_broadcom(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
                 break;
             case 0x0159: /* LE Energy Info */
                 if (status == STATUS_SUCCESS) {
-                    proto_tree_add_item(main_tree, hf_broadcom_le_energy_total_rx_time, tvb, offset, 1, ENC_NA);
+                    proto_tree_add_item(main_tree, hf_broadcom_le_energy_total_rx_time, tvb, offset, 1, ENC_BIG_ENDIAN);
                     offset += 1;
 
-                    proto_tree_add_item(main_tree, hf_broadcom_le_energy_total_tx_time, tvb, offset, 1, ENC_NA);
+                    proto_tree_add_item(main_tree, hf_broadcom_le_energy_total_tx_time, tvb, offset, 1, ENC_BIG_ENDIAN);
                     offset += 1;
 
-                    proto_tree_add_item(main_tree, hf_broadcom_le_energy_total_idle_time, tvb, offset, 1, ENC_NA);
+                    proto_tree_add_item(main_tree, hf_broadcom_le_energy_total_idle_time, tvb, offset, 1, ENC_BIG_ENDIAN);
                     offset += 1;
 
-                    proto_tree_add_item(main_tree, hf_broadcom_le_energy_total_energy_used, tvb, offset, 1, ENC_NA);
+                    proto_tree_add_item(main_tree, hf_broadcom_le_energy_total_energy_used, tvb, offset, 1, ENC_BIG_ENDIAN);
                     offset += 1;
                 }
 

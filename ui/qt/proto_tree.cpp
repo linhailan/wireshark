@@ -14,6 +14,7 @@
 
 #include <epan/ftypes/ftypes.h>
 #include <epan/prefs.h>
+#include <epan/print.h>
 #include <epan/epan.h>
 #include <epan/epan_dissect.h>
 #include <cfile.h>
@@ -28,9 +29,9 @@
 #include <ui/qt/follow_stream_action.h>
 #include <ui/qt/main_window.h>
 #include <ui/qt/io_graph_action.h>
+#include <ui/qt/plot_action.h>
 #include <ui/qt/protocol_preferences_menu.h>
 #include <ui/all_files_wildcard.h>
-#include <ui/alert_box.h>
 #include <ui/urls.h>
 #include "main_application.h"
 
@@ -59,19 +60,17 @@ ProtoTree::ProtoTree(QWidget *parent, epan_dissect_t *edt_fixed) :
     edt_(edt_fixed)
 {
     setAccessibleName(tr("Packet details"));
-    // Leave the uniformRowHeights property as-is (false) since items might
-    // have multiple lines (e.g. packet comments). If this slows things down
-    // too much we should add a custom delegate which handles SizeHintRole
-    // similar to PacketListModel::data.
+    setAccessibleDescription(tr("Tree view of the selected packet's fields"));
+    // Leave the uniformRowHeights property as-is (false) since items might have
+    // have multiple lines (e.g. packet or event comments). If this slows things
+    // down too much we should add a custom delegate which handles SizeHintRole.
     setHeaderHidden(true);
 
-#if !defined(Q_OS_WIN)
     setStyleSheet(QStringLiteral(
         "QTreeView:item:hover {"
         "  background-color: %1;"
         "  color: palette(text);"
         "}").arg(ColorUtils::hoverBackground().name(QColor::HexArgb)));
-#endif
 
     // Shrink down to a small but nonzero size in the main splitter.
     int one_em = fontMetrics().height();
@@ -330,6 +329,8 @@ void ProtoTree::contextMenuEvent(QContextMenuEvent *event)
     }
 
     ctx_menu->addMenu(IOGraphAction::createMenu(finfo->headerInfo(), ctx_menu));
+
+    ctx_menu->addMenu(PlotAction::createMenu(finfo->headerInfo(), ctx_menu));
 
     submenu = ctx_menu->addMenu(tr("Copy"));
     submenu->setToolTipsVisible(true);
@@ -666,7 +667,7 @@ void ProtoTree::itemClicked(const QModelIndex &index)
 {
     // selectionChanged() is not issued when some action would select
     // the same item as currently selected - but we want to make sure
-    // ByteViewText is highlighting that field. The BVT highlighted bytes
+    // HexDataSourceView is highlighting that field. The BVT highlighted bytes
     // might be different, due to hover highlighting or Find Packet "bytes".
     //
     // Unfortunately, clicked() is singled after selectionChanged(), so

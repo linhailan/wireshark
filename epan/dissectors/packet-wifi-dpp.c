@@ -280,15 +280,14 @@ dissect_wifi_dpp_attributes(packet_info *pinfo _U_, proto_tree *tree,
   uint16_t attribute_id;
   uint16_t attribute_len;
   unsigned attributes_len = 0;
-  unsigned remaining_len = tvb_reported_length_remaining(tvb, offset);
 
-  while (remaining_len) {
+  while (tvb_reported_length_remaining(tvb, offset)) {
     attribute_id = tvb_get_uint16(tvb, offset, ENC_LITTLE_ENDIAN);
     attribute_len = tvb_get_uint16(tvb, offset + 2, ENC_LITTLE_ENDIAN);
     attr = proto_tree_add_subtree_format(tree, tvb, offset,
                                 attribute_len + 4, ett_wifi_dpp_attribute,
                                 &si, "%s Attribute",
-                                val_to_str(attribute_id,
+                                val_to_str(pinfo->pool, attribute_id,
                                         dpp_ie_attr_ids,
                                         "Unknown (%u)"));
     attr_hdr = proto_tree_add_subtree(attr, tvb, offset, 4,
@@ -309,7 +308,7 @@ dissect_wifi_dpp_attributes(packet_info *pinfo _U_, proto_tree *tree,
     switch (attribute_id) {
     case DPP_STATUS:
       status = tvb_get_uint8(tvb, offset);
-      proto_item_append_text(si, ": %s", val_to_str(status,
+      proto_item_append_text(si, ": %s", val_to_str(pinfo->pool, status,
                                          dpp_status_codes,
                                          "Unknown (%u)"));
       proto_tree_add_item(specific_attr, hf_wifi_dpp_status, tvb, offset, attribute_len, ENC_LITTLE_ENDIAN);
@@ -406,8 +405,6 @@ dissect_wifi_dpp_attributes(packet_info *pinfo _U_, proto_tree *tree,
 
     offset += attribute_len;
     attributes_len += attribute_len + 4;
-    remaining_len -= (attribute_len + 4);
-
   }
 
   return attributes_len; // We return the attribute length plus hdr!
@@ -451,25 +448,23 @@ dissect_wifi_dpp_public_action(tvbuff_t *tvb, packet_info *pinfo,
   /* The Crypto suite comes before the DPP frame type */
   subtype = tvb_get_uint8(tvb, offset + 1);
   col_append_fstr(pinfo->cinfo, COL_INFO, ", DPP - %s",
-                  val_to_str(subtype, dpp_public_action_subtypes,
+                  val_to_str(pinfo->pool, subtype, dpp_public_action_subtypes,
                              "Unknown (%u)"));
 
-  remaining_len = tvb_reported_length_remaining(tvb, offset);
 
   dpp_item = proto_tree_add_item(tree, proto_wifi_dpp, tvb, offset, -1, ENC_NA);
   dpp_tree = proto_item_add_subtree(dpp_item, ett_wifi_dpp_pa);
-  proto_item_append_text(dpp_item, ": %s", val_to_str(subtype,
+  proto_item_append_text(dpp_item, ": %s", val_to_str(pinfo->pool, subtype,
                                                  dpp_public_action_subtypes,
                                                  "Unknown (%u)"));
   proto_tree_add_item(dpp_tree, hf_wifi_dpp_crypto_suite, tvb, offset, 1,
                       ENC_LITTLE_ENDIAN);
   offset++;
-  remaining_len--;
 
   proto_tree_add_item(dpp_tree, hf_wifi_dpp_public_action_subtype, tvb, offset,
                       1, ENC_LITTLE_ENDIAN);
   offset++;  /* Skip the OUI Subtype/DPP Request type */
-  remaining_len--;
+  remaining_len = tvb_reported_length_remaining(tvb, offset);
   if (remaining_len) {
     attr_tree = proto_tree_add_subtree_format(dpp_tree, tvb, offset,
                        remaining_len,
@@ -506,7 +501,7 @@ dissect_wifi_dpp_tcp_pdu(tvbuff_t *tvb, packet_info *pinfo _U_,
   offset += 1;
 
   if (action == 0x09) {
-    proto_tree_add_item(tree, hf_wifi_dpp_tcp_oui, tvb, offset, 3, ENC_NA);
+    proto_tree_add_item(tree, hf_wifi_dpp_tcp_oui, tvb, offset, 3, ENC_BIG_ENDIAN);
     offset += 3;
 
     proto_tree_add_item(tree, hf_wifi_dpp_tcp_oui_type, tvb, offset, 1, ENC_NA);
@@ -533,7 +528,7 @@ dissect_wifi_dpp_tcp_pdu(tvbuff_t *tvb, packet_info *pinfo _U_,
                         ENC_NA);
     offset += 1;
 
-    proto_tree_add_item(tree, hf_wifi_dpp_tcp_oui, tvb, offset, 3, ENC_NA);
+    proto_tree_add_item(tree, hf_wifi_dpp_tcp_oui, tvb, offset, 3, ENC_BIG_ENDIAN);
     offset += 3;
 
     proto_tree_add_item(tree, hf_wifi_dpp_tcp_oui_type, tvb, offset, 1, ENC_NA);
@@ -581,7 +576,7 @@ dissect_wifi_dpp_tcp_pdu(tvbuff_t *tvb, packet_info *pinfo _U_,
                         ENC_NA);
     offset += 1;
 
-    proto_tree_add_item(tree, hf_wifi_dpp_tcp_oui, tvb, offset, 3, ENC_NA);
+    proto_tree_add_item(tree, hf_wifi_dpp_tcp_oui, tvb, offset, 3, ENC_BIG_ENDIAN);
     offset += 3;
 
     proto_tree_add_item(tree, hf_wifi_dpp_tcp_oui_type, tvb, offset, 1, ENC_NA);

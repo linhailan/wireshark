@@ -841,7 +841,7 @@ static const value_string uncertainty_range[] = {
     { 0,  NULL }
 };
 
-typedef uint16_t (**elem_func_hander)(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, unsigned len, char *add_string, int string_len);
+typedef uint16_t (* const * elem_func_hander)(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, unsigned len, char *add_string, int string_len);
 
 int
 dissect_geographical_description(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree) {
@@ -938,13 +938,13 @@ dissect_geographical_description(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tr
         }else if (type_of_shape == ELLIPSOID_POINT_WITH_ALT) {
             /* Ellipsoid Point with Altitude */
             /*D: Direction of Altitude */
-            proto_tree_add_item(tree, hf_gsm_a_geo_loc_D, tvb, offset, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(tree, hf_gsm_a_geo_loc_D, tvb, offset, 2, ENC_BIG_ENDIAN);
             /* Altitude */
             proto_tree_add_item(tree, hf_gsm_a_geo_loc_altitude, tvb, offset, 2, ENC_BIG_ENDIAN);
         }else if (type_of_shape == ELLIPSOID_POINT_WITH_ALT_AND_UNCERT_ELLIPSOID) {
             /* Ellipsoid Point with altitude and uncertainty ellipsoid */
             /*D: Direction of Altitude octet 8,9 */
-            proto_tree_add_item(tree, hf_gsm_a_geo_loc_D, tvb, offset, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(tree, hf_gsm_a_geo_loc_D, tvb, offset, 2, ENC_BIG_ENDIAN);
             /* Altitude Octet 8,9*/
             proto_tree_add_item(tree, hf_gsm_a_geo_loc_altitude, tvb, offset, 2, ENC_BIG_ENDIAN);
             offset = offset +2;
@@ -1284,67 +1284,67 @@ dissect_description_of_velocity(tvbuff_t *tvb, proto_tree *tree, packet_info *pi
     return (curr_offset - offset);
 }
 
-const char* get_gsm_a_msg_string(int pdu_type, int idx)
+const char* get_gsm_a_msg_string(wmem_allocator_t* pool, int pdu_type, int idx)
 {
     const char *msg_string = NULL;
 
     switch (pdu_type) {
     case GSM_A_PDU_TYPE_BSSMAP:
-        msg_string = val_to_str_ext(idx, &gsm_bssmap_elem_strings_ext, "GSM_A_PDU_TYPE_BSSMAP (%u)");
+        msg_string = val_to_str_ext(pool, idx, &gsm_bssmap_elem_strings_ext, "GSM_A_PDU_TYPE_BSSMAP (%u)");
         break;
     case GSM_A_PDU_TYPE_DTAP:
-        msg_string = val_to_str_ext(idx, &gsm_dtap_elem_strings_ext, "GSM_A_PDU_TYPE_DTAP (%u)");
+        msg_string = val_to_str_ext(pool, idx, &gsm_dtap_elem_strings_ext, "GSM_A_PDU_TYPE_DTAP (%u)");
         break;
     case GSM_A_PDU_TYPE_RP:
-        msg_string = val_to_str_ext(idx, &gsm_rp_elem_strings_ext, "GSM_A_PDU_TYPE_RP (%u)");
+        msg_string = val_to_str_ext(pool, idx, &gsm_rp_elem_strings_ext, "GSM_A_PDU_TYPE_RP (%u)");
         break;
     case GSM_A_PDU_TYPE_RR:
-        msg_string = val_to_str_ext(idx, &gsm_rr_elem_strings_ext, "GSM_A_PDU_TYPE_RR (%u)");
+        msg_string = val_to_str_ext(pool, idx, &gsm_rr_elem_strings_ext, "GSM_A_PDU_TYPE_RR (%u)");
         break;
     case GSM_A_PDU_TYPE_COMMON:
-        msg_string = val_to_str_ext(idx, &gsm_common_elem_strings_ext, "GSM_A_PDU_TYPE_COMMON (%u)");
+        msg_string = val_to_str_ext(pool, idx, &gsm_common_elem_strings_ext, "GSM_A_PDU_TYPE_COMMON (%u)");
         break;
     case GSM_A_PDU_TYPE_GM:
-        msg_string = val_to_str_ext(idx, &gsm_gm_elem_strings_ext, "GSM_A_PDU_TYPE_GM (%u)");
+        msg_string = val_to_str_ext(pool, idx, &gsm_gm_elem_strings_ext, "GSM_A_PDU_TYPE_GM (%u)");
         break;
     case GSM_A_PDU_TYPE_BSSLAP:
-        msg_string = val_to_str_ext(idx, &gsm_bsslap_elem_strings_ext, "GSM_A_PDU_TYPE_BSSLAP (%u)");
+        msg_string = val_to_str_ext(pool, idx, &gsm_bsslap_elem_strings_ext, "GSM_A_PDU_TYPE_BSSLAP (%u)");
         break;
     case GSM_PDU_TYPE_BSSMAP_LE:
-        msg_string = val_to_str_ext(idx, &gsm_bssmap_le_elem_strings_ext, "GSM_PDU_TYPE_BSSMAP_LE (%u)");
+        msg_string = val_to_str_ext(pool, idx, &gsm_bssmap_le_elem_strings_ext, "GSM_PDU_TYPE_BSSMAP_LE (%u)");
         break;
     case NAS_PDU_TYPE_COMMON:
-        msg_string = val_to_str_ext(idx, &nas_eps_common_elem_strings_ext, "NAS_PDU_TYPE_COMMON (%u)");
+        msg_string = val_to_str_ext(pool, idx, &nas_eps_common_elem_strings_ext, "NAS_PDU_TYPE_COMMON (%u)");
         break;
     case NAS_PDU_TYPE_EMM:
-        msg_string = val_to_str_ext(idx, &nas_emm_elem_strings_ext, "NAS_PDU_TYPE_EMM (%u)");
+        msg_string = val_to_str_ext(pool, idx, &nas_emm_elem_strings_ext, "NAS_PDU_TYPE_EMM (%u)");
         break;
     case NAS_PDU_TYPE_ESM:
-        msg_string = val_to_str_ext(idx, &nas_esm_elem_strings_ext, "NAS_PDU_TYPE_ESM (%u)");
+        msg_string = val_to_str_ext(pool, idx, &nas_esm_elem_strings_ext, "NAS_PDU_TYPE_ESM (%u)");
         break;
     case SGSAP_PDU_TYPE:
-        msg_string = val_to_str_ext(idx, &sgsap_elem_strings_ext, "SGSAP_PDU_TYPE (%u)");
+        msg_string = val_to_str_ext(pool, idx, &sgsap_elem_strings_ext, "SGSAP_PDU_TYPE (%u)");
         break;
     case BSSGP_PDU_TYPE:
-        msg_string = val_to_str_ext(idx, &bssgp_elem_strings_ext, "BSSGP_PDU_TYPE (%u)");
+        msg_string = val_to_str_ext(pool, idx, &bssgp_elem_strings_ext, "BSSGP_PDU_TYPE (%u)");
         break;
     case GMR1_IE_COMMON:
-        msg_string = val_to_str_ext(idx, &gmr1_ie_common_strings_ext, "GMR1_IE_COMMON (%u)");
+        msg_string = val_to_str_ext(pool, idx, &gmr1_ie_common_strings_ext, "GMR1_IE_COMMON (%u)");
         break;
     case GMR1_IE_RR:
-        msg_string = val_to_str_ext(idx, &gmr1_ie_rr_strings_ext, "GMR1_IE_RR (%u)");
+        msg_string = val_to_str_ext(pool, idx, &gmr1_ie_rr_strings_ext, "GMR1_IE_RR (%u)");
         break;
     case NAS_5GS_PDU_TYPE_COMMON:
-        msg_string = val_to_str_ext(idx, &nas_5gs_common_elem_strings_ext, "NAS_5GS_PDU_TYPE_COMMON (%u)");
+        msg_string = val_to_str_ext(pool, idx, &nas_5gs_common_elem_strings_ext, "NAS_5GS_PDU_TYPE_COMMON (%u)");
         break;
     case NAS_5GS_PDU_TYPE_MM:
-        msg_string = val_to_str_ext(idx, &nas_5gs_mm_elem_strings_ext, "NAS_5GS_PDU_TYPE_MM (%u)");
+        msg_string = val_to_str_ext(pool, idx, &nas_5gs_mm_elem_strings_ext, "NAS_5GS_PDU_TYPE_MM (%u)");
         break;
     case NAS_5GS_PDU_TYPE_SM:
-        msg_string = val_to_str_ext(idx, &nas_5gs_sm_elem_strings_ext, "NAS_5GS_PDU_TYPE_SM (%u)");
+        msg_string = val_to_str_ext(pool, idx, &nas_5gs_sm_elem_strings_ext, "NAS_5GS_PDU_TYPE_SM (%u)");
         break;
     case NAS_5GS_PDU_TYPE_UPDP:
-        msg_string = val_to_str_ext(idx, &nas_5gs_updp_elem_strings_ext, "NAS_5GS_PDU_TYPE_UPDP (%u)");
+        msg_string = val_to_str_ext(pool, idx, &nas_5gs_updp_elem_strings_ext, "NAS_5GS_PDU_TYPE_UPDP (%u)");
         break;
     default:
         DISSECTOR_ASSERT_NOT_REACHED();
@@ -1701,8 +1701,8 @@ uint16_t elem_tv(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint8_t ie
 
         /* idx is out of range */
         if (elem_name == NULL) {
-            proto_tree_add_expert_format(tree, pinfo, &ei_gsm_a_unknown_element,
-                tvb, curr_offset, -1,
+            proto_tree_add_expert_format_remaining(tree, pinfo, &ei_gsm_a_unknown_element,
+                tvb, curr_offset,
                 "Unknown - aborting dissection%s", (name_add == NULL) || (name_add[0] == '\0') ? "" : name_add);
             return consumed;
         }
@@ -1775,8 +1775,8 @@ uint16_t elem_tv_short(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint
 
         /* idx is out of range */
         if (elem_name == NULL) {
-            proto_tree_add_expert_format(tree, pinfo, &ei_gsm_a_unknown_element,
-                tvb, curr_offset, -1,
+            proto_tree_add_expert_format_remaining(tree, pinfo, &ei_gsm_a_unknown_element,
+                tvb, curr_offset,
                 "Unknown - aborting dissection%s", (name_add == NULL) || (name_add[0] == '\0') ? "" : name_add);
             return consumed;
         }
@@ -1842,7 +1842,7 @@ uint16_t elem_t(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint8_t iei
             get_hf_elem_id(pdu_type), tvb,
             curr_offset, 1, oct,
             "%s%s",
-            val_to_str_ext(idx, &elem_names_ext, "Unknown (%u)"),
+            val_to_str_ext(pinfo->pool, idx, &elem_names_ext, "Unknown (%u)"),
             (name_add == NULL) || (name_add[0] == '\0') ? "" : name_add);
 
         consumed = 1;
@@ -2052,7 +2052,7 @@ uint16_t elem_v_short(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, int p
     proto_item         *item;
     value_string_ext    elem_names_ext;
     int                *elem_ett;
-    elem_fcn           *elem_funcs;
+    const elem_fcn     *elem_funcs;
     char               *a_add_string;
     const char         *elem_name;
 
@@ -3564,7 +3564,7 @@ de_ms_net_feat_sup(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, uint
 }
 
 
-uint16_t (*common_elem_fcn[])(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, unsigned len, char *add_string, int string_len) = {
+uint16_t (* const common_elem_fcn[])(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, unsigned len, char *add_string, int string_len) = {
     /* Common Information Elements 10.5.1 */
     de_cell_id,                        /* Cell Identity */
     de_ciph_key_seq_num,               /* Ciphering Key Sequence Number */
@@ -3604,15 +3604,10 @@ static stat_tap_table_item gsm_a_stat_fields[] = {
 
 static void gsm_a_stat_init(stat_tap_table_ui* new_stat, const char *table_title, const value_string *msg_strings)
 {
-    int num_fields = array_length(gsm_a_stat_fields);
+    unsigned num_fields = array_length(gsm_a_stat_fields);
     stat_tap_table* table;
     unsigned i;
     stat_tap_table_item_type items[array_length(gsm_a_stat_fields)];
-
-    items[IEI_COLUMN].type = TABLE_ITEM_UINT;
-    items[MSG_NAME_COLUMN].type = TABLE_ITEM_STRING;
-    items[COUNT_COLUMN].type = TABLE_ITEM_UINT;
-    items[COUNT_COLUMN].value.uint_value = 0;
 
     table = stat_tap_find_table(new_stat, table_title);
     if (table) {
@@ -3621,6 +3616,12 @@ static void gsm_a_stat_init(stat_tap_table_ui* new_stat, const char *table_title
         }
         return;
     }
+
+    memset(items, 0, sizeof(items));
+    items[IEI_COLUMN].type = TABLE_ITEM_UINT;
+    items[MSG_NAME_COLUMN].type = TABLE_ITEM_STRING;
+    items[COUNT_COLUMN].type = TABLE_ITEM_UINT;
+    items[COUNT_COLUMN].value.uint_value = 0;
 
     table = stat_tap_init_table(table_title, num_fields, 0, NULL);
     stat_tap_add_table(new_stat, table);
@@ -4429,7 +4430,7 @@ proto_register_gsm_a_common(void)
         NULL, HFILL}
     },
     { &hf_gsm_a_dtm_e_gprs_high_multi_slot_info_present,
-        { "DTM E/GPRS High Multi Slot Information present", "gsm_a.classmark3.dtm_e_gprs_high_mutli_slot_info_present",
+        { "DTM E/GPRS High Multi Slot Information present", "gsm_a.classmark3.dtm_e_gprs_high_multi_slot_info_present",
         FT_BOOLEAN, BASE_NONE, NULL, 0x00,
         NULL, HFILL}
     },
@@ -4790,7 +4791,7 @@ proto_register_gsm_a_common(void)
             NUM_GSM_COMMON_ELEM];
 
     static ei_register_info ei[] = {
-        { &ei_gsm_a_extraneous_data, { "gsm_a.extraneous_data", PI_PROTOCOL, PI_NOTE, "Extraneous Data, dissector bug or later version spec(report to wireshark.org)", EXPFILL }},
+        { &ei_gsm_a_extraneous_data, { "gsm_a.extraneous_data", PI_PROTOCOL, PI_NOTE, "Extraneous Data, dissector bug or later version spec (report to wireshark.org)", EXPFILL }},
         { &ei_gsm_a_unknown_element, { "gsm_a.unknown_element", PI_PROTOCOL, PI_ERROR, "Unknown - aborting dissection", EXPFILL }},
         { &ei_gsm_a_unknown_pdu_type, { "gsm_a.unknown_pdu_type", PI_PROTOCOL, PI_WARN, "Unknown PDU type", EXPFILL }},
         { &ei_gsm_a_no_element_dissector, { "gsm_a.no_element_dissector", PI_PROTOCOL, PI_WARN, "No element dissector, rest of dissection may be incorrect", EXPFILL }},

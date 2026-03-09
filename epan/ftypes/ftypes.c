@@ -37,10 +37,7 @@ ftypes_register_pseudofields(void)
 {
 	static int proto_ftypes;
 
-	proto_ftypes = proto_register_protocol(
-				"Wireshark Field/Fundamental Types",
-				"Wireshark FTypes",
-				"_ws.ftypes");
+	proto_ftypes = proto_register_protocol("Wireshark Field/Fundamental Types", "Wireshark FTypes", "_ws.ftypes");
 
 	ftype_register_pseudofields_bytes(proto_ftypes);
 	ftype_register_pseudofields_double(proto_ftypes);
@@ -429,6 +426,15 @@ ftype_can_is_negative(enum ftenum ftype)
 
 	FTYPE_LOOKUP(ftype, ft);
 	return ft->is_negative ? true : false;
+}
+
+bool
+ftype_can_is_nan(enum ftenum ftype)
+{
+	const ftype_t	*ft;
+
+	FTYPE_LOOKUP(ftype, ft);
+	return ft->is_nan ? true : false;
 }
 
 bool
@@ -1379,16 +1385,22 @@ fvalue_matches(const fvalue_t *a, const ws_regex_t *re)
 	return yes ? FT_TRUE : FT_FALSE;
 }
 
-ft_bool_t
+bool
 fvalue_is_zero(const fvalue_t *a)
 {
-	return a->ftype->is_zero(a) ? FT_TRUE : FT_FALSE;
+	return a->ftype->is_zero(a);
 }
 
-ft_bool_t
+bool
 fvalue_is_negative(const fvalue_t *a)
 {
-	return a->ftype->is_negative(a) ? FT_TRUE : FT_FALSE;
+	return a->ftype->is_negative(a);
+}
+
+bool
+fvalue_is_nan(const fvalue_t *a)
+{
+	return a->ftype->is_nan(a);
 }
 
 static fvalue_t *

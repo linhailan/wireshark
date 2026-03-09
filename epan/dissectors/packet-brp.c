@@ -23,8 +23,6 @@
 void proto_register_brp(void);
 void proto_reg_handoff_brp(void);
 
-#define PROTO_TAG_BRP   "BRP"
-
 /* Wireshark ID of the BRP protocol */
 static int proto_brp;
 
@@ -124,11 +122,11 @@ dissect_brp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 
     /* If there is a "tree" requested, we handle that request. */
 
-    col_set_str(pinfo->cinfo, COL_PROTOCOL, PROTO_TAG_BRP);
+    col_set_str(pinfo->cinfo, COL_PROTOCOL, "BRP");
     /* We add some snazzy bizness to the info field to quickly ascertain
         what type of message was sent to/from the BRS/BRC. */
     col_add_fstr(pinfo->cinfo, COL_INFO, "Message Type - %s",
-            val_to_str(packet_type, brp_packettype_names, "Unknown (0x%02x)"));
+            val_to_str(pinfo->pool, packet_type, brp_packettype_names, "Unknown (0x%02x)"));
 
     /* This call adds our tree to the main dissection tree. */
 
@@ -334,7 +332,7 @@ void proto_register_brp (void)
           { "Destination IP Address", "brp.dstip", FT_IPv4, BASE_NONE, NULL, 0x0,
             NULL, HFILL }},
         { &hf_brp_dstuport,
-          { "Destination UDP Port", "brp.dstuport", FT_UINT16, BASE_DEC, NULL, 0x0,
+          { "Destination UDP Port", "brp.dstuport", FT_UINT16, BASE_PT_UDP, NULL, 0x0,
             NULL, HFILL }},
         { &hf_brp_mbz,
           { "MBZ", "brp.mbz", FT_UINT24, BASE_DEC, NULL, 0x0,

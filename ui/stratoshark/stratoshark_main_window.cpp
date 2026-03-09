@@ -25,7 +25,6 @@ DIAG_ON(frame-larger-than=)
 #include <wsutil/wslog.h>
 #include <wsutil/ws_assert.h>
 #include <epan/prefs.h>
-#include <epan/plugin_if.h>
 
 #include "ui/iface_toolbar.h"
 
@@ -34,7 +33,6 @@ DIAG_ON(frame-larger-than=)
 #include <capture/capture_session.h>
 #endif
 
-#include "ui/alert_box.h"
 #ifdef HAVE_LIBPCAP
 #include "ui/capture_ui_utils.h"
 #endif
@@ -45,7 +43,7 @@ DIAG_ON(frame-larger-than=)
 #include "ui/util.h"
 #include "ui/preference_utils.h"
 
-#include "byte_view_tab.h"
+#include "data_source_tab.h"
 #ifdef HAVE_LIBPCAP
 #include "capture_options_dialog.h"
 #endif
@@ -71,6 +69,7 @@ DIAG_ON(frame-larger-than=)
 #include <ui/qt/utils/qt_ui_utils.h>
 #include <ui/qt/utils/stock_icon.h>
 #include <ui/qt/utils/variant_pointer.h>
+#include <ui/qt/utils/workspace_state.h>
 
 #include <QAction>
 #include <QActionGroup>
@@ -81,12 +80,9 @@ DIAG_ON(frame-larger-than=)
 #include <QMetaObject>
 #include <QMimeData>
 #include <QTabWidget>
-#include <QTextCodec>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QUrl>
-
-//menu_recent_file_write_all
 
 // If we ever add support for multiple windows this will need to be replaced.
 static StratosharkMainWindow *gbl_cur_main_window_;
@@ -329,9 +325,6 @@ StratosharkMainWindow::StratosharkMainWindow(QWidget *parent) :
     , capture_options_dialog_(NULL)
     , info_data_()
 #endif
-#if defined(Q_OS_MAC)
-    , dock_menu_(NULL)
-#endif
 {
     if (!gbl_cur_main_window_) {
         connect(mainApp, &MainApplication::openStatCommandDialog, this, &StratosharkMainWindow::openStatCommandDialog);
@@ -340,14 +333,19 @@ StratosharkMainWindow::StratosharkMainWindow(QWidget *parent) :
     }
     gbl_cur_main_window_ = this;
 #ifdef HAVE_LIBPCAP
+    info_data_.ui.ui = this;
     capture_input_init(&cap_session_, CaptureFile::globalCapFile());
 #endif
 
-    findTextCodecs();
     // setpUi calls QMetaObject::connectSlotsByName(this). connectSlotsByName
     // iterates over *all* of our children, looking for matching "on_" slots.
     // The fewer children we have at this point the better.
     main_ui_->setupUi(this);
+
+    // Initialize base class menu pointers for recent captures handling
+    recent_captures_menu_ = main_ui_->menuOpenRecentCaptureFile;
+    no_recent_files_action_ = main_ui_->actionDummyNoFilesFound;
+
 #ifdef HAVE_SOFTWARE_UPDATE
     update_action_ = new QAction(tr("Check for Updates…"), main_ui_->menuHelp);
 #endif
@@ -395,7 +393,8 @@ StratosharkMainWindow::StratosharkMainWindow(QWidget *parent) :
     connect(mainApp, &MainApplication::preferencesChanged, this, &StratosharkMainWindow::zoomText);
     connect(mainApp, &MainApplication::preferencesChanged, this, &StratosharkMainWindow::updateTitlebar);
 
-    connect(mainApp, &MainApplication::updateRecentCaptureStatus, this, &StratosharkMainWindow::updateRecentCaptures);
+    connect(WorkspaceState::instance(), &WorkspaceState::recentCaptureFilesChanged, this, &StratosharkMainWindow::updateRecentCaptures);
+    connect(WorkspaceState::instance(), &WorkspaceState::recentFileStatusChanged, this, &StratosharkMainWindow::updateRecentCaptures);
     connect(mainApp, &MainApplication::preferencesChanged, this, &StratosharkMainWindow::updateRecentCaptures);
     updateRecentCaptures();
 
@@ -530,7 +529,7 @@ main_ui_->goToLineEdit->setValidator(goToLineQiv);
     connect(mainApp, &WiresharkApplication::captureActive,
             this, &StratosharkMainWindow::captureActive);
 
-    byte_view_tab_ = new ByteViewTab(&master_split_);
+    data_source_tab_ = new DataSourceTab(&master_split_);
 
     // Packet list and proto tree must exist before these are called.
     setMenusForSelectedPacket();
@@ -566,8 +565,8 @@ main_ui_->goToLineEdit->setValidator(goToLineQiv);
 
     connect(main_ui_->mainStack, &QStackedWidget::currentChanged, this, &StratosharkMainWindow::mainStackChanged);
 
-    connect(welcome_page_, &WelcomePage::startCapture, this, [this](QStringList) { startCapture(); });
-    connect(welcome_page_, &WelcomePage::recentFileActivated, this, [this](QString cfile) { openCaptureFile(cfile); });
+    connect(welcome_page_, &StratosharkWelcomePage::startCapture, this, [this](QStringList) { startCapture(); });
+    connect(welcome_page_, &StratosharkWelcomePage::recentFileActivated, this, [this](QString cfile) { openCaptureFile(cfile); });
 
     connect(main_ui_->addressEditorFrame, &AddressEditorFrame::redissectPackets,
             this, &StratosharkMainWindow::redissectPackets);
@@ -638,11 +637,11 @@ main_ui_->goToLineEdit->setValidator(goToLineQiv);
     if (iface_tree) {
         connect(iface_tree, &QTreeWidget::itemSelectionChanged, this, &StratosharkMainWindow::interfaceSelectionChanged);
     }
-    connect(main_ui_->welcomePage, &WelcomePage::captureFilterSyntaxChanged,
+    connect(main_ui_->welcomePage, &StratosharkWelcomePage::captureFilterSyntaxChanged,
             this, &StratosharkMainWindow::captureFilterSyntaxChanged);
 
     connect(this, &StratosharkMainWindow::showExtcapOptions, this, &StratosharkMainWindow::showExtcapOptionsDialog);
-    connect(this->welcome_page_, &WelcomePage::showExtcapOptions, this, &StratosharkMainWindow::showExtcapOptionsDialog);
+    connect(this->welcome_page_, &StratosharkWelcomePage::showExtcapOptions, this, &StratosharkMainWindow::showExtcapOptionsDialog);
 
 #endif // HAVE_LIBPCAP
 
@@ -687,7 +686,7 @@ main_ui_->goToLineEdit->setValidator(goToLineQiv);
 
 StratosharkMainWindow::~StratosharkMainWindow()
 {
-    disconnect(main_ui_->mainStack, 0, 0, 0);
+    disconnect(main_ui_->mainStack, &QStackedWidget::currentChanged, this, &StratosharkMainWindow::mainStackChanged);
     if (previous_focus_ != nullptr) {
         disconnect(previous_focus_, &QWidget::destroyed, this, &StratosharkMainWindow::resetPreviousFocus);
     }
@@ -810,9 +809,16 @@ void StratosharkMainWindow::removeInterfaceToolbar(const char *menu_title)
 
 void StratosharkMainWindow::updateStyleSheet()
 {
+    // TODO: The event type QEvent::ApplicationPaletteChange is sent to all
+    // top-level windows, which propagate QEvent::PaletteChange events to
+    // all children - but not those that use style sheets.
+    //
+    // Workaround this by updating the style sheets manually for all child
+    // widgets that have style sheets that do depend on the application
+    // palette (generally whether the theme is dark or not.) Some of these
+    // widgets only have style sheets that vary with whether theme is dark
+    // on macOS. (XXX - We could just update them all anyway.)
 #ifdef Q_OS_MAC
-    // TODO: The event type QEvent::ApplicationPaletteChange is not sent to all child widgets.
-    // Workaround this by doing it manually for all AccordionFrame.
     main_ui_->addressEditorFrame->updateStyleSheet();
     main_ui_->columnEditorFrame->updateStyleSheet();
     main_ui_->filterExpressionFrame->updateStyleSheet();
@@ -820,9 +826,9 @@ void StratosharkMainWindow::updateStyleSheet()
     main_ui_->preferenceEditorFrame->updateStyleSheet();
     main_ui_->searchFrame->updateStyleSheet();
 
-    df_combo_box_->updateStyleSheet();
-    welcome_page_->updateStyleSheets();
 #endif
+    welcome_page_->updateStyleSheets();
+    df_combo_box_->updateStyleSheet();
 }
 
 bool StratosharkMainWindow::eventFilter(QObject *obj, QEvent *event) {
@@ -1426,7 +1432,7 @@ bool StratosharkMainWindow::saveCaptureFile(capture_file *cf, bool dont_reopen) 
 bool StratosharkMainWindow::saveAsCaptureFile(capture_file *cf, bool must_support_comments, bool dont_reopen) {
     QString file_name = "";
     int file_type;
-    wtap_compression_type compression_type;
+    ws_compression_type compression_type;
     cf_write_status_t status;
     char    *dirname;
     bool discard_comments = false;
@@ -1525,7 +1531,7 @@ bool StratosharkMainWindow::saveAsCaptureFile(capture_file *cf, bool must_suppor
             cf->unsaved_changes = false; //we just saved so we signal that we have no unsaved changes
             updateForUnsavedChanges(); // we update the title bar to remove the *
             /* Add this filename to the list of recent files in the "Recent Files" submenu */
-            add_menu_recent_capture_file(qUtf8Printable(file_name), false);
+            WorkspaceState::instance()->addRecentCaptureFile(qUtf8Printable(file_name));
             return true;
 
         case CF_WRITE_ERROR:
@@ -1543,7 +1549,7 @@ bool StratosharkMainWindow::saveAsCaptureFile(capture_file *cf, bool must_suppor
 void StratosharkMainWindow::exportSelectedPackets() {
     QString file_name = "";
     int file_type;
-    wtap_compression_type compression_type;
+    ws_compression_type compression_type;
     packet_range_t range;
     cf_write_status_t status;
     char    *dirname;
@@ -1663,7 +1669,7 @@ void StratosharkMainWindow::exportSelectedPackets() {
             if (discard_comments)
                 packet_list_->redrawVisiblePackets();
             /* Add this filename to the list of recent files in the "Recent Files" submenu */
-            add_menu_recent_capture_file(qUtf8Printable(file_name), false);
+            WorkspaceState::instance()->addRecentCaptureFile(qUtf8Printable(file_name));
             goto cleanup;
 
         case CF_WRITE_ERROR:
@@ -1751,7 +1757,7 @@ bool StratosharkMainWindow::testCaptureFileClose(QString before_what, FileCloseC
             QPushButton *discard_button;
 
             msg_dialog.setIcon(QMessageBox::Question);
-            msg_dialog.setWindowTitle("Unsaved packets" UTF8_HORIZONTAL_ELLIPSIS);
+            msg_dialog.setWindowTitle(tr("Unsaved packets…"));
 
             /* This file has unsaved data or there's a capture in
                progress; ask the user whether to save the data. */
@@ -1941,56 +1947,6 @@ void StratosharkMainWindow::captureStop() {
     }
 }
 
-void StratosharkMainWindow::findTextCodecs() {
-    const QList<int> mibs = QTextCodec::availableMibs();
-    QRegularExpression ibmRegExp("^IBM([0-9]+).*$");
-    QRegularExpression iso8859RegExp("^ISO-8859-([0-9]+).*$");
-    QRegularExpression windowsRegExp("^WINDOWS-([0-9]+).*$");
-    QRegularExpressionMatch match;
-    for (int mib : mibs) {
-        QTextCodec *codec = QTextCodec::codecForMib(mib);
-        // QTextCodec::availableMibs() returns a list of hard-coded MIB
-        // numbers, it doesn't check if they are really available. ICU data may
-        // not have been compiled with support for all encodings.
-        if (!codec) {
-            continue;
-        }
-
-        QString key = codec->name().toUpper();
-        char rank;
-
-        if (key.localeAwareCompare("IBM") < 0) {
-            rank = 1;
-        } else if ((match = ibmRegExp.match(key)).hasMatch()) {
-            rank = match.captured(1).size(); // Up to 5
-        } else if (key.localeAwareCompare("ISO-8859-") < 0) {
-            rank = 6;
-        } else if ((match = iso8859RegExp.match(key)).hasMatch()) {
-            rank = 6 + match.captured(1).size(); // Up to 6 + 2
-        } else if (key.localeAwareCompare("WINDOWS-") < 0) {
-            rank = 9;
-        } else if ((match = windowsRegExp.match(key)).hasMatch()) {
-            rank = 9 + match.captured(1).size(); // Up to 9 + 4
-        } else {
-            rank = 14;
-        }
-        // This doesn't perfectly well order the IBM codecs because it's
-        // annoying to properly place IBM00858 and IBM00924 in the middle of
-        // code page numbers not zero padded to 5 digits.
-        // We could manipulate the key further to have more commonly used
-        // charsets earlier. IANA MIB ordering would be unexpected:
-        // https://www.iana.org/assignments/character-sets/character-sets.xml
-        // For data about use in HTTP (other protocols can be quite different):
-        // https://w3techs.com/technologies/overview/character_encoding
-
-        key.prepend(char('0' + rank));
-        // We use a map here because, due to backwards compatibility,
-        // the same QTextCodec may be returned for multiple MIBs, which
-        // happens for GBK/GB2312, EUC-KR/windows-949/UHC, and others.
-        text_codec_map_.insert(key, codec);
-    }
-}
-
 void StratosharkMainWindow::initMainToolbarIcons()
 {
     // Normally 16 px. Reflects current GTK+ behavior and other Windows apps.
@@ -2045,6 +2001,8 @@ void StratosharkMainWindow::initMainToolbarIcons()
     main_ui_->actionViewResizeColumns->setIcon(StockIcon("x-resize-columns"));
     main_ui_->actionViewResetLayout->setIcon(StockIcon("x-reset-layout_2"));
     main_ui_->actionViewReload->setIcon(StockIcon("x-capture-file-reload"));
+    // XXX - What icon to use?
+    //main_ui_->actionViewRedissect->setIcon(StockIcon("x-capture-file-reload"));
 
     main_ui_->actionNewDisplayFilterExpression->setIcon(StockIcon("list-add"));
 }
@@ -2064,7 +2022,7 @@ void StratosharkMainWindow::initShowHideMainWidgets()
     shmw_actions[main_ui_->actionViewStatusBar] = main_ui_->statusBar;
     shmw_actions[main_ui_->actionViewPacketList] = packet_list_;
     shmw_actions[main_ui_->actionViewPacketDetails] = proto_tree_;
-    shmw_actions[main_ui_->actionViewPacketBytes] = byte_view_tab_;
+    shmw_actions[main_ui_->actionViewPacketBytes] = data_source_tab_;
 
     foreach(QAction *shmwa, shmw_actions.keys()) {
         shmwa->setData(QVariant::fromValue(shmw_actions[shmwa]));
@@ -2142,6 +2100,7 @@ void StratosharkMainWindow::initFreezeActions()
     QList<QAction *> freeze_actions = QList<QAction *>()
             << main_ui_->actionFileClose
             << main_ui_->actionViewReload
+            << main_ui_->actionViewRedissect
             << main_ui_->actionEditMarkSelected
             << main_ui_->actionEditMarkAllDisplayed
             << main_ui_->actionEditUnmarkAllDisplayed
@@ -2245,7 +2204,7 @@ bool StratosharkMainWindow::addFollowStreamMenuItem(const void *key _U_, void *v
      */
     // XXX - Should we add matches for syscall properties, e.g. file descriptors?
     const char *short_name = (const char*)key;
-    if (g_strcmp0(short_name, "Falco Bridge") == 0) {
+    if (g_strcmp0(short_name, "Falco Events") == 0) {
         follow_action->setText(tr("File Descriptor Stream"));
     }
     // if (g_strcmp0(short_name, "TCP") == 0) {
@@ -2413,10 +2372,12 @@ void StratosharkMainWindow::setForCapturedPackets(bool have_captured_packets)
     main_ui_->actionViewZoomOut->setEnabled(have_captured_packets);
     main_ui_->actionViewNormalSize->setEnabled(have_captured_packets);
     main_ui_->actionViewResizeColumns->setEnabled(have_captured_packets);
+    main_ui_->actionViewRedissect->setEnabled(have_captured_packets);
 
     main_ui_->actionStatisticsCaptureFileProperties->setEnabled(have_captured_packets);
     main_ui_->actionStatisticsProtocolHierarchy->setEnabled(have_captured_packets);
     main_ui_->actionStatisticsIOGraph->setEnabled(have_captured_packets);
+    main_ui_->actionStatisticsPlot->setEnabled(have_captured_packets);
 }
 
 void StratosharkMainWindow::setMenusForFileSet(bool enable_list_files) {
@@ -2426,11 +2387,6 @@ void StratosharkMainWindow::setMenusForFileSet(bool enable_list_files) {
     main_ui_->actionFileSetListFiles->setEnabled(enable_list_files);
     main_ui_->actionFileSetNextFile->setEnabled(enable_next);
     main_ui_->actionFileSetPreviousFile->setEnabled(enable_prev);
-}
-
-void StratosharkMainWindow::setWindowIcon(const QIcon &icon) {
-    mainApp->setWindowIcon(icon);
-    QMainWindow::setWindowIcon(icon);
 }
 
 void StratosharkMainWindow::updateForUnsavedChanges() {
@@ -2446,8 +2402,7 @@ void StratosharkMainWindow::changeEvent(QEvent* event)
         {
         case QEvent::LanguageChange:
             main_ui_->retranslateUi(this);
-            // make sure that the "Clear Menu" item is retranslated
-            mainApp->emitAppSignal(WiresharkApplication::RecentCapturesChanged);
+            retranslateUiElements();
             // make sure that the color actions in the PacketList and ProtoTree
             // are retranslated
             initConversationMenus();
@@ -2736,6 +2691,11 @@ void StratosharkMainWindow::addPluginIFStructures()
 
     if (cntToolbars)
         tbMenu->menuAction()->setVisible(true);
+}
+
+void StratosharkMainWindow::setFunnelMenus(void)
+{
+    funnel_statistics_->loadInitFunnelMenus();
 }
 
 void StratosharkMainWindow::removeAdditionalToolbar(QString toolbarName)

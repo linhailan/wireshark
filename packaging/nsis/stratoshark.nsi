@@ -86,6 +86,8 @@ BrandingText "Stratoshark${U+00ae} Installer"
 !define MUI_LICENSEPAGE_BUTTON "Noted"
 !insertmacro MUI_PAGE_LICENSE "${STAGING_DIR}\COPYING.txt"
 
+Page custom DisplayDonatePage
+
 !insertmacro MUI_PAGE_COMPONENTS
 !ifdef QT_DIR
 Page custom DisplayAdditionalTasksPage LeaveAdditionalTasksPage
@@ -110,7 +112,7 @@ Page custom DisplayAdditionalTasksPage LeaveAdditionalTasksPage
   ; Old Modern 1 UI: https://nsis.sourceforge.io/Docs/Modern%20UI/Readme.html
   ; To do: Upgrade to the Modern 2 UI:
   ;ReserveFile "AdditionalTasksPage.ini"
-  ;ReserveFile "DonatePage.ini"
+  ReserveFile "DonatePage.ini"
   ReserveFile /plugin InstallOptions.dll
 
   ; Modern UI 2 / nsDialog pages.
@@ -277,7 +279,7 @@ Function .onInit
 
   ; This should match the following:
   ; - The NTDDI_VERSION and _WIN32_WINNT parts of cmakeconfig.h.in
-  ; - The <compatibility><application> section in image\wireshark.exe.manifest.in
+  ; - The <compatibility><application> section in resources\stratoshark.exe.manifest.in
   ; - The VersionNT parts of packaging\wix\Prerequisites.wxi
 
   ; Uncomment to test.
@@ -285,8 +287,9 @@ Function .onInit
 
 ${If} ${AtMostWin8.1}
 ${OrIf} ${AtMostWin2012R2}
+${OrIfNot} ${AtLeastBuild} 17763
   MessageBox MB_OK \
-    "Windows 10, Server 2016, and later are required." /SD IDOK
+    "Windows 10, version 1809 or Server 2019 and later are required." /SD IDOK
   Quit
 ${EndIf}
 
@@ -413,6 +416,7 @@ done:
 
   ;Extract InstallOptions INI files
   ;!insertmacro INSTALLOPTIONS_EXTRACT "AdditionalTasksPage.ini"
+  !insertmacro INSTALLOPTIONS_EXTRACT "DonatePage.ini"
 FunctionEnd
 
 !ifdef QT_DIR
@@ -421,10 +425,10 @@ Function DisplayAdditionalTasksPage
 FunctionEnd
 !endif
 
-; Function DisplayDonatePage
-;   !insertmacro MUI_HEADER_TEXT "Your donations keep these releases coming" "Donate today"
-;   !insertmacro INSTALLOPTIONS_DISPLAY "DonatePage.ini"
-; FunctionEnd
+Function DisplayDonatePage
+  !insertmacro MUI_HEADER_TEXT "Your donations keep these releases coming" "Donate today!"
+  !insertmacro INSTALLOPTIONS_DISPLAY "DonatePage.ini"
+FunctionEnd
 
 ; ============================================================================
 ; Installation execution commands
@@ -443,6 +447,7 @@ WriteUninstaller "$INSTDIR\${UNINSTALLER_NAME}"
 File "${STAGING_DIR}\libwiretap.dll"
 File "${STAGING_DIR}\libwireshark.dll"
 File "${STAGING_DIR}\libwsutil.dll"
+File "${STAGING_DIR}\libuiqt_plugin.dll"
 
 !include stratoshark-manifest.nsh
 
@@ -510,8 +515,8 @@ File "${STAGING_DIR}\diameter\AlcatelLucent.xml"
 File "${STAGING_DIR}\diameter\chargecontrol.xml"
 File "${STAGING_DIR}\diameter\Cisco.xml"
 File "${STAGING_DIR}\diameter\CiscoSystems.xml"
-File "${STAGING_DIR}\diameter\Custom.xml"
 File "${STAGING_DIR}\diameter\dictionary.dtd"
+File "${STAGING_DIR}\diameter\dictionary.ent"
 File "${STAGING_DIR}\diameter\dictionary.xml"
 File "${STAGING_DIR}\diameter\eap.xml"
 File "${STAGING_DIR}\diameter\Ericsson.xml"
@@ -878,6 +883,16 @@ Call Associate
 ; AdditionalTasks page
 ${Endif}
 
+; Create a dummy configuraton directory for libgcrypt
+; XXX Is there a way to confidently and cleanly remove this?
+CreateDirectory $COMMONPROGRAMDATA\GNU\etc\gcrypt
+; This *should* match the gpg4win installer behavior.
+ExecShellWait "" "$SYSDIR\icacls.exe" '"$COMMONPROGRAMDATA\GNU\etc\gcrypt" /inheritance:r' SW_HIDE
+; BUILTIN\Administrators
+ExecShellWait "" "$SYSDIR\icacls.exe" '"$COMMONPROGRAMDATA\GNU\etc\gcrypt" /grant *S-1-5-32-544:(GA)' SW_HIDE
+; BUILTIN\Users
+ExecShellWait "" "$SYSDIR\icacls.exe" '"$COMMONPROGRAMDATA\GNU\etc\gcrypt" /grant *S-1-5-32-545:(R,RA,REA,RC,GE)' SW_HIDE
+
 SectionEnd ; "Required"
 
 !ifdef QT_DIR
@@ -905,41 +920,33 @@ SectionEnd ; "SecStratosharkQt"
 !endif
 
 
-Section "TShark" SecTShark
+Section "Strato" SecStrato
 ;-------------------------------------------
 SetOutPath $INSTDIR
-File "${STAGING_DIR}\tshark.exe"
-File "${STAGING_DIR}\tshark.html"
+File "${STAGING_DIR}\strato.exe"
+File "${STAGING_DIR}\strato.html"
 SectionEnd
 
 Section "-Plugins & Extensions"
 
 ;-------------------------------------------
 SetOutPath '$INSTDIR\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan'
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\falco-bridge.dll"
+File "${STAGING_DIR}\plugins\stratoshark\${MAJOR_VERSION}.${MINOR_VERSION}\epan\falco-events.dll"
 SetOutPath '$INSTDIR\plugins\falco'
-File "${STAGING_DIR}\plugins\falco\cloudtrail.dll"
-File "${STAGING_DIR}\plugins\falco\gcpaudit.dll"
+File "${STAGING_DIR}\plugins\stratoshark\falco\cloudtrail.dll"
+File "${STAGING_DIR}\plugins\stratoshark\falco\gcpaudit.dll"
+File "${STAGING_DIR}\plugins\stratoshark\falco\k8saudit.dll"
 !include "custom_plugins.txt"
 
 ;-------------------------------------------
 SetOutPath '$INSTDIR\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan'
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\stats_tree.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\epan\stats_tree.dll"
 
 ;-------------------------------------------
 SetOutPath '$INSTDIR\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan'
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\mate.dll"
+File "${STAGING_DIR}\plugins\wireshark\${MAJOR_VERSION}.${MINOR_VERSION}\epan\mate.dll"
 
-;-------------------------------------------
-; This should be a function or macro
-SetOutPath '$INSTDIR\profiles\CloudTrail'
-File "${TOP_SRC_DIR}\resources\share\stratoshark\profiles\CloudTrail\colorfilters"
-; File "${TOP_SRC_DIR}\resources\share\stratoshark\profiles\CloudTrail\preferences"
-; SetOutPath '$INSTDIR\profiles\Classic'
-; File "${TOP_SRC_DIR}\resources\share\stratoshark\profiles\Classic\colorfilters"
-; SetOutPath '$INSTDIR\profiles\No Reassembly'
-; File "${TOP_SRC_DIR}\resources\share\stratoshark\profiles\No Reassembly\preferences"
-
+!include wireshark-profile-manifest.nsh
 
 !ifdef SMI_DIR
 ;-------------------------------------------
@@ -952,12 +959,6 @@ File "${SMI_DIR}\share\pibs\*"
 File "${SMI_DIR}\share\yang\*.yang"
 !include "custom_mibs.txt"
 !endif
-
-SetOutPath '$INSTDIR\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan'
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\transum.dll"
-
-SetOutPath '$INSTDIR\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan'
-File "${STAGING_DIR}\plugins\${MAJOR_VERSION}.${MINOR_VERSION}\epan\stats_tree.dll"
 
 SectionEnd ; "Plugins / Extensions"
 
@@ -999,6 +1000,8 @@ File "${STAGING_DIR}\text2pcap.html"
 SectionEnd ; "Tools"
 
 SectionGroup /e "External capture tools (extcap)" SecExtcapGroup
+
+; Dumpcalls is Linux-only
 
 Section "Falcodump" SecFalcodump
 ;-------------------------------------------
@@ -1101,7 +1104,7 @@ Push "rawshark"
 Push "reordercap"
 Push "sharkd"
 Push "text2pcap"
-Push "tshark"
+Push "strato"
 
 !ifdef MMDBRESOLVE_EXE
 Push "mmdbresolve"
@@ -1281,9 +1284,9 @@ SectionEnd
 ; ============================================================================
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
 !ifdef QT_DIR
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecStratosharkQt} "The main syscall and log analyzer application."
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecStratosharkQt} "The main system call and log analyzer application."
 !endif
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecTShark} "Text based network protocol analyzer."
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecStrato} "Text based system call and log analyzer."
 
   !insertmacro MUI_DESCRIPTION_TEXT ${SecExtcapGroup} "External Capture Interfaces"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecFalcodump} "Provide capture interfaces from Falco plugins."

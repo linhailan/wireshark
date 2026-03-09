@@ -47,7 +47,7 @@ ThirdPartyID/min min_bit_string
   it = proto_tree_add_item(tree, proto_ulp, tvb, 0, -1, ENC_NA);
   ulp_tree = proto_item_add_subtree(it, ett_ulp);
 
-  col_set_str(actx->pinfo->cinfo, COL_PROTOCOL, PSNAME);
+  col_set_str(actx->pinfo->cinfo, COL_PROTOCOL, "ULP");
   col_clear(actx->pinfo->cinfo, COL_INFO);
 #.END
 
@@ -57,11 +57,13 @@ ThirdPartyID/min min_bit_string
 
 #.FN_BODY UlpMessage  VAL_PTR = &UlpMessage
 
-uint32_t UlpMessage;
+  int32_t UlpMessage;
 
   %(DEFAULT_BODY)s
 
-  col_prepend_fstr(%(ACTX)s->pinfo->cinfo, COL_INFO, "%%s ", val_to_str_const(UlpMessage,ulp_UlpMessage_vals,"Unknown"));
+  if (UlpMessage != -1) {
+    col_prepend_fstr(%(ACTX)s->pinfo->cinfo, COL_INFO, "%%s ", val_to_str_const((uint32_t)UlpMessage,ulp_UlpMessage_vals,"Unknown"));
+  }
 
 #.END
 
@@ -310,7 +312,7 @@ ExtendedEphemeris/validity DISPLAY=BASE_CUSTOM STRINGS=CF_FUNC(ulp_ExtendedEphem
     proto_tree *subtree;
 
     subtree = proto_item_add_subtree(actx->created_item, ett_ulp_setid);
-    dissect_e164_msisdn(msisdn_tvb, subtree, 0, 8, E164_ENC_BCD);
+    dissect_e164_msisdn(msisdn_tvb, actx->pinfo, subtree, 0, 8, E164_ENC_BCD);
   }
 
 #.FN_BODY SETId/mdn VAL_PTR=&mdn_tvb
@@ -706,7 +708,7 @@ SET-GANSSReferenceTime/ganss-TODUncertainty ulp_UTRAN_gpsReferenceTimeUncertaint
     proto_tree *subtree;
 
     subtree = proto_item_add_subtree(actx->created_item, ett_ulp_thirdPartyId);
-    dissect_e164_msisdn(msisdn_tvb, subtree, 0, 8, E164_ENC_BCD);
+    dissect_e164_msisdn(msisdn_tvb, actx->pinfo, subtree, 0, 8, E164_ENC_BCD);
   }
 
 #.FN_BODY ThirdPartyID/sip-uri

@@ -49,7 +49,9 @@ typedef enum {
     AT_VINES,              /* Banyan Vines address */
     AT_NUMERIC,            /* Numeric address type. */
     AT_MCTP,               /* MCTP */
-
+    AT_ILNP_NID,           /* ILNP NID */
+    AT_ILNP_L64,           /* ILNP L64 */
+    AT_ILNP_ILV,           /* ILNP ILV */
     AT_END_OF_LIST         /* Must be last in list */
 } address_type;
 
@@ -129,7 +131,7 @@ set_address_ipv6(address *addr, const ipv6_addr_and_prefix *ipv6) {
  *                     AT_IPv4 or sizeof(ws_in6_addr) for AT_IPv6.
  */
 static inline void
-set_address_tvb(address *addr, int addr_type, int addr_len, tvbuff_t *tvb, int offset) {
+set_address_tvb(address *addr, int addr_type, unsigned addr_len, tvbuff_t *tvb, unsigned offset) {
     const void *p;
 
     if (addr_len != 0) {

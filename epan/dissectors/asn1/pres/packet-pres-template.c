@@ -27,15 +27,6 @@
 #include "packet-pres.h"
 #include "packet-rtse.h"
 
-
-#define PNAME  "ISO 8823 OSI Presentation Protocol"
-#define PSNAME "PRES"
-#define PFNAME "pres"
-
-#define CLPNAME  "ISO 9576-1 OSI Connectionless Presentation Protocol"
-#define CLPSNAME "CLPRES"
-#define CLPFNAME "clpres"
-
 void proto_register_pres(void);
 void proto_reg_handoff_pres(void);
 
@@ -199,8 +190,8 @@ pres_free_cb(void *r)
 /*
  * Dissect an PPDU.
  */
-static int
-dissect_ppdu(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *tree, struct SESSION_DATA_STRUCTURE* local_session)
+static unsigned
+dissect_ppdu(tvbuff_t *tvb, unsigned offset, packet_info *pinfo, proto_tree *tree, struct SESSION_DATA_STRUCTURE* local_session)
 {
 	proto_item *ti;
 	proto_tree *pres_tree;
@@ -210,20 +201,20 @@ dissect_ppdu(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *tree, st
 
 	/* do we have spdu type from the session dissector?  */
 	if (local_session == NULL) {
-		proto_tree_add_expert(tree, pinfo, &ei_pres_wrong_spdu_type, tvb, offset, -1);
+		proto_tree_add_expert_remaining(tree, pinfo, &ei_pres_wrong_spdu_type, tvb, offset);
 		return 0;
 	}
 
 	session = local_session;
 	if (session->spdu_type == 0) {
-		proto_tree_add_expert_format(tree, pinfo, &ei_pres_wrong_spdu_type, tvb, offset, -1,
+		proto_tree_add_expert_format_remaining(tree, pinfo, &ei_pres_wrong_spdu_type, tvb, offset,
 			"Internal error:wrong spdu type %x from session dissector.",session->spdu_type);
 		return 0;
 	}
 
 	/*  set up type of PPDU */
 	col_add_str(pinfo->cinfo, COL_INFO,
-		    val_to_str_ext(session->spdu_type, &ses_vals_ext, "Unknown PPDU type (0x%02x)"));
+		    val_to_str_ext(pinfo->pool, session->spdu_type, &ses_vals_ext, "Unknown PPDU type (0x%02x)"));
 
 	asn1_ctx.private_data = session;
 
@@ -267,7 +258,7 @@ dissect_ppdu(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *tree, st
 static int
 dissect_pres(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* data)
 {
-	int offset = 0, old_offset;
+	unsigned offset = 0, old_offset;
 	struct SESSION_DATA_STRUCTURE* session;
 
 	session = ((struct SESSION_DATA_STRUCTURE*)data);
@@ -277,7 +268,7 @@ dissect_pres(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* d
 	if (!tvb_bytes_exist(tvb, 0, 4)) {
 		if (session && session->spdu_type != SES_MAJOR_SYNC_POINT) {
 			proto_tree_add_item(parent_tree, hf_pres_user_data, tvb, offset,
-					    tvb_reported_length_remaining(tvb,offset), ENC_NA);
+					tvb_reported_length_remaining(tvb,offset), ENC_BIG_ENDIAN);
 			return 0;  /* no, it isn't a presentation PDU */
 		}
 	}
@@ -318,7 +309,7 @@ dissect_pres(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* d
 			call_ber_oid_callback (oid, tvb, offset, pinfo, parent_tree, session);
 		} else {
 			proto_tree_add_item(parent_tree, hf_pres_user_data, tvb, offset,
-					    tvb_reported_length_remaining(tvb,offset), ENC_NA);
+			                    tvb_reported_length_remaining(tvb,offset), ENC_BIG_ENDIAN);
 		}
 		return tvb_captured_length(tvb);
 	}
@@ -327,7 +318,7 @@ dissect_pres(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* d
 		old_offset = offset;
 		offset = dissect_ppdu(tvb, offset, pinfo, parent_tree, session);
 		if (offset <= old_offset) {
-			proto_tree_add_expert(parent_tree, pinfo, &ei_pres_invalid_offset, tvb, offset, -1);
+			proto_tree_add_expert_remaining(parent_tree, pinfo, &ei_pres_invalid_offset, tvb, offset);
 			break;
 		}
 	}
@@ -402,11 +393,11 @@ void proto_register_pres(void) {
   module_t *pres_module;
 
   /* Register protocol */
-  proto_pres = proto_register_protocol(PNAME, PSNAME, PFNAME);
+  proto_pres = proto_register_protocol("ISO 8823 OSI Presentation Protocol", "PRES", "pres");
   register_dissector("pres", dissect_pres, proto_pres);
 
   /* Register connectionless protocol (just for the description) */
-  proto_clpres = proto_register_protocol(CLPNAME, CLPSNAME, CLPFNAME);
+  proto_clpres = proto_register_protocol("ISO 9576-1 OSI Connectionless Presentation Protocol", "CLPRES", "clpres");
 
   /* Register fields and subtrees */
   proto_register_field_array(proto_pres, hf, array_length(hf));

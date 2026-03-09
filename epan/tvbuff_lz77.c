@@ -67,8 +67,7 @@ static bool do_uncompress(tvbuff_t *tvb, int offset, int in_size,
 						match_len = tvb_get_letohs(tvb, offset+in_off);
 						in_off += 2;
 						if (match_len == 0) {
-							/* This case isn't documented */
-							match_len = tvb_get_letohs(tvb, offset+in_off);
+							match_len = tvb_get_letohl(tvb, offset+in_off);
 							in_off += 4;
 						}
 						if (match_len < 15+7)
@@ -95,7 +94,7 @@ static bool do_uncompress(tvbuff_t *tvb, int offset, int in_size,
 }
 
 tvbuff_t *
-tvb_uncompress_lz77(tvbuff_t *tvb, const int offset, int in_size)
+tvb_uncompress_lz77(tvbuff_t *tvb, const unsigned offset, unsigned in_size)
 {
 	volatile bool ok = false;
 	wmem_allocator_t *pool;
@@ -134,7 +133,7 @@ tvb_uncompress_lz77(tvbuff_t *tvb, const int offset, int in_size)
 }
 
 tvbuff_t *
-tvb_child_uncompress_lz77(tvbuff_t *parent, tvbuff_t *tvb, const int offset, int in_size)
+tvb_child_uncompress_lz77(tvbuff_t *parent, tvbuff_t *tvb, const unsigned offset, unsigned in_size)
 {
 	tvbuff_t *new_tvb = tvb_uncompress_lz77(tvb, offset, in_size);
 	if (new_tvb)

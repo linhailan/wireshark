@@ -161,11 +161,9 @@ dissect_dsi_open_session(tvbuff_t *tvb, proto_tree *dsi_tree, int offset, int ds
 
 	while( dsi_length >2 ) {
 
-		type = tvb_get_uint8(tvb, offset);
-		proto_tree_add_item(tree, hf_dsi_open_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+		proto_tree_add_item_ret_uint8(tree, hf_dsi_open_type, tvb, offset, 1, ENC_BIG_ENDIAN, &type);
 		offset++;
-		len = tvb_get_uint8(tvb, offset);
-		proto_tree_add_item(tree, hf_dsi_open_len, tvb, offset, 1, ENC_BIG_ENDIAN);
+		proto_tree_add_item_ret_uint8(tree, hf_dsi_open_len, tvb, offset, 1, ENC_BIG_ENDIAN, &len);
 		offset++;
 		switch (type) {
 			case 0:
@@ -238,9 +236,9 @@ dissect_dsi_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 	dsi_length = tvb_get_ntohl(tvb, 8);
 
 	col_add_fstr(pinfo->cinfo, COL_INFO, "%s %s (%u)",
-			val_to_str(dsi_flags, flag_vals,
+			val_to_str(pinfo->pool, dsi_flags, flag_vals,
 				   "Unknown flag (0x%02x)"),
-			val_to_str_ext(dsi_command, &func_vals_ext,
+			val_to_str_ext(pinfo->pool, dsi_command, &func_vals_ext,
 				   "Unknown function (0x%02x)"),
 			dsi_requestid);
 

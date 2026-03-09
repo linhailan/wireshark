@@ -21,13 +21,11 @@
 #include <epan/prefs.h>
 #include <epan/prefs-int.h>
 
-
 WSLUA_FUNCTION wslua_get_version(lua_State* L) { /* Gets the Wireshark version as a string. */
     const char* str = VERSION;
     lua_pushstring(L,str);
     WSLUA_RETURN(1); /* The version string, e.g. "3.2.5". */
 }
-
 
 static char* current_plugin_version = NULL;
 
@@ -192,6 +190,27 @@ WSLUA_FUNCTION wslua_get_preference(lua_State *L) {
                 wmem_free(NULL, range_value);
                 break;
             }
+            case PREF_UAT:
+            {
+                uat_t* get_uat = prefs_get_uat_value(pref);
+                if (get_uat != NULL) {
+                    lua_newtable(L);
+                    for (unsigned int idx = 0; idx < get_uat->user_data->len; idx++) {
+                        lua_pushinteger(L, idx + 1);
+                        lua_newtable(L);
+                        void *rec = UAT_INDEX_PTR(get_uat, idx);
+                        unsigned int colnum;
+                        for(colnum = 0; colnum < get_uat->ncols; colnum++) {
+                            lua_pushinteger(L, colnum + 1);
+                            char *str = uat_fld_tostr(rec, &(get_uat->fields[colnum]));
+                            lua_pushstring(L, str);
+                            lua_settable(L, -3);
+                        }
+                        lua_settable(L, -3);
+                    }
+                }
+                break;
+            }
             default:
                 /* Get not supported for this type. */
                 return luaL_error(L, "preference type %d is not supported.", prefs_get_type(pref));
@@ -325,7 +344,7 @@ WSLUA_FUNCTION wslua_reset_preference(lua_State *L) {
 WSLUA_FUNCTION wslua_apply_preferences(lua_State *L) {
     /* Write preferences to file and apply changes. */
     char *pf_path = NULL;
-    int err = write_prefs(&pf_path);
+    int err = write_prefs(lua_app_env_var_prefix, &pf_path);
 
     if (err) {
         /* Make a copy of pf_path because luaL_error() will return */
@@ -373,7 +392,7 @@ char* wslua_get_actual_filename(const char* fname) {
         return g_strdup(fname_clean);
     }
 
-    filename = get_persconffile_path(fname_clean,false);
+    filename = get_persconffile_path(fname_clean,false,lua_app_env_var_prefix);
 
     if ( file_exists(filename) ) {
         return filename;
@@ -385,7 +404,7 @@ char* wslua_get_actual_filename(const char* fname) {
      * installations. For executions from the build dir, it will look for files
      * copied to DATAFILE_DIR.
      */
-    filename = get_datafile_path(fname_clean);
+    filename = get_datafile_path(fname_clean,lua_app_env_var_prefix);
     if ( file_exists(filename) ) {
         return filename;
     }
@@ -488,7 +507,7 @@ static int statcmd_init_cb_error_handler(lua_State* L _U_) {
     return 0;
 }
 
-static void statcmd_init(const char *opt_arg, void* userdata) {
+static bool statcmd_init(const char *opt_arg, void* userdata) {
     statcmd_t* sc = (statcmd_t *)userdata;
     lua_State* L = sc->L;
 
@@ -515,6 +534,7 @@ static void statcmd_init(const char *opt_arg, void* userdata) {
             break;
     }
 
+    return true;
 }
 
 WSLUA_FUNCTION wslua_register_stat_cmd_arg(lua_State* L) {

@@ -26,8 +26,6 @@
 
 #include <wsutil/array.h>
 
-#define PROTO_SHORT_NAME "WASSP"
-#define PROTO_LONG_NAME "Wireless Access Station Session Protocol"
 #define LBS_HDR_MAGIC 0x7c83
 #define MU_NETFLOW_RECORD_SIZE 46
 #define WASSP_SNMP 161
@@ -1679,7 +1677,7 @@ static const TLV_PARSER_ENTRY tlvMainTable[]  =
 	{ EID_MU_TUNNEL_PRIVATE_GROUP_ID_STRING, "MU Tunnel Private Group ID String", TLV_TYPE_STRING, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_MU_USER_ID_STRING, "MU User ID String", TLV_TYPE_STRING, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_MU_DEFENDED_STATE, "MU Defended State", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
-	{ EID_MU_MOD_MASK, "MU Modulation Maske", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
+	{ EID_MU_MOD_MASK, "MU Modulation Mask", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_LOCATOR_TRACKED, "Locator Tracked", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_PORT, "Port", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_RETRIES_COUNT, "Retries Count", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -5627,7 +5625,7 @@ static int dissect_mu_netflow(proto_tree *tree, tvbuff_t *tvb, int offset)
 	proto_tree_add_item(mu_netflow_header_tree, hf_wassp_mu_netflow_version, tvb, MU_NETFLOW_HDR_VERSION, 2, ENC_BIG_ENDIAN);
 	proto_tree_add_item(mu_netflow_header_tree, hf_wassp_mu_netflow_length, tvb, MU_NETFLOW_HDR_LENGTH, 2, ENC_BIG_ENDIAN);
 	proto_tree_add_item(mu_netflow_header_tree, hf_wassp_mu_netflow_flags, tvb, MU_NETFLOW_HDR_FLAG, 2, ENC_BIG_ENDIAN);
-	proto_tree_add_item(mu_netflow_header_tree, hf_wassp_mu_netflow_uptime, tvb, MU_NETFLOW_HDR_UPTIME, 4, ENC_NA);
+	proto_tree_add_item(mu_netflow_header_tree, hf_wassp_mu_netflow_uptime, tvb, MU_NETFLOW_HDR_UPTIME, 4, ENC_TIME_SECS_NSECS);
 	offset += MU_NETFLOW_HEADER_TOTAL_LENGTH;
 
 	netflowLen = tvb_get_ntohs(tvb, MU_NETFLOW_HDR_LENGTH);
@@ -5869,7 +5867,7 @@ tlv_dissect:
 	offset = dissect_wassp_tlv(wassp_tree, tvb, pinfo, offset, ru_msg_type);
 data_dissect:
 	/* Call data dissector on any remaining bytes */
-	call_dissector(data_handle, tvb_new_subset_length(tvb, offset, -1), pinfo, wassp_tree);
+	call_dissector(data_handle, tvb_new_subset_remaining(tvb, offset), pinfo, wassp_tree);
 }
 
 
@@ -5907,7 +5905,7 @@ static int dissect_wassp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree )
 
 	************************************************************************************************************************************************************/
 
-	col_set_str(pinfo->cinfo, COL_PROTOCOL, PROTO_SHORT_NAME);
+	col_set_str(pinfo->cinfo, COL_PROTOCOL, "WASSP");
 	remain_len = tvb_reported_length_remaining(tvb, WASSP_HDR_VERSION);
 	next_tvb = tvb;
 	ru_msg_type = (wassp_ru_msg_t)tvb_get_uint8(tvb, WASSP_HDR_TYPE);
@@ -6007,7 +6005,7 @@ static int dissect_wassp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree )
 		else
 		{
 			col_append_fstr(pinfo->cinfo, COL_INFO, " (Message fragment %u)", seq_number);
-			next_tvb = tvb_new_subset_length(tvb, WASSP_HDR_LEN, -1);
+			next_tvb = tvb_new_subset_remaining(tvb, WASSP_HDR_LEN);
 		}
 	}
 

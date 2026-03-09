@@ -256,9 +256,8 @@ dissect_elmi_info_elem(
             tvb, offset, 1, ENC_BIG_ENDIAN);
     offset++;
 
-    len = tvb_get_uint8(tvb, offset);
-    proto_tree_add_item(info_elem_tree, hf_elmi_info_elem_len,
-            tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint8(info_elem_tree, hf_elmi_info_elem_len,
+            tvb, offset, 1, ENC_BIG_ENDIAN, &len);
     offset++;
 
     switch (tag) {
@@ -357,7 +356,7 @@ dissect_elmi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     proto_tree_add_item(elmi_tree, hf_elmi_msg_type,
             tvb, offset, 1, ENC_BIG_ENDIAN);
     col_append_str(pinfo->cinfo, COL_INFO,
-            val_to_str(msg_type, elmi_msg_type, "unknown (0x%x)"));
+            val_to_str(pinfo->pool, msg_type, elmi_msg_type, "unknown (0x%x)"));
     offset++;
 
     while (tvb_reported_length_remaining(tvb, offset) > 0) {

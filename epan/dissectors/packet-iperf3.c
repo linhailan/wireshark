@@ -186,7 +186,7 @@ dissect_iperf3_control_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
         case GENERIC_STATE:
         {
             int8_t state_code = tvb_get_int8(tvb, 0);
-            const char *msg = val_to_str(state_code, iperf3_state_vals, "Unknown %d");
+            const char *msg = val_to_str(pinfo->pool, state_code, iperf3_state_vals, "Unknown %d");
             col_append_fstr(pinfo->cinfo, COL_INFO, " %s(%" PRIi8 ")", msg, state_code);
             col_set_fence(pinfo->cinfo, COL_INFO);
             proto_tree_add_item(iperf3_tree, hf_iperf3_state, tvb, 0, 1, ENC_BIG_ENDIAN);
@@ -356,7 +356,7 @@ dissect_iperf3_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
         if (tvb_get_raw_bytes_as_stringz(tvb, 0, COOKIE_SIZE, cookie) == COOKIE_SIZE-1) {
             if (!wmem_map_contains(cookiejar, cookie)) {
                 // This is a new control connection (or a data connection for which the control connection has not been seen, fail)
-                char *cookie_save = wmem_strndup(wmem_file_scope(), cookie, COOKIE_SIZE);
+                char *cookie_save = wmem_strndup(wmem_file_scope(), (char*)cookie, COOKIE_SIZE);
                 if (wmem_map_insert(cookiejar, cookie_save, NULL)) {  // No value to store, only the cookie
                     // We insert a new cookie in the jar, which now says there's already one.
                     DISSECTOR_ASSERT_NOT_REACHED();

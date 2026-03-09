@@ -117,14 +117,13 @@ dissect_btsnoop(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data 
     header_item = proto_tree_add_item(main_tree, hf_btsnoop_header, tvb, offset, sizeof(magic) + 4 + 4, ENC_NA);
     header_tree = proto_item_add_subtree(header_item, ett_btsnoop_header);
 
-    proto_tree_add_item(header_tree, hf_btsnoop_magic_bytes, tvb, offset, sizeof(magic), ENC_ASCII | ENC_NA);
+    proto_tree_add_item(header_tree, hf_btsnoop_magic_bytes, tvb, offset, sizeof(magic), ENC_ASCII);
     offset += (int)sizeof(magic);
 
     proto_tree_add_item(header_tree, hf_btsnoop_version, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset += 4;
 
-    proto_tree_add_item(header_tree, hf_btsnoop_datalink, tvb, offset, 4, ENC_BIG_ENDIAN);
-    datalink = tvb_get_ntohl(tvb, offset);
+    proto_tree_add_item_ret_uint(header_tree, hf_btsnoop_datalink, tvb, offset, 4, ENC_BIG_ENDIAN, &datalink);
     offset += 4;
 
     while (tvb_reported_length_remaining(tvb, offset) > 0) {
@@ -140,8 +139,7 @@ dissect_btsnoop(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data 
         proto_tree_add_item(frame_tree, hf_btsnoop_origin_length, tvb, offset, 4, ENC_BIG_ENDIAN);
         offset += 4;
 
-        proto_tree_add_item(frame_tree, hf_btsnoop_included_length, tvb, offset, 4, ENC_BIG_ENDIAN);
-        length = tvb_get_ntohl(tvb, offset);
+        proto_tree_add_item_ret_uint(frame_tree, hf_btsnoop_included_length, tvb, offset, 4, ENC_BIG_ENDIAN, &length);
         offset += 4;
 
         flags_item = proto_tree_add_item(frame_tree, hf_btsnoop_flags, tvb, offset, 4, ENC_BIG_ENDIAN);

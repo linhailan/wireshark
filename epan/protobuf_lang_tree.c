@@ -571,9 +571,9 @@ pbl_field_descriptor_is_packed(const pbl_field_descriptor_t* field)
 
 /* like FieldDescriptor::TypeName() */
 const char*
-pbl_field_descriptor_TypeName(int field_type)
+pbl_field_descriptor_TypeName(wmem_allocator_t* scope, int field_type)
 {
-    return val_to_str(field_type, protobuf_field_type, "UNKNOWN_FIELD_TYPE(%d)");
+    return val_to_str(scope, field_type, protobuf_field_type, "UNKNOWN_FIELD_TYPE(%d)");
 }
 
 /* like FieldDescriptor::message_type()  type = TYPE_MESSAGE or TYPE_GROUP */
@@ -791,7 +791,7 @@ void
 pbl_foreach_message(const pbl_descriptor_pool_t* pool, void (*cb)(const pbl_message_descriptor_t*, void*), void* userdata)
 {
     GHashTableIter it;
-    gpointer key, value;
+    void *key, *value;
     g_hash_table_iter_init (&it, pool->packages);
     while (g_hash_table_iter_next (&it, &key, &value)) {
         pbl_traverse_sub_tree((const pbl_node_t*)value, cb, userdata);

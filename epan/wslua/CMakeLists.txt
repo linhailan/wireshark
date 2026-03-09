@@ -34,11 +34,13 @@ set(WSLUA_MODULES
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_proto.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_proto_expert.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_proto_field.c
+	${CMAKE_CURRENT_SOURCE_DIR}/wslua_proto_helpers.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_struct.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_tree.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_tvb.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_utility.c
 	${CMAKE_CURRENT_SOURCE_DIR}/wslua_wtap.c
+	${CMAKE_CURRENT_SOURCE_DIR}/wslua_gcrypt.c
 )
 
 set(WSLUA_FILES
@@ -120,6 +122,8 @@ endif()
 
 target_include_directories(wslua
 	SYSTEM PRIVATE
+		${GCRYPT_INCLUDE_DIRS}
+		${GNUTLS_INCLUDE_DIRS}
 		${LUA_INCLUDE_DIRS}
 	PRIVATE
 		${CMAKE_CURRENT_BINARY_DIR}

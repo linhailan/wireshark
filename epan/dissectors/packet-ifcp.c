@@ -293,9 +293,9 @@ dissect_ifcp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, voi
                 ti = proto_tree_add_protocol_format (parent_tree, proto_ifcp, tvb, offset,
                                                      iFCP_ENCAP_HEADER_LEN,
                                                      "iFCP (%s/%s)",
-                                                     val_to_str (sof, ifcp_sof_vals,
+                                                     val_to_str(pinfo->pool, sof, ifcp_sof_vals,
                                                                  "0x%x"),
-                                                     val_to_str (eof, ifcp_eof_vals,
+                                                     val_to_str(pinfo->pool, eof, ifcp_eof_vals,
                                                                  "0x%x"));
             } else {
                 sof = tvb_get_uint8 (tvb, offset+iFCP_ENCAP_HEADER_LEN);
@@ -303,7 +303,7 @@ dissect_ifcp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, voi
                 ti = proto_tree_add_protocol_format (parent_tree, proto_ifcp, tvb, offset,
                                                      iFCP_ENCAP_HEADER_LEN,
                                                      "iFCP (%s/%s)",
-                                                     val_to_str (sof, ifcp_sof_vals,
+                                                     val_to_str(pinfo->pool, sof, ifcp_sof_vals,
                                                                  "0x%x"),
                                                      "NA");
             }
@@ -314,8 +314,7 @@ dissect_ifcp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, voi
 
     /* The Common FC Encap header */
     /* protocol */
-    protocol = tvb_get_uint8 (tvb, offset);
-    ti=proto_tree_add_item(tree, hf_ifcp_protocol, tvb, offset, 1, ENC_BIG_ENDIAN);
+    ti=proto_tree_add_item_ret_uint8(tree, hf_ifcp_protocol, tvb, offset, 1, ENC_BIG_ENDIAN, &protocol);
     protocol_tree=proto_item_add_subtree(ti, ett_ifcp_protocol);
 
     offset++;
@@ -538,10 +537,10 @@ proto_register_ifcp (void)
           {"EOF", "ifcp.eof", FT_UINT8, BASE_HEX, VALS (ifcp_eof_vals), 0,
            NULL, HFILL}},
         { &hf_ifcp_sof_c,
-          {"SOF Compliment", "ifcp.sof_c", FT_UINT8, BASE_HEX, NULL , 0,
+          {"SOF Complement", "ifcp.sof_c", FT_UINT8, BASE_HEX, NULL , 0,
            NULL, HFILL}},
         { &hf_ifcp_eof_c,
-          {"EOF Compliment", "ifcp.eof_c", FT_UINT8, BASE_HEX, NULL , 0,
+          {"EOF Complement", "ifcp.eof_c", FT_UINT8, BASE_HEX, NULL , 0,
            NULL, HFILL}},
         { &hf_ifcp_ls_command_acc,
           {"Ls Command Acc", "ifcp.ls_command_acc", FT_UINT8, BASE_HEX, NULL, 0,

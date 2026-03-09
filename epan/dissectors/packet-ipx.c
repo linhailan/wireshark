@@ -21,14 +21,15 @@
 #include "packet-sll.h"
 #include <epan/addr_resolv.h>
 #include <epan/etypes.h>
-#include <epan/ppptypes.h>
-#include <epan/llcsaps.h>
 #include <epan/aftypes.h>
-#include <epan/arcnet_pids.h>
 #include <epan/conversation.h>
 #include <epan/conversation_table.h>
 #include <epan/proto_data.h>
 #include <epan/unit_strings.h>
+#include "packet-ppp.h"
+#include "packet-llc.h"
+#include "packet-arcnet.h"
+
 
 void proto_register_ipx(void);
 void proto_reg_handoff_ipx(void);
@@ -325,7 +326,7 @@ dissect_ipx(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
     copy_address_shallow(&pinfo->dst, &pinfo->net_dst);
     copy_address_shallow(&ipxh->ipx_dst, &pinfo->net_dst);
 
-	col_add_str(pinfo->cinfo, COL_INFO, val_to_str_ext(ipxh->ipx_dsocket, &ipx_socket_vals_ext, "Unknown (0x%04x)"));
+	col_add_str(pinfo->cinfo, COL_INFO, val_to_str_ext(pinfo->pool, ipxh->ipx_dsocket, &ipx_socket_vals_ext, "Unknown (0x%04x)"));
 
 	if (tree) {
 

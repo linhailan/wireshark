@@ -348,7 +348,7 @@ dissect_payload_kink_ap_req(packet_info *pinfo, tvbuff_t *tvb, int offset, proto
     tvbuff_t *krb_tvb;
 
     krb_ap_req_length = payload_length - PAYLOAD_HEADER;
-    krb_tvb=tvb_new_subset_length_caplen(tvb, offset, (krb_ap_req_length>tvb_captured_length_remaining(tvb, offset))?tvb_captured_length_remaining(tvb, offset):krb_ap_req_length, krb_ap_req_length);
+    krb_tvb=tvb_new_subset_length(tvb, offset, krb_ap_req_length);
     keytype=kerberos_output_keytype();
     dissect_kerberos_main(krb_tvb, pinfo, payload_kink_ap_req_tree, false, NULL);
     /*offset += krb_ap_req_length;*/
@@ -404,7 +404,7 @@ dissect_payload_kink_ap_rep(packet_info *pinfo, tvbuff_t *tvb, int offset, proto
     tvbuff_t *krb_tvb;
 
     krb_ap_rep_length = payload_length - PAYLOAD_HEADER;
-    krb_tvb=tvb_new_subset_length_caplen(tvb, offset, (krb_ap_rep_length>tvb_captured_length_remaining(tvb, offset))?tvb_captured_length_remaining(tvb, offset):krb_ap_rep_length, krb_ap_rep_length);
+    krb_tvb=tvb_new_subset_length(tvb, offset, krb_ap_rep_length);
     keytype=kerberos_output_keytype();
     dissect_kerberos_main(krb_tvb, pinfo, payload_kink_ap_rep_tree, false, NULL);
 
@@ -458,7 +458,7 @@ dissect_payload_kink_krb_error(packet_info *pinfo, tvbuff_t *tvb, int offset, pr
     tvbuff_t *krb_tvb;
 
     krb_error_length = payload_length - KINK_KRB_ERROR_HEADER;
-    krb_tvb=tvb_new_subset_length_caplen(tvb, offset, (krb_error_length>tvb_captured_length_remaining(tvb, offset))?tvb_captured_length_remaining(tvb, offset):krb_error_length, krb_error_length);
+    krb_tvb=tvb_new_subset_length(tvb, offset, krb_error_length);
 
     dissect_kerberos_main(krb_tvb, pinfo, payload_kink_krb_error_tree, false, NULL);
     /*offset += krb_error_length;*/
@@ -505,7 +505,7 @@ dissect_payload_kink_tgt_req(packet_info *pinfo, tvbuff_t *tvb, int offset, prot
   proto_tree_add_uint(payload_kink_tgt_req_tree, hf_kink_realm_name_length, tvb, offset, 2, realm_name_length);
   offset += 2;
 
-  proto_tree_add_item(payload_kink_tgt_req_tree, hf_kink_realm_name, tvb, offset, realm_name_length, ENC_NA|ENC_ASCII);
+  proto_tree_add_item(payload_kink_tgt_req_tree, hf_kink_realm_name, tvb, offset, realm_name_length, ENC_ASCII);
 
   /* This part consider the padding. Payload_length don't contain the padding. */
   if(payload_length % PADDING != 0){
@@ -549,7 +549,7 @@ dissect_payload_kink_tgt_rep(packet_info *pinfo, tvbuff_t *tvb, int offset, prot
   proto_tree_add_uint(payload_kink_tgt_rep_tree, hf_kink_princ_name_length, tvb, offset, 2, princ_name_length);
   offset += 2;
 
-  proto_tree_add_item(payload_kink_tgt_rep_tree, hf_kink_princ_name, tvb, offset, princ_name_length, ENC_NA|ENC_ASCII);
+  proto_tree_add_item(payload_kink_tgt_rep_tree, hf_kink_princ_name, tvb, offset, princ_name_length, ENC_ASCII);
 
   /* This part consider the padding. Princ_name_length don't contain the padding. */
   if((princ_name_length + FRONT_TGT_REP_HEADER) % PADDING != 0){
@@ -563,7 +563,7 @@ dissect_payload_kink_tgt_rep(packet_info *pinfo, tvbuff_t *tvb, int offset, prot
   proto_tree_add_uint(payload_kink_tgt_rep_tree, hf_kink_tgt_length, tvb, offset, 2, tgt_length);
   offset += 2;
 
-  proto_tree_add_item(payload_kink_tgt_rep_tree, hf_kink_tgt, tvb, offset, tgt_length, ENC_NA|ENC_ASCII);
+  proto_tree_add_item(payload_kink_tgt_rep_tree, hf_kink_tgt, tvb, offset, tgt_length, ENC_ASCII);
   /*offset += tgt_length;*/
 
   /* This part consider the padding. Payload_length don't contain the padding. */
@@ -584,7 +584,7 @@ dissect_payload_kink_isakmp(packet_info *pinfo, tvbuff_t *tvb, int offset, proto
   proto_item *ti;
   uint8_t next_payload;
   unsigned payload_length,isakmp_length;
-  int length, reported_length;
+  int reported_length;
   uint8_t inner_next_pload;
   int start_payload_offset = 0;      /* Keep the beginning of the payload offset */
   tvbuff_t *isakmp_tvb;
@@ -621,13 +621,10 @@ dissect_payload_kink_isakmp(packet_info *pinfo, tvbuff_t *tvb, int offset, proto
 
   if(payload_length > PAYLOAD_HEADER){
     isakmp_length = payload_length - PAYLOAD_HEADER;
-    length = tvb_captured_length_remaining(tvb, offset);
-    if (length > (int)isakmp_length)
-      length = isakmp_length;
     reported_length = tvb_reported_length_remaining(tvb, offset);
     if (reported_length > (int)isakmp_length)
       reported_length = isakmp_length;
-    isakmp_tvb = tvb_new_subset_length_caplen(tvb, offset, length, reported_length);
+    isakmp_tvb = tvb_new_subset_length(tvb, offset, reported_length);
     isakmp_dissect_payloads(isakmp_tvb, payload_kink_isakmp_tree, 1, inner_next_pload, 0, isakmp_length, pinfo);
   }
 
@@ -686,7 +683,7 @@ dissect_payload_kink_encrypt(packet_info *pinfo, tvbuff_t *tvb, int offset, prot
     tvbuff_t *next_tvb;
     uint8_t *plaintext=NULL;
 
-    next_tvb=tvb_new_subset_length_caplen(tvb, offset, MIN(tvb_captured_length_remaining(tvb, offset), encrypt_length), encrypt_length);
+    next_tvb=tvb_new_subset_length(tvb, offset, encrypt_length);
     plaintext=decrypt_krb5_data(tree, pinfo, 0, next_tvb, keytype, NULL);
     if(plaintext){
       next_tvb=tvb_new_child_real_data(tvb, plaintext, encrypt_length, encrypt_length);

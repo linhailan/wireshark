@@ -1,5 +1,5 @@
 /* packet-openvpn.c
- * routines for openvpn packet dissasembly
+ * routines for openvpn packet disassembly
  * - http://www.openvpn.net
  * - http://fengnet.com/book/vpns%20illustrated%20tunnels%20%20vpnsand%20ipsec/ch08lev1sec5.html
  *
@@ -26,10 +26,6 @@
 
 void proto_register_openvpn(void);
 void proto_reg_handoff_openvpn(void);
-
-#define PFNAME "openvpn"
-#define PNAME  "OpenVPN Protocol"
-#define PSNAME "OpenVPN"
 
 #define OPENVPN_PORT 1194
 
@@ -184,7 +180,7 @@ dissect_openvpn_msg_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *openvp
   int            wkc_offset = -1;
 
   /* Clear out stuff in the info column */
-  col_set_str(pinfo->cinfo, COL_PROTOCOL, PSNAME);
+  col_set_str(pinfo->cinfo, COL_PROTOCOL, "OpenVPN");
   col_clear(pinfo->cinfo,COL_INFO);
 
   /* read opcode and write to info column */
@@ -195,7 +191,7 @@ dissect_openvpn_msg_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *openvp
 
   openvpn_keyid = tvb_get_bits8(tvb, offset*8 + 5, 3);
   proto_item_append_text(parent_tree, ", Opcode: %s, Key ID: %d",
-                         val_to_str(openvpn_opcode, openvpn_message_types, "Unknown (0x%02x)"),
+                         val_to_str(pinfo->pool, openvpn_opcode, openvpn_message_types, "Unknown (0x%02x)"),
                          openvpn_keyid);
 
   ti2 = proto_tree_add_item(openvpn_tree, hf_openvpn_pdu_type, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -579,11 +575,7 @@ proto_register_openvpn(void)
   };
   module_t *openvpn_module;
 
-  proto_openvpn = proto_register_protocol (
-    PNAME,   /* name       */
-    PSNAME,  /* short name */
-    PFNAME   /* abbrev     */
-    );
+  proto_openvpn = proto_register_protocol ("OpenVPN Protocol", "OpenVPN", "openvpn");
 
   proto_register_field_array(proto_openvpn, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));

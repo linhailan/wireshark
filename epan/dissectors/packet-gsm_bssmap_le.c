@@ -735,7 +735,7 @@ static int ett_gsm_bssmap_le_msg[NUM_GSM_BSSMAP_LE_MSG];
 
 /*
 This enum is defined in packet-gsm_a_common.h to
-make it possible to use element dissecton from this dissector
+make it possible to use element dissection from this dissector
 in other dissectors.
 
 It is shown here as a comment for easier reference.
@@ -780,7 +780,7 @@ bssmap_le_elem_idx_t;
 */
 
 
-uint16_t (*bssmap_le_elem_fcn[])(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, uint32_t offset, unsigned len, char *add_string, int string_len) = {
+uint16_t (* const bssmap_le_elem_fcn[])(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, uint32_t offset, unsigned len, char *add_string, int string_len) = {
 	/* NOTE: The null types below are defined elsewhere. i.e in packet-gsm_a_bssmap.c */
 	de_bmaple_lcs_qos,				/* 10.16 LCS QoS */
 	NULL,							/* LCS Priority */
@@ -954,7 +954,7 @@ bssmap_le_perf_loc_info(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_,
 	EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_gsm_a_bssmap_le_extraneous_data);
 }
 
-static void (*bssmap_le_msg_fcn[])(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, uint32_t offset, unsigned len) = {
+static void (* const bssmap_le_msg_fcn[])(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, uint32_t offset, unsigned len) = {
 	NULL,
 	NULL,
 	NULL,
@@ -1019,9 +1019,7 @@ dissect_bssmap_le(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
 	str = try_val_to_str_idx((uint32_t) oct, gsm_bssmap_le_msg_strings, &idx);
 
 	if (sccp_msg_p && !sccp_msg_p->data.co.label) {
-		sccp_msg_p->data.co.label = wmem_strdup(wmem_file_scope(),
-												val_to_str((uint32_t) oct,
-												gsm_bssmap_le_msg_strings, "BSSMAP LE(0x%02x)"));
+		sccp_msg_p->data.co.label = val_to_str(wmem_file_scope(), (uint32_t) oct, gsm_bssmap_le_msg_strings, "BSSMAP LE(0x%02x)");
 	}
 
 	/*
@@ -1273,7 +1271,7 @@ proto_register_gsm_bssmap_le(void)
 
 	static ei_register_info ei[] = {
 		{ &ei_gsm_a_bssmap_le_not_decoded_yet, { "gsm_bssmap_le.not_decoded_yet", PI_UNDECODED, PI_WARN, "Not decoded yet", EXPFILL }},
-		{ &ei_gsm_a_bssmap_le_extraneous_data, { "gsm_bssmap_le.extraneous_data", PI_PROTOCOL, PI_NOTE, "Extraneous Data, dissector bug or later version spec(report to wireshark.org)", EXPFILL }},
+		{ &ei_gsm_a_bssmap_le_extraneous_data, { "gsm_bssmap_le.extraneous_data", PI_PROTOCOL, PI_NOTE, "Extraneous Data, dissector bug or later version spec (report to wireshark.org)", EXPFILL }},
 		{ &ei_gsm_a_bssmap_le_missing_mandatory_element, { "gsm_bssmap_le.missing_mandatory_element", PI_PROTOCOL, PI_WARN, "Missing Mandatory element, rest of dissection is suspect", EXPFILL }},
 	};
 

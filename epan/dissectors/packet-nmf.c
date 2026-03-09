@@ -5,19 +5,7 @@
  *
  * Copyright 2017 Stefan Metzmacher <metze@samba.org>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
 #include "config.h"
@@ -177,7 +165,6 @@ dissect_nmf_record(tvbuff_t *tvb, packet_info *pinfo,
 	uint32_t size = 0;
 	const uint8_t *str = NULL;
 	tvbuff_t *payload_tvb = NULL;
-	tvbuff_t *xml_tvb = NULL;
 
 	record_item = proto_tree_add_item(tree, hf_nmf_record, tvb, offset, -1, ENC_NA);
 	proto_item_append_text(record_item, ", start_offset=0x%x, ", (unsigned)offset);
@@ -217,7 +204,7 @@ dissect_nmf_record(tvbuff_t *tvb, packet_info *pinfo,
 
 		proto_tree_add_item_ret_string(record_tree, hf_nmf_via_value,
 					       tvb, offset, size, ENC_UTF_8,
-					       wmem_packet_scope(), &str);
+					       pinfo->pool, &str);
 		offset += size;
 		proto_item_append_text(record_item, ": %s", (const char *)str);
 		break;
@@ -246,6 +233,7 @@ dissect_nmf_record(tvbuff_t *tvb, packet_info *pinfo,
 				       size, plurality(size, "", "s"));
 		proto_tree_add_format_text(record_tree, payload_tvb, 0, size);
 #if 0
+		tvbuff_t *xml_tvb = NULL;
 		if (0) {
 			/* TODO:
 			 *
@@ -261,11 +249,11 @@ dissect_nmf_record(tvbuff_t *tvb, packet_info *pinfo,
 				xml_tvb = NULL;
 			}
 		}
-#endif
 		if (xml_tvb != NULL) {
 			call_dissector_with_data(xml_handle, xml_tvb, pinfo,
 					         record_tree, NULL);
 		}
+#endif
 		break;
 	case NMF_END_RECORD:
 		/* TODO */
@@ -283,7 +271,7 @@ dissect_nmf_record(tvbuff_t *tvb, packet_info *pinfo,
 
 		proto_tree_add_item_ret_string(record_tree, hf_nmf_upgrade_protocol,
 					       tvb, offset, size, ENC_UTF_8,
-					       wmem_packet_scope(), &str);
+					       pinfo->pool, &str);
 		offset += size;
 		proto_item_append_text(record_item, ": %s", (const char *)str);
 		break;

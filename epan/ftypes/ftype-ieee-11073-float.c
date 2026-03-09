@@ -792,7 +792,7 @@ float_ieee_11073_val_to_repr(wmem_allocator_t *scope, const fvalue_t *fv, ftrepr
         return wmem_strdup(scope, s);
     }
 
-    /* Longest Signed Nonfloat Number: -8388608*(10^-128) (1 character for sign, 7 for mantisa digits, 127 zeros, 1 character for NULL) */
+    /* Longest Signed Nonfloat Number: -8388608*(10^-128) (1 character for sign, 7 for mantissa digits, 127 zeros, 1 character for NULL) */
     char buf[136];
 
     exponent = fv->value.float_ieee_11073 >> 24;
@@ -1163,6 +1163,8 @@ Example: 114 is 0x0072
         sfloat_ieee_11073_hash,               /* hash */
         sfloat_ieee_11073_is_zero,            /* is_zero */
         sfloat_ieee_11073_is_negative,        /* is_negative */
+        /* TODO: implement is_nan for IEEE 11073 floats */
+        NULL,                                 /* is_nan */
         NULL,                                 /* len */
         NULL,                                 /* slice */
         NULL,                                 /* bitwise_and */
@@ -1236,6 +1238,8 @@ Example: 36.4 is 0xFF00016C
         float_ieee_11073_hash,               /* hash */
         float_ieee_11073_is_zero,            /* is_zero */
         float_ieee_11073_is_negative,        /* is_negative */
+        /* TODO: implement is_nan for IEEE 11073 floats */
+        NULL,                                /* is_nan */
         NULL,                                /* len */
         NULL,                                /* slice */
         NULL,                                /* bitwise_and */

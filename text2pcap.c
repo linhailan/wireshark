@@ -82,11 +82,13 @@
 #include <wsutil/os_version_info.h>
 #include <wsutil/privileges.h>
 #include <wsutil/strtoi.h>
+#include <wsutil/report_message.h>
 
 #include <glib.h>
 
 #include <ws_exit_codes.h>
 #include <wsutil/filesystem.h>
+#include <app/application_flavor.h>
 #include <wsutil/str_util.h>
 #include <wsutil/strnatcmp.h>
 #include <wsutil/wslog.h>
@@ -315,7 +317,7 @@ list_output_compression_types(void) {
     GSList *output_compression_types;
 
     cmdarg_err("The available output compression type(s) for the \"--compress\" flag are:\n");
-    output_compression_types = wtap_get_all_output_compression_type_names_list();
+    output_compression_types = ws_get_all_output_compression_type_names_list();
     for (GSList *compression_type = output_compression_types;
         compression_type != NULL;
         compression_type = g_slist_next(compression_type)) {
@@ -378,6 +380,18 @@ cleanup_dump_params(wtap_dump_params *params)
     wtap_dump_params_cleanup(params);
 }
 
+static const struct ws_option long_options[] = {
+    {"help", ws_no_argument, NULL, 'h'},
+    {"version", ws_no_argument, NULL, 'v'},
+    {"compress", ws_required_argument, NULL, LONGOPT_COMPRESS},
+    {"little-endian", ws_no_argument, NULL, LONGOPT_LITTLE_ENDIAN},
+    LONGOPT_WSLOG
+    {0, 0, 0, 0 }
+};
+
+#define OPTSTRING "hqab:De:E:F:i:l:m:nN:o:u:P:r:s:S:t:T:v4:6:"
+static const char optstring[] = OPTSTRING;
+
 /*----------------------------------------------------------------------
  * Parse CLI options
  */
@@ -387,13 +401,6 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
     int   ret;
     int   c;
     char *p;
-    static const struct ws_option long_options[] = {
-        {"help", ws_no_argument, NULL, 'h'},
-        {"version", ws_no_argument, NULL, 'v'},
-        {"compress", ws_required_argument, NULL, LONGOPT_COMPRESS},
-        {"little-endian", ws_no_argument, NULL, LONGOPT_LITTLE_ENDIAN},
-        {0, 0, 0, 0 }
-    };
     const char *interface_name = NULL;
     /* Link-layer type; see https://www.tcpdump.org/linktypes.html for details */
     uint32_t pcap_link_type = 1;   /* Default is LINKTYPE_ETHERNET */
@@ -401,7 +408,7 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
     int wtap_encap_type = WTAP_ENCAP_ETHERNET;
     int err;
     char* err_info;
-    wtap_compression_type compression_type = WTAP_UNKNOWN_COMPRESSION;
+    ws_compression_type compression_type = WS_FILE_UNKNOWN_COMPRESSION;
     GError* gerror = NULL;
     GRegex* regex = NULL;
 
@@ -411,16 +418,15 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
     info->payload = "data";
 
     /* Initialize the version information. */
-    ws_init_version_info("Text2pcap", NULL, NULL);
+    ws_init_version_info("Text2pcap", NULL, application_get_vcs_version_info, NULL, NULL);
 
     /* Scan CLI parameters */
-    while ((c = ws_getopt_long(argc, argv, "hqab:De:E:F:i:l:m:nN:o:u:P:r:s:S:t:T:v4:6:", long_options, NULL)) != -1) {
+    while ((c = ws_getopt_long(argc, argv, optstring, long_options, NULL)) != -1) {
         switch (c) {
         case 'h':
             show_help_header("Generate a capture file from an ASCII hexdump of packets.");
             print_usage(stdout);
-            exit(0);
-            break;
+            return WS_EXIT_NOW;
         case 'q': quiet = true; break;
         case 'a': info->hexdump.identify_ascii = true; break;
         case 'D': info->hexdump.has_direction = true; break;
@@ -677,8 +683,7 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
 
         case 'v':
             show_version();
-            exit(0);
-            break;
+            return WS_EXIT_NOW;
 
         case '4':
         case '6':
@@ -740,8 +745,8 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
             break;
 
         case LONGOPT_COMPRESS:
-            compression_type = wtap_name_to_compression_type(ws_optarg);
-            if (compression_type == WTAP_UNKNOWN_COMPRESSION) {
+            compression_type = ws_name_to_compression_type(ws_optarg);
+            if (compression_type == WS_FILE_UNKNOWN_COMPRESSION) {
                 cmdarg_err("\"%s\" isn't a valid output compression mode",
                             ws_optarg);
                 list_output_compression_types();
@@ -866,27 +871,27 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
         }
     }
 
-    if (compression_type == WTAP_UNKNOWN_COMPRESSION) {
+    if (compression_type == WS_FILE_UNKNOWN_COMPRESSION) {
         /* An explicitly specified compression type overrides filename
          * magic. (Should we allow specifying "no" compression with, e.g.
          * a ".gz" extension?) */
         const char *sfx = strrchr(argv[ws_optind+1], '.');
         if (sfx) {
-            compression_type = wtap_extension_to_compression_type(sfx + 1);
+            compression_type = ws_extension_to_compression_type(sfx + 1);
         }
     }
 
-    if (compression_type == WTAP_UNKNOWN_COMPRESSION) {
-        compression_type = WTAP_UNCOMPRESSED;
+    if (compression_type == WS_FILE_UNKNOWN_COMPRESSION) {
+        compression_type = WS_FILE_UNCOMPRESSED;
     }
 
-    if (!wtap_can_write_compression_type(compression_type)) {
+    if (!ws_can_write_compression_type(compression_type)) {
         cmdarg_err("Output files can't be written as %s",
-                wtap_compression_type_description(compression_type));
+                ws_compression_type_description(compression_type));
         return WS_EXIT_INVALID_OPTION;
     }
 
-    if (compression_type != WTAP_UNCOMPRESSED && !wtap_dump_can_compress(file_type_subtype)) {
+    if (compression_type != WS_FILE_UNCOMPRESSED && !wtap_dump_can_compress(file_type_subtype)) {
         cmdarg_err("The file format %s can't be written to output compressed format",
             wtap_file_type_subtype_name(file_type_subtype));
         return WS_EXIT_INVALID_OPTION;
@@ -904,7 +909,7 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
         } else {
             input_file = ws_fopen(input_filename, "rb");
             if (!input_file) {
-                open_failure_message(input_filename, errno, false);
+                report_open_failure(input_filename, errno, false);
                 return WS_EXIT_OPEN_ERROR;
             }
         }
@@ -954,8 +959,8 @@ parse_options(int argc, char *argv[], text_import_info_t * const info, wtap_dump
     }
 
     if (!wdh) {
-        cfile_dump_open_failure_message(output_filename, err, err_info,
-                                        file_type_subtype);
+        report_cfile_dump_open_failure(output_filename, err, err_info,
+                                       file_type_subtype);
         cleanup_dump_params(params);
         return WS_EXIT_OPEN_ERROR;
     }
@@ -1040,6 +1045,8 @@ main(int argc, char *argv[])
     text_import_info_t info;
     wtap_dump_params params;
     uint64_t bytes_written;
+    const struct file_extension_info* file_extensions;
+    unsigned num_extensions;
 
     /* Set the program name. */
     g_set_prgname("text2pcap");
@@ -1047,10 +1054,10 @@ main(int argc, char *argv[])
     cmdarg_err_init(stderr_cmdarg_err, stderr_cmdarg_err_cont);
 
     /* Initialize log handler early so we can have proper logging during startup. */
-    ws_log_init(vcmdarg_err);
+    ws_log_init(vcmdarg_err, "Text2Pcap Debug Console");
 
     /* Early logging command-line initialization. */
-    ws_log_parse_args(&argc, argv, vcmdarg_err, WS_EXIT_INVALID_OPTION);
+    ws_log_parse_args(&argc, argv, optstring, long_options, vcmdarg_err, WS_EXIT_INVALID_OPTION);
 
     ws_noisy("Finished log init and parsing command line log arguments");
 
@@ -1063,7 +1070,7 @@ main(int argc, char *argv[])
     /*
      * Make sure our plugin path is initialized for wtap_init.
      */
-    configuration_init_error = configuration_init(argv[0]);
+    configuration_init_error = configuration_init(argv[0], "wireshark");
     if (configuration_init_error != NULL) {
         cmdarg_err("Can't get pathname of directory containing the text2pcap program: %s.",
                 configuration_init_error);
@@ -1071,11 +1078,27 @@ main(int argc, char *argv[])
     }
 
     init_report_failure_message("text2pcap");
-    wtap_init(true);
+    application_file_extensions(&file_extensions, &num_extensions);
+    wtap_init(true, application_configuration_environment_prefix(), file_extensions, num_extensions);
 
     memset(&info, 0, sizeof(info));
     wtap_dump_params_init(&params, NULL);
     if ((ret = parse_options(argc, argv, &info, &params)) != EXIT_SUCCESS) {
+        //
+        // Either we got an error parsing the command-line options
+        // or we got an option specifying that we should print
+        // information and then quit, and have, in fact, printed
+        // that information successfully.
+        //
+        if (ret == WS_EXIT_NOW) {
+            //
+            // One of the options indicated we should just print
+            // something and exit, e.g --help, and we have already
+            // successfully printed it, so we don't have anything
+            // more to do, and should just exit successfully.
+            //
+            ret = EXIT_SUCCESS;
+        }
         goto clean_exit;
     }
 
@@ -1107,7 +1130,7 @@ clean_exit:
         int err;
         char *err_info;
         if (!wtap_dump_close(wdh, NULL, &err, &err_info)) {
-            cfile_close_failure_message(output_filename, err, err_info);
+            report_cfile_close_failure(output_filename, err, err_info);
             ret = 2;
         }
     }

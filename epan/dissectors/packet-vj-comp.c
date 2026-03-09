@@ -27,11 +27,12 @@
 #include <epan/in_cksum.h>
 #include <epan/expert.h>
 #include <epan/packet.h>
-#include <epan/ipproto.h>
-#include <epan/ppptypes.h>
 #include <epan/tfs.h>
+#include <epan/iana-info.h>
 #include <wsutil/pint.h>
 #include <wsutil/str_util.h>
+#include "packet-ppp.h"
+
 
 /* Store the last connection number we've seen.
  * Only used on the first pass, in case the connection number itself
@@ -261,7 +262,7 @@ dissect_vjc_uncomp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 
     /* Start with some sanity checks */
     if (tvb_captured_length(tvb) < VJC_CONNID_OFFSET+1) {
-        proto_tree_add_expert_format(subtree, pinfo, &ei_vjc_bad_data, tvb, 0, -1,
+        proto_tree_add_expert_format_remaining(subtree, pinfo, &ei_vjc_bad_data, tvb, 0,
                 "Packet truncated before Connection ID field");
         return tvb_captured_length(tvb);
     }
@@ -306,7 +307,7 @@ dissect_vjc_uncomp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
         /* Not enough data. We can still pass this packet onward (though probably
          * to no benefit), but can't base future decompression off of it.
          */
-        proto_tree_add_expert_format(subtree, pinfo, &ei_vjc_bad_data, tvb, 0, -1,
+        proto_tree_add_expert_format_remaining(subtree, pinfo, &ei_vjc_bad_data, tvb, 0,
                 "Packet truncated before end of TCP/IP headers");
     }
     else if (!pinfo->fd->visited) {
@@ -326,13 +327,13 @@ dissect_vjc_uncomp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
         // This value is used for re-calculating seq/ack numbers
         pkt_data->last_frame_len = tvb_reported_length(tvb) - ip_len;
 
-        pkt_data->vjc_headers.ip_id = pntoh16(pdata + 4);
-        pkt_data->vjc_headers.seq = pntoh32(pdata + ip_len + 4);
-        pkt_data->vjc_headers.ack = pntoh32(pdata + ip_len + 8);
+        pkt_data->vjc_headers.ip_id = pntohu16(pdata + 4);
+        pkt_data->vjc_headers.seq = pntohu32(pdata + ip_len + 4);
+        pkt_data->vjc_headers.ack = pntohu32(pdata + ip_len + 8);
         pkt_data->vjc_headers.psh = (pdata[ip_len + 13] & 0x08) == 0x08;
-        pkt_data->vjc_headers.win = pntoh16(pdata + ip_len + 14);
-        pkt_data->vjc_headers.tcp_chksum = pntoh16(pdata + ip_len + 16);
-        pkt_data->vjc_headers.urg = pntoh16(pdata + ip_len + 18);
+        pkt_data->vjc_headers.win = pntohu16(pdata + ip_len + 14);
+        pkt_data->vjc_headers.tcp_chksum = pntohu16(pdata + ip_len + 16);
+        pkt_data->vjc_headers.urg = pntohu16(pdata + ip_len + 18);
 
         wmem_multimap_insert32(vjc_conv_table, conv_id, pinfo->num, (void *)pkt_data);
     }
@@ -456,7 +457,7 @@ done_header_len:
     subtree = proto_item_add_subtree(ti, ett_vjc);
     proto_item_set_text(subtree, "PPP Van Jacobson compressed TCP/IP");
     if (hdr_error) {
-        proto_tree_add_expert_format(subtree, pinfo, &ei_vjc_bad_data, tvb, 0, -1,
+        proto_tree_add_expert_format_remaining(subtree, pinfo, &ei_vjc_bad_data, tvb, 0,
                 "Packet truncated, compression header incomplete");
         return tvb_captured_length(tvb);
     }
@@ -663,24 +664,24 @@ done_header_len:
         ip_len = (pdata[0] & 0x0F) << 2;
 
         /* IP length */
-        phton16(pdata + 2, pkt_len);
+        phtonu16(pdata + 2, pkt_len);
 
         /* IP ID */
-        phton16(pdata + 4, this_hdr->ip_id);
+        phtonu16(pdata + 4, this_hdr->ip_id);
 
         /* IP checksum */
-        phton16(pdata + 10, 0x0000);
+        phtonu16(pdata + 10, 0x0000);
         ip_chksum = ip_checksum(pdata, ip_len);
-        phton16(pdata + 10, g_htons(ip_chksum));
+        phtonu16(pdata + 10, g_htons(ip_chksum));
 
         /* TCP seq */
-        phton32(pdata + ip_len + 4, this_hdr->seq);
+        phtonu32(pdata + ip_len + 4, this_hdr->seq);
 
         /* TCP ack */
-        phton32(pdata + ip_len + 8, this_hdr->ack);
+        phtonu32(pdata + ip_len + 8, this_hdr->ack);
 
         /* TCP window */
-        phton16(pdata + ip_len + 14, this_hdr->win);
+        phtonu16(pdata + ip_len + 14, this_hdr->win);
 
         /* TCP push */
         if (this_hdr->psh) {
@@ -691,16 +692,16 @@ done_header_len:
         }
 
         /* TCP checksum */
-        phton16(pdata + ip_len + 16, this_hdr->tcp_chksum);
+        phtonu16(pdata + ip_len + 16, this_hdr->tcp_chksum);
 
         /* TCP urg */
         if (this_hdr->urg) {
             pdata[ip_len + 13] |= 0x20;
-            phton16(pdata + ip_len + 18, this_hdr->urg);
+            phtonu16(pdata + ip_len + 18, this_hdr->urg);
         }
         else {
             pdata[ip_len + 13] &= ~0x20;
-            phton16(pdata + ip_len + 18, 0x0000);
+            phtonu16(pdata + ip_len + 18, 0x0000);
         }
 
         /* Now that we're done manipulating the packet header, stick it into

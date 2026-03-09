@@ -136,9 +136,12 @@ register_all_tap_listeners(tap_reg_t const *tap_reg_listeners)
          * by stats_tree_stat.c and need to registered before that */
 	g_slist_foreach(tap_plugins, call_plugin_register_tap_listener, NULL);
 
-	/* Register all builtin listeners. */
-	for (tap_reg_t const *t = &tap_reg_listeners[0]; t->cb_func != NULL; t++) {
-		t->cb_func();
+	if (tap_reg_listeners != NULL)
+	{
+		/* Register all builtin listeners. */
+		for (tap_reg_t const *t = &tap_reg_listeners[0]; t->cb_func != NULL; t++) {
+			t->cb_func();
+		}
 	}
 }
 
@@ -538,12 +541,6 @@ find_tap_id(const char *name)
 static void
 free_tap_listener(tap_listener_t *tl)
 {
-	/* The free_tap_listener is called in the error path of
-	 * register_tap_listener (when the dfilter fails to be registered)
-	 * and the finish callback is set after that.
-	 * If this is changed make sure the finish callback is not called
-	 * twice to prevent double-free errors.
-	 */
 	if (tl->finish) {
 		tl->finish(tl->tapdata);
 	}
@@ -593,7 +590,7 @@ register_tap_listener(const char *tapname, void *tapdata, const char *fstring,
 			    "Filter \"%s\" is invalid - %s",
 			    fstring, df_err->msg);
 			df_error_free(&df_err);
-			free_tap_listener(tl);
+			g_free(tl);
 			return error_string;
 		}
 		tl->fstring=g_strdup(fstring);

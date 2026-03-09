@@ -1,6 +1,6 @@
 /* packet-f1ap.c
  * Routines for E-UTRAN F1 Application Protocol (F1AP) packet dissection
- * Copyright 2018-2024, Pascal Quantin <pascal@wireshark.org>
+ * Copyright 2018-2026, Pascal Quantin <pascal@wireshark.org>
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -8,7 +8,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * References: 3GPP TS 38.473 V18.4.0 (2024-12)
+ * References: 3GPP TS 38.473 V19.1.0 (2025-12)
  */
 
 #include "config.h"
@@ -16,7 +16,6 @@
 #include <epan/packet.h>
 
 #include <epan/asn1.h>
-#include <epan/sctpppids.h>
 #include <epan/proto_data.h>
 #include <epan/stats_tree.h>
 #include <epan/tfs.h>
@@ -32,10 +31,7 @@
 #include "packet-lte-rrc.h"
 #include "packet-nrppa.h"
 #include "packet-lpp.h"
-
-#define PNAME  "F1 Application Protocol"
-#define PSNAME "F1AP"
-#define PFNAME "f1ap"
+#include "packet-sctp.h"
 
 #define SCTP_PORT_F1AP 38472
 
@@ -176,6 +172,20 @@ static int ett_f1ap_NeedForInterruptionInfoNR;
 static int ett_f1ap_RACHConfiguration;
 static int ett_f1ap_SRSPosRRCInactiveValidityAreaConfig;
 static int ett_f1ap_TCIStatesConfigurationsList;
+static int ett_f1ap_executionCondition;
+static int ett_f1ap_noSecurityChangeID;
+static int ett_f1ap_servingCellNoSecurityChangeID;
+static int ett_f1ap_nZP_CSI_RS_ResourceSet;
+static int ett_f1ap_nZP_CSI_RS_Resource;
+static int ett_f1ap_cSI_RSResourceToAddModList;
+static int ett_f1ap_cSI_RSResourceToReleaseList;
+static int ett_f1ap_cSI_RSResourceSetToAddModList;
+static int ett_f1ap_cSI_IMResourceToAddModList;
+static int ett_f1ap_cSI_IMResourceSetToAddModList;
+static int ett_f1ap_OndemandSIB1Config;
+static int ett_f1ap_SBFD_Frequency_Configuration;
+static int ett_f1ap_SSB_resource_config;
+static int ett_f1ap_sRS_Resource;
 #include "packet-f1ap-ett.c"
 
 enum{
@@ -188,8 +198,8 @@ enum{
 
 static void set_stats_message_type(packet_info *pinfo, int type);
 
-static const uint8_t *st_str_packets        = "Total Packets";
-static const uint8_t *st_str_packet_types   = "F1AP Packet Types";
+static const char *st_str_packets        = "Total Packets";
+static const char *st_str_packet_types   = "F1AP Packet Types";
 
 static int st_node_packets = -1;
 static int st_node_packet_types = -1;
@@ -356,6 +366,12 @@ struct f1ap_tap_t {
 #define MTYPE_BROADCAST_TRANSPORT_RESOURCE_REQUEST         155
 #define MTYPE_DU_CU_ACCESS_AND_MOBILITY_INDICATION         156
 #define MTYPE_SRS_INFORMATION_RESERVATION_NOTIFICATION     157
+#define MTYPE_CU_DU_MOBILITY_INITIATION_REQUEST            158
+#define MTYPE_CLI_INDICATION                               159
+#define MTYPE_DU_CU_CSI_RS_COORDINATION_REQUEST            160
+#define MTYPE_DU_CU_CSI_RS_COORDINATION_RESPONSE           161
+#define MTYPE_CU_DU_CSI_RS_COORDINATION_REQUEST            162
+#define MTYPE_CU_DU_CSI_RS_COORDINATION_RESPONSE           163
 
 static const value_string mtype_names[] = {
     { MTYPE_RESET,     "Reset" },
@@ -515,6 +531,12 @@ static const value_string mtype_names[] = {
     { MTYPE_BROADCAST_TRANSPORT_RESOURCE_REQUEST, "BroadcastTransportResourceRequest" },
     { MTYPE_DU_CU_ACCESS_AND_MOBILITY_INDICATION, "DUCUAccessAndMobilityIndication" },
     { MTYPE_SRS_INFORMATION_RESERVATION_NOTIFICATION, "SRSInformationReservationNotification" },
+    { MTYPE_CU_DU_MOBILITY_INITIATION_REQUEST, "CUDUMobilityInitiationRequest" },
+    { MTYPE_CLI_INDICATION, "CLI-Indication" },
+    { MTYPE_DU_CU_CSI_RS_COORDINATION_REQUEST, "DUCUCSIRSCoordinationRequest" },
+    { MTYPE_DU_CU_CSI_RS_COORDINATION_RESPONSE, "DUCUCSIRSCoordinationResponse" },
+    { MTYPE_CU_DU_CSI_RS_COORDINATION_REQUEST, "CUDUCSIRSCoordinationRequest" },
+    { MTYPE_CU_DU_CSI_RS_COORDINATION_RESPONSE, "CUDUCSIRSCoordinationResponse" },
     { 0,  NULL }
 };
 static value_string_ext mtype_names_ext = VALUE_STRING_EXT_INIT(mtype_names);
@@ -543,6 +565,7 @@ typedef struct {
 /* Global variables */
 static dissector_handle_t f1ap_handle;
 static dissector_handle_t nr_rrc_ul_ccch_handle;
+static dissector_handle_t nr_rrc_ul_ccch1_handle;
 static dissector_handle_t nr_rrc_dl_ccch_handle;
 static dissector_handle_t nr_rrc_ul_dcch_handle;
 static dissector_handle_t nr_pdcp_handle;
@@ -692,14 +715,14 @@ f1ap_stats_tree_init(stats_tree *st)
 }
 
 static tap_packet_status
-f1ap_stats_tree_packet(stats_tree* st, packet_info* pinfo _U_,
+f1ap_stats_tree_packet(stats_tree* st, packet_info* pinfo,
                        epan_dissect_t* edt _U_ , const void* p, tap_flags_t flags _U_)
 {
     const struct f1ap_tap_t *pi = (const struct f1ap_tap_t *) p;
 
     tick_stat_node(st, st_str_packets, 0, false);
     stats_tree_tick_pivot(st, st_node_packet_types,
-                          val_to_str_ext(pi->f1ap_mtype, &mtype_names_ext,
+                          val_to_str_ext(pinfo->pool, pi->f1ap_mtype, &mtype_names_ext,
                                          "Unknown packet type (%d)"));
     return TAP_PACKET_REDRAW;
 }
@@ -951,11 +974,25 @@ void proto_register_f1ap(void) {
     &ett_f1ap_RACHConfiguration,
     &ett_f1ap_SRSPosRRCInactiveValidityAreaConfig,
     &ett_f1ap_TCIStatesConfigurationsList,
+    &ett_f1ap_executionCondition,
+    &ett_f1ap_noSecurityChangeID,
+    &ett_f1ap_servingCellNoSecurityChangeID,
+    &ett_f1ap_nZP_CSI_RS_ResourceSet,
+    &ett_f1ap_nZP_CSI_RS_Resource,
+    &ett_f1ap_cSI_RSResourceToAddModList,
+    &ett_f1ap_cSI_RSResourceToReleaseList,
+    &ett_f1ap_cSI_RSResourceSetToAddModList,
+    &ett_f1ap_cSI_IMResourceToAddModList,
+    &ett_f1ap_cSI_IMResourceSetToAddModList,
+    &ett_f1ap_OndemandSIB1Config,
+    &ett_f1ap_SBFD_Frequency_Configuration,
+    &ett_f1ap_SSB_resource_config,
+    &ett_f1ap_sRS_Resource,
 #include "packet-f1ap-ettarr.c"
   };
 
   /* Register protocol */
-  proto_f1ap = proto_register_protocol(PNAME, PSNAME, PFNAME);
+  proto_f1ap = proto_register_protocol("F1 Application Protocol", "F1AP", "f1ap");
   /* Register fields and subtrees */
   proto_register_field_array(proto_f1ap, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
@@ -979,6 +1016,7 @@ proto_reg_handoff_f1ap(void)
   dissector_add_uint_with_preference("sctp.port", SCTP_PORT_F1AP, f1ap_handle);
   dissector_add_uint("sctp.ppi", F1AP_PROTOCOL_ID, f1ap_handle);
   nr_rrc_ul_ccch_handle = find_dissector_add_dependency("nr-rrc.ul.ccch", proto_f1ap);
+  nr_rrc_ul_ccch1_handle = find_dissector_add_dependency("nr-rrc.ul.ccch1", proto_f1ap);
   nr_rrc_dl_ccch_handle = find_dissector_add_dependency("nr-rrc.dl.ccch", proto_f1ap);
   nr_rrc_ul_dcch_handle = find_dissector_add_dependency("nr-rrc.ul.dcch", proto_f1ap);
   nr_pdcp_handle = find_dissector_add_dependency("pdcp-nr", proto_f1ap);

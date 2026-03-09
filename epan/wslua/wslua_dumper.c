@@ -232,7 +232,7 @@ WSLUA_CONSTRUCTOR Dumper_new(lua_State* L) {
     /* XXX - Check for an existing file, or the same file name as the current
      * capture file?
      */
-    d = wtap_dump_open(filename, filetype, WTAP_UNCOMPRESSED, &params, &err,
+    d = wtap_dump_open(filename, filetype, WS_FILE_UNCOMPRESSED, &params, &err,
                        &err_info);
 
     if (! d ) {
@@ -385,7 +385,7 @@ WSLUA_METHOD Dumper_dump(lua_State* L) {
 
     wtap_rec_init(&rec, ba->len);
 
-    rec.rec_type = REC_TYPE_PACKET;
+    wtap_setup_packet_rec(&rec, DUMPER_ENCAP(d));
 
     rec.presence_flags = WTAP_HAS_TS;
     rec.ts.secs  = (unsigned int)(floor(ts));
@@ -393,7 +393,6 @@ WSLUA_METHOD Dumper_dump(lua_State* L) {
 
     rec.rec_header.packet_header.len       = ba->len;
     rec.rec_header.packet_header.caplen    = ba->len;
-    rec.rec_header.packet_header.pkt_encap = DUMPER_ENCAP(d);
     if (ph->wph) {
         rec.rec_header.packet_header.pseudo_header = *ph->wph;
     }
@@ -450,7 +449,7 @@ WSLUA_METHOD Dumper_new_for_current(lua_State* L) {
 
     encap = lua_pinfo->rec->rec_header.packet_header.pkt_encap;
     params.encap = encap;
-    d = wtap_dump_open(filename, filetype, WTAP_UNCOMPRESSED, &params, &err,
+    d = wtap_dump_open(filename, filetype, WS_FILE_UNCOMPRESSED, &params, &err,
                        &err_info);
 
     if (! d ) {
@@ -547,12 +546,11 @@ WSLUA_METHOD Dumper_dump_current(lua_State* L) {
 
     wtap_rec_init(&rec, tvb_captured_length(tvb));
 
-    rec.rec_type                           = REC_TYPE_PACKET;
+    wtap_setup_packet_rec(&rec, lua_pinfo->rec->rec_header.packet_header.pkt_encap);
     rec.presence_flags                     = WTAP_HAS_TS|WTAP_HAS_CAP_LEN;
     rec.ts                                 = lua_pinfo->abs_ts;
     rec.rec_header.packet_header.len       = tvb_reported_length(tvb);
     rec.rec_header.packet_header.caplen    = tvb_captured_length(tvb);
-    rec.rec_header.packet_header.pkt_encap = lua_pinfo->rec->rec_header.packet_header.pkt_encap;
     rec.rec_header.packet_header.pseudo_header = *lua_pinfo->pseudo_header;
 
     /*

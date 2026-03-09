@@ -128,7 +128,6 @@ dissect_fcoe(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
     unsigned    version;
     const char *ver;
     uint16_t    len_sof;
-    int         bytes_remaining;
     uint8_t     sof          = 0;
     uint8_t     eof          = 0;
     const char *eof_str;
@@ -150,7 +149,17 @@ dissect_fcoe(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
     if (tvb_get_uint8(tvb, 1)) {
         header_len = 2;
         len_sof = tvb_get_ntohs(tvb, 0);
-        frame_len = ((len_sof & 0x3ff0) >> 2) - 4;
+        frame_len = (len_sof & 0x3ff0) >> 2;
+        if (len_sof >= 4) {
+            /* This length includes the CRC; subtract it off.
+             * If it's less than 4, that's bogus; we'll warn
+             * about an invalid length below and not try to
+             * dissect the CRC, so we don't have to throw a
+             * ReportedBoundsError here (but don't want to
+             * overflow.)
+             */
+            len_sof -= 4;
+        }
         sof = len_sof & 0xf;
         sof |= (sof < 8) ? 0x30 : 0x20;
         version = len_sof >> 14;
@@ -161,14 +170,12 @@ dissect_fcoe(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
         eof_str = "none";
         if (tvb_bytes_exist(tvb, eof_offset, 1)) {
             eof = tvb_get_uint8(tvb, eof_offset);
-            eof_str = val_to_str(eof, fcoe_eof_vals, "0x%x");
+            eof_str = val_to_str(pinfo->pool, eof, fcoe_eof_vals, "0x%x");
         }
         /* Old format has a length field, so we can help the Ethernet dissector
          * guess about the FCS; note this format does not pad after the EOF */
         set_actual_length(tvb, eof_offset+1);
     } else {
-        frame_len = tvb_reported_length_remaining(tvb, 0) -
-          FCOE_HEADER_LEN - FCOE_TRAILER_LEN;
         sof = tvb_get_uint8(tvb, FCOE_HEADER_LEN - 1);
 
         /*
@@ -180,6 +187,15 @@ dissect_fcoe(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
         if (version != 0)
             ver = wmem_strdup_printf(pinfo->pool, ver, "ver %d ", version);
 
+        frame_len = tvb_reported_length_remaining(tvb, FCOE_HEADER_LEN);
+        if (frame_len >= FCOE_TRAILER_LEN) {
+            /* The frame is claimed to be long enough for a trailer.
+             * Slice it off. Otherwise (which doesn't make sense), just
+             * ignore it and the eof_offset will be off the edge and the
+             * various tvb_bytes_exist checks will prevent exceptions.
+             */
+            frame_len -= FCOE_TRAILER_LEN;
+        }
         eof_offset = header_len + frame_len + 4;
         if (NULL == (eof_str = fcoe_get_eof(tvb, eof_offset))) {
             /* We didn't find the EOF, look 4 bytes earlier */
@@ -205,10 +221,7 @@ dissect_fcoe(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "FCoE");
     crc_offset = header_len + frame_len;
 
-    bytes_remaining = tvb_captured_length_remaining(tvb, header_len);
-    if (bytes_remaining > frame_len)
-        bytes_remaining = frame_len;        /* backing length */
-    next_tvb = tvb_new_subset_length_caplen(tvb, header_len, bytes_remaining, frame_len);
+    next_tvb = tvb_new_subset_length(tvb, header_len, frame_len);
 
     /*
      * Check the CRC.
@@ -230,7 +243,7 @@ dissect_fcoe(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
     ti = proto_tree_add_protocol_format(tree, proto_fcoe, tvb, 0,
                                         header_len,
                                         "FCoE %s(%s/%s) %d bytes%s%s", ver,
-                                        val_to_str(sof, fcoe_sof_vals,
+                                        val_to_str(pinfo->pool, sof, fcoe_sof_vals,
                                                    "0x%x"),
                                         eof_str, frame_len, crc_msg,
                                         len_msg);

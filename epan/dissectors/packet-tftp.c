@@ -55,7 +55,7 @@ void proto_register_tftp(void);
 /* Things we may want to remember for a whole conversation */
 typedef struct _tftp_conv_info_t {
   uint16_t     blocksize;
-  const uint8_t *source_file, *destination_file;
+  const char  *source_file, *destination_file;
   uint32_t     request_frame;
   bool         tsize_requested;
   bool         dynamic_windowing_active;
@@ -409,7 +409,7 @@ static void dissect_tftp_message(tftp_conv_info_t *tftp_info,
   opcode = tvb_get_ntohs(tvb, offset);
   proto_tree_add_uint(tftp_tree, hf_tftp_opcode, tvb, offset, 2, opcode);
   col_add_str(pinfo->cinfo, COL_INFO,
-              val_to_str(opcode, tftp_opcode_vals, "Unknown (0x%04x)"));
+              val_to_str(pinfo->pool, opcode, tftp_opcode_vals, "Unknown (0x%04x)"));
   offset += 2;
 
   /* read and write requests contain file names
@@ -437,7 +437,7 @@ static void dissect_tftp_message(tftp_conv_info_t *tftp_info,
   case TFTP_RRQ:
     i1 = tvb_strsize(tvb, offset);
     proto_tree_add_item_ret_string(tftp_tree, hf_tftp_source_file,
-                        tvb, offset, i1, ENC_ASCII|ENC_NA, wmem_file_scope(), &tftp_info->source_file);
+                        tvb, offset, i1, ENC_ASCII|ENC_NA, wmem_file_scope(), (const uint8_t**)&tftp_info->source_file);
 
     /* we either have a source file name (for read requests) or a
        destination file name (for write requests)
@@ -466,7 +466,7 @@ static void dissect_tftp_message(tftp_conv_info_t *tftp_info,
   case TFTP_WRQ:
     i1 = tvb_strsize(tvb, offset);
     proto_tree_add_item_ret_string(tftp_tree, hf_tftp_destination_file,
-                        tvb, offset, i1, ENC_ASCII|ENC_NA, wmem_file_scope(), &tftp_info->destination_file);
+                        tvb, offset, i1, ENC_ASCII|ENC_NA, wmem_file_scope(), (const uint8_t**)&tftp_info->destination_file);
 
     tftp_info->source_file = NULL; /* see above */
     tftp_info->request_frame = pinfo->num;
@@ -697,7 +697,7 @@ static void dissect_tftp_message(tftp_conv_info_t *tftp_info,
                         error);
 
     col_append_fstr(pinfo->cinfo, COL_INFO, ", Code: %s",
-                    val_to_str(error, tftp_error_code_vals, "Unknown (%u)"));
+                    val_to_str(pinfo->pool, error, tftp_error_code_vals, "Unknown (%u)"));
 
     offset += 2;
 
@@ -814,8 +814,12 @@ static conversation_t* create_tftp_conversation(packet_info *pinfo)
   conversation_t* conversation = NULL;
   if (!PINFO_FD_VISITED(pinfo)) {
     /* New read or write request on first pass, so create conversation with client port only */
-    conversation = conversation_new(pinfo->num, &pinfo->src, &pinfo->dst, CONVERSATION_UDP,
-                                    pinfo->srcport, 0, NO_PORT2);
+    /* XXX - We might want to create one conversation for the addresses and
+     * port, and have a wmem_tree_t of tftp_conv_info_t, which is the
+     * information for a single transfer.
+     */
+    conversation = conversation_new_strat(pinfo, CONVERSATION_UDP, NO_PORT2);
+
     conversation_set_dissector(conversation, tftp_handle);
     /* Store conversation in this frame */
     p_add_proto_data(wmem_file_scope(), pinfo, proto_tftp, CONVERSATION_KEY,
@@ -901,27 +905,24 @@ dissect_tftp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
   conversation_t   *conversation = NULL;
 
   /*
-   * The first TFTP packet goes to the TFTP port; the second one
-   * comes from some *other* port, but goes back to the same
-   * IP address and port as the ones from which the first packet
-   * came; all subsequent packets go between those two IP addresses
-   * and ports.
+   * The first TFTP packet (which is always a read or write request)
+   * goes to the TFTP port; the second one comes from some *other* port,
+   * but goes back to the same IP address and port as the ones from which
+   * the first packet came; all subsequent packets go between those two
+   * IP addresses and ports.
    *
-   * If this packet went to the TFTP port (either to one of the ports
-   * set in the preferences or to a port set via Decode As), we check
-   * to see if there's already a conversation with one address/port pair
-   * matching the source IP address and port of this packet,
-   * the other address matching the destination IP address of this
-   * packet, and any destination port.
-   *
-   * If not, we create one, with its address 1/port 1 pair being
+   * If this packet looks like the first of a transfer, we create
+   * a conversation, with its address 1/port 1 pair being
    * the source address/port of this packet, its address 2 being
    * the destination address of this packet, and its port 2 being
    * wildcarded, and give it the TFTP dissector as a dissector.
+   *
+   * By checking if it looks like a request, we handle the case where
+   * the same port is reused for another file transfer later in the
+   * capture, and also handle the (rare but apparently existing) case
+   * where the *other* port is still the TFTP port.
    */
-  if ((value_is_in_range(global_tftp_port_range, pinfo->destport) ||
-       (pinfo->match_uint == pinfo->destport)) &&
-      is_valid_request(tvb, pinfo))
+  if (is_valid_request(tvb, pinfo))
   {
     conversation = create_tftp_conversation(pinfo);
   }
@@ -929,9 +930,10 @@ dissect_tftp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
   if (conversation == NULL)
   {
     /* Not the initial read or write request */
-    /* Look for wildcarded conversation based upon client port */
-    if ((conversation = find_conversation(pinfo->num, &pinfo->dst, &pinfo->src, CONVERSATION_UDP,
-                                     pinfo->destport, 0, NO_PORT_B)) && conversation_get_dissector(conversation, pinfo->num) == tftp_handle) {
+    /* Look for wildcarded conversation based upon client port, checking
+     * both directions (we don't know which side *is* the client port.) */
+    if ((conversation = find_conversation_strat(pinfo, CONVERSATION_UDP,
+                                     NO_PORT_B, true)) && conversation_get_dissector(conversation, pinfo->num) == tftp_handle) {
 #if 0
       /* XXX: While setting the wildcarded port makes sense, if we do that,
        * it's more complicated to find the correct conversation if ports are
@@ -944,8 +946,8 @@ dissect_tftp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
       if (pinfo->destport == conversation_key_port1(conversation->key_ptr))
         conversation_set_port2(conversation, pinfo->srcport);
 #endif
-    } else if ((conversation = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, CONVERSATION_UDP,
-                                     pinfo->srcport, 0, NO_PORT_B)) && conversation_get_dissector(conversation, pinfo->num) == tftp_handle) {
+    } else if ((conversation = find_conversation_strat(pinfo, CONVERSATION_UDP,
+                                     NO_PORT_B, false)) && conversation_get_dissector(conversation, pinfo->num) == tftp_handle) {
 
     } else {
       /* How did we get here? We must have matched one of the TFTP ports
@@ -954,7 +956,7 @@ dissect_tftp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
        * such servers out there (issue #18122), and since the default port
        * is IANA assigned it doesn't do harm to process it. Note that in
        * that case the conversation won't have the tftp dissector set. */
-      conversation = find_conversation_pinfo(pinfo, 0);
+      conversation = find_conversation_pinfo_strat(pinfo, 0);
       if (conversation == NULL) {
         return 0;
       }

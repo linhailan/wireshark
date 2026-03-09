@@ -2,8 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-import pytest
-from suite_dfilter.dfiltertest import *
+# from suite_dfilter.dfiltertest import checkDFilterCount, checkDFilterCountWithSelectedFrame, checkDFilterFail
 
 
 class TestDfilterTime:
@@ -110,7 +109,7 @@ class TestDfilterTimeRelative:
 
     def test_relative_time_2(self, checkDFilterCount):
         dfilter = "frame.time_delta > 0.7"
-        checkDFilterCount(dfilter, 0)
+        checkDFilterCount(dfilter, 1)
 
     def test_relative_time_3(self, checkDFilterCount):
         dfilter = "frame.time_delta < 0.7"

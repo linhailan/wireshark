@@ -22,7 +22,6 @@
 
 #include <epan/packet.h>
 #include <epan/to_str.h>
-#include <epan/sctpppids.h>
 #include <epan/stat_tap_ui.h>
 #include <epan/expert.h>
 #include <epan/proto_data.h>
@@ -34,6 +33,7 @@
 #include <wsutil/array.h>
 
 #include "packet-asap+enrp-common.h"
+#include "packet-sctp.h"
 
 void proto_register_enrp(void);
 void proto_reg_handoff_enrp(void);
@@ -311,8 +311,7 @@ dissect_pool_member_selection_policy_parameter(tvbuff_t *parameter_tvb, proto_tr
   uint32_t type;
   unsigned   length;
 
-  proto_tree_add_item(parameter_tree, hf_policy_type,  parameter_tvb, POLICY_TYPE_OFFSET,  POLICY_TYPE_LENGTH,  ENC_BIG_ENDIAN);
-  type = tvb_get_ntohl(parameter_tvb, POLICY_TYPE_OFFSET);
+  proto_tree_add_item_ret_uint(parameter_tree, hf_policy_type,  parameter_tvb, POLICY_TYPE_OFFSET,  POLICY_TYPE_LENGTH,  ENC_BIG_ENDIAN, &type);
   switch (type) {
   case RANDOM_POLICY:
   case ROUND_ROBIN_POLICY:
@@ -1107,10 +1106,10 @@ proto_register_enrp(void)
     { &hf_dccp_port,              { "Port",                        "enrp.dccp_transport_port",                      FT_UINT16,  BASE_DEC,  NULL,                              0x0,                        NULL, HFILL } },
     { &hf_dccp_reserved,          { "Reserved",                    "enrp.dccp_transport_reserved",                  FT_UINT16,  BASE_DEC,  NULL,                              0x0,                        NULL, HFILL } },
     { &hf_dccp_service_code,      { "Service Code",                "enrp.dccp_transport_service_code",              FT_UINT16,  BASE_DEC,  NULL,                              0x0,                        NULL, HFILL } },
-    { &hf_sctp_port,              { "Port",                        "enrp.sctp_transport_port",                      FT_UINT16,  BASE_DEC,  NULL,                              0x0,                        NULL, HFILL } },
+    { &hf_sctp_port,              { "Port",                        "enrp.sctp_transport_port",                      FT_UINT16,  BASE_PT_SCTP,  NULL,                          0x0,                        NULL, HFILL } },
     { &hf_transport_use,          { "Transport Use",               "enrp.transport_use",                            FT_UINT16,  BASE_DEC,  VALS(transport_use_values),        0x0,                        NULL, HFILL } },
-    { &hf_tcp_port,               { "Port",                        "enrp.tcp_transport_port",                       FT_UINT16,  BASE_DEC,  NULL,                              0x0,                        NULL, HFILL } },
-    { &hf_udp_port,               { "Port",                        "enrp.udp_transport_port",                       FT_UINT16,  BASE_DEC,  NULL,                              0x0,                        NULL, HFILL } },
+    { &hf_tcp_port,               { "Port",                        "enrp.tcp_transport_port",                       FT_UINT16,  BASE_PT_TCP,  NULL,                           0x0,                        NULL, HFILL } },
+    { &hf_udp_port,               { "Port",                        "enrp.udp_transport_port",                       FT_UINT16,  BASE_PT_UDP,  NULL,                           0x0,                        NULL, HFILL } },
     { &hf_udp_reserved,           { "Reserved",                    "enrp.udp_transport_reserved",                   FT_UINT16,  BASE_DEC,  NULL,                              0x0,                        NULL, HFILL } },
     { &hf_udp_lite_port,          { "Port",                        "enrp.udp_lite_transport_port",                  FT_UINT16,  BASE_DEC,  NULL,                              0x0,                        NULL, HFILL } },
     { &hf_udp_lite_reserved,      { "Reserved",                    "enrp.udp_lite_transport_reserved",              FT_UINT16,  BASE_DEC,  NULL,                              0x0,                        NULL, HFILL } },

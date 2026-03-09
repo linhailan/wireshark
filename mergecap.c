@@ -27,11 +27,13 @@
 #include <wsutil/clopts_common.h>
 #include <wsutil/cmdarg_err.h>
 #include <wsutil/filesystem.h>
+#include <app/application_flavor.h>
 #include <wsutil/file_util.h>
 #include <wsutil/privileges.h>
 #include <wsutil/strnatcmp.h>
 #include <wsutil/ws_assert.h>
 #include <wsutil/wslog.h>
+#include <ws_exit_codes.h>
 
 #include <cli_main.h>
 #include <wsutil/version_info.h>
@@ -45,6 +47,7 @@
 #include "ui/failure_message.h"
 
 #define LONGOPT_COMPRESS                LONGOPT_BASE_APPLICATION+1
+#define LONGOPT_NO_MERGING_COMMENT      LONGOPT_BASE_APPLICATION+2
 
 /*
  * Show the usage
@@ -66,6 +69,8 @@ print_usage(FILE *output)
     fprintf(output, "  -I <IDB merge mode> set the merge mode for Interface Description Blocks; default is 'all'.\n");
     fprintf(output, "                    an empty \"-I\" option will list the merge modes.\n");
     fprintf(output, "  --compress <type> compress the output file using the type compression format.\n");
+    fprintf(output, "  --no-merging-comment\n");
+    fprintf(output, "                    do not add \"File created by merging:\" comment.\n");
     fprintf(output, "\n");
     fprintf(output, "Miscellaneous:\n");
     fprintf(output, "  -h, --help        display this help and exit.\n");
@@ -102,7 +107,7 @@ list_output_compression_types(void) {
     GSList *output_compression_types;
 
     fprintf(stderr, "mergecap: The available output compress type(s) for the \"--compress\" flag are:\n");
-    output_compression_types = wtap_get_all_output_compression_type_names_list();
+    output_compression_types = ws_get_all_output_compression_type_names_list();
     for (GSList *compression_type = output_compression_types;
         compression_type != NULL;
         compression_type = g_slist_next(compression_type)) {
@@ -186,8 +191,13 @@ main(int argc, char *argv[])
         {"help", ws_no_argument, NULL, 'h'},
         {"version", ws_no_argument, NULL, 'v'},
         {"compress", ws_required_argument, NULL, LONGOPT_COMPRESS},
+        {"no-merging-comment", ws_no_argument, NULL, LONGOPT_NO_MERGING_COMMENT},
+        LONGOPT_WSLOG
         {0, 0, 0, 0 }
     };
+#define OPTSTRING "aF:hI:s:vVw:"
+    static const char optstring[] = OPTSTRING;
+    bool                  add_merging_comment = true;
     bool                  do_append        = false;
     bool                  verbose          = false;
     int                   in_file_count    = 0;
@@ -196,8 +206,10 @@ main(int argc, char *argv[])
     char                  *out_filename    = NULL;
     bool                  status           = true;
     idb_merge_mode        mode             = IDB_MERGE_MODE_MAX;
-    wtap_compression_type compression_type = WTAP_UNKNOWN_COMPRESSION;
+    ws_compression_type   compression_type = WS_FILE_UNKNOWN_COMPRESSION;
     merge_progress_callback_t cb;
+    const struct file_extension_info* file_extensions;
+    unsigned num_extensions;
 
     /* Set the program name. */
     g_set_prgname("mergecap");
@@ -205,10 +217,10 @@ main(int argc, char *argv[])
     cmdarg_err_init(stderr_cmdarg_err, stderr_cmdarg_err_cont);
 
     /* Initialize log handler early so we can have proper logging during startup. */
-    ws_log_init(vcmdarg_err);
+    ws_log_init(vcmdarg_err, "Mergecap Debug Console");
 
     /* Early logging command-line initialization. */
-    ws_log_parse_args(&argc, argv, vcmdarg_err, 1);
+    ws_log_parse_args(&argc, argv, optstring, long_options, vcmdarg_err, WS_EXIT_INVALID_OPTION);
 
     ws_noisy("Finished log init and parsing command line log arguments");
 
@@ -225,7 +237,7 @@ main(int argc, char *argv[])
      * Attempt to get the pathname of the directory containing the
      * executable file.
      */
-    configuration_init_error = configuration_init(argv[0]);
+    configuration_init_error = configuration_init(argv[0], "wireshark");
     if (configuration_init_error != NULL) {
         cmdarg_err(
                 "Can't get pathname of directory containing the mergecap program: %s.",
@@ -234,14 +246,15 @@ main(int argc, char *argv[])
     }
 
     /* Initialize the version information. */
-    ws_init_version_info("Mergecap", NULL, NULL);
+    ws_init_version_info("Mergecap", NULL, application_get_vcs_version_info, NULL, NULL);
 
     init_report_failure_message("mergecap");
 
-    wtap_init(true);
+    application_file_extensions(&file_extensions, &num_extensions);
+    wtap_init(true, application_configuration_environment_prefix(), file_extensions, num_extensions);
 
     /* Process the options first */
-    while ((opt = ws_getopt_long(argc, argv, "aF:hI:s:vVw:", long_options, NULL)) != -1) {
+    while ((opt = ws_getopt_long(argc, argv, optstring, long_options, NULL)) != -1) {
 
         switch (opt) {
             case 'a':
@@ -277,7 +290,10 @@ main(int argc, char *argv[])
                 break;
 
             case 's':
-                snaplen = get_nonzero_uint32(ws_optarg, "snapshot length");
+                if (!get_nonzero_uint32(ws_optarg, "snapshot length", &snaplen)) {
+                    status = false;
+                    goto clean_exit;
+                }
                 break;
 
             case 'V':
@@ -294,15 +310,25 @@ main(int argc, char *argv[])
                 break;
 
             case LONGOPT_COMPRESS:
-                compression_type = wtap_name_to_compression_type(ws_optarg);
-                if (compression_type == WTAP_UNKNOWN_COMPRESSION) {
+                compression_type = ws_name_to_compression_type(ws_optarg);
+                if (compression_type == WS_FILE_UNKNOWN_COMPRESSION) {
                     cmdarg_err("\"%s\" isn't a valid output compression mode",
                                 ws_optarg);
                     list_output_compression_types();
                     goto clean_exit;
                 }
                 break;
+
+            case LONGOPT_NO_MERGING_COMMENT:
+                add_merging_comment = false;
+                break;
+
             case '?':              /* Bad options if GNU getopt */
+            default:
+                /* wslog arguments are okay */
+                if (ws_log_is_wslog_arg(opt))
+                    break;
+
                 switch(ws_optopt) {
                     case'F':
                         list_capture_types();
@@ -344,28 +370,28 @@ main(int argc, char *argv[])
         return 1;
     }
 
-    if (compression_type == WTAP_UNKNOWN_COMPRESSION) {
+    if (compression_type == WS_FILE_UNKNOWN_COMPRESSION) {
         /* An explicitly specified compression type overrides filename
          * magic. (Should we allow specifying "no" compression with, e.g.
          * a ".gz" extension?) */
         const char *sfx = strrchr(out_filename, '.');
         if (sfx) {
-            compression_type = wtap_extension_to_compression_type(sfx + 1);
+            compression_type = ws_extension_to_compression_type(sfx + 1);
         }
     }
 
-    if (compression_type == WTAP_UNKNOWN_COMPRESSION) {
-        compression_type = WTAP_UNCOMPRESSED;
+    if (compression_type == WS_FILE_UNKNOWN_COMPRESSION) {
+        compression_type = WS_FILE_UNCOMPRESSED;
     }
 
-    if (!wtap_can_write_compression_type(compression_type)) {
+    if (!ws_can_write_compression_type(compression_type)) {
         cmdarg_err("Output files can't be written as %s",
-                wtap_compression_type_description(compression_type));
+                ws_compression_type_description(compression_type));
         status = false;
         goto clean_exit;
     }
 
-    if (compression_type != WTAP_UNCOMPRESSED && !wtap_dump_can_compress(file_type)) {
+    if (compression_type != WS_FILE_UNCOMPRESSED && !wtap_dump_can_compress(file_type)) {
         cmdarg_err("The file format %s can't be written to output compressed format",
             wtap_file_type_subtype_name(file_type));
         status = false;
@@ -393,14 +419,14 @@ main(int argc, char *argv[])
         /* merge the files to the standard output */
         status = merge_files_to_stdout(file_type,
                 (const char *const *) &argv[ws_optind],
-                in_file_count, do_append, mode, snaplen,
-                get_appname_and_version(),
+                in_file_count, add_merging_comment, do_append, mode, snaplen,
+                get_appname_and_version(), application_configuration_environment_prefix(),
                 verbose ? &cb : NULL, compression_type);
     } else {
         /* merge the files to the outfile */
         status = merge_files(out_filename, file_type,
                 (const char *const *) &argv[ws_optind], in_file_count,
-                do_append, mode, snaplen, get_appname_and_version(),
+                add_merging_comment, do_append, mode, snaplen, get_appname_and_version(), application_configuration_environment_prefix(),
                 verbose ? &cb : NULL, compression_type);
     }
 

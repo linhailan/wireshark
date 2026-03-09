@@ -34,20 +34,15 @@
 #include <epan/proto_data.h>
 #include <epan/uat.h>
 #include <epan/tfs.h>
+#include <epan/expert.h>
 
 #include "packet-udp.h"
 #include "packet-tcp.h"
 #include "packet-socketcan.h"
 
-#define XCP_NAME                            "XCP"
-#define XCP_FILTER_NAME                     "xcp"
-#define XCP_LONG_NAME                       "Universal Measurement and Calibration Protocol (XCP)"
-
 #define DATAFILE_XCP_MEMORY_ADDRESSES       "XCP_Addresses"
 #define DATAFILE_XCP_ETH_MAPPING            "XCP_Mapping_UDP_TCP"
 #define DATAFILE_XCP_CAN_MAPPING            "XCP_Mapping_CAN"
-
-#define NOT_IMPLEMENTED_STRING              "Not implemented yet. Please consider creating a ticket and attaching an example trace."
 
 #define XCP_TYPE_UNKNOWN                    0
 #define XCP_TYPE_CAN                        1
@@ -965,6 +960,9 @@ static int ett_xcp_clear_program_range_fct;
 static int ett_xcp_set_daq_packed_mode_timestamp_mode;
 static int ett_xcp_element;
 
+/* expert info items */
+static expert_field ei_xcp_not_implemented;
+
 void proto_register_xcp(void);
 void proto_reg_handoff_xcp(void);
 
@@ -1642,7 +1640,8 @@ dissect_transport_layer_cmd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
                 switch (ip_version) {
                 case 0:
-                    proto_tree_add_item(tree, hf_xcp_sub_command_eth_ipv4, tvb, offset, 4, ENC_NA);
+                    /* TODO: is this actually encoded in big-endian order? */
+                    proto_tree_add_item(tree, hf_xcp_sub_command_eth_ipv4, tvb, offset, 4, ENC_BIG_ENDIAN);
                     offset += 4;
 
                     /* TODO: we need to register the address and since the answer will be sent there... */
@@ -1691,7 +1690,7 @@ dissect_transport_layer_cmd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
             break;
 
         default:
-            proto_tree_add_text_internal(tree, tvb, offset, tvb_captured_length_remaining(tvb, offset), NOT_IMPLEMENTED_STRING);
+            proto_tree_add_expert_remaining(tree, pinfo, &ei_xcp_not_implemented, tvb, offset);
             col_append_str(pinfo->cinfo, COL_INFO, "   *** NOT IMPLEMENTED YET ***");
             break;
         }
@@ -1732,7 +1731,7 @@ dissect_transport_layer_cmd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                 break;
 
             default:
-                proto_tree_add_text_internal(tree, tvb, offset, tvb_captured_length_remaining(tvb, offset), NOT_IMPLEMENTED_STRING);
+                proto_tree_add_expert_remaining(tree, pinfo, &ei_xcp_not_implemented, tvb, offset);
                 col_append_str(pinfo->cinfo, COL_INFO, "   *** NOT IMPLEMENTED YET ***");
                 break;
             }
@@ -1750,18 +1749,18 @@ dissect_sw_debug_cmd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32
         uint32_t cmd;
         proto_tree_add_item_ret_uint(tree, hf_xcp_debug_command, tvb, offset, 1, ENC_NA, &cmd);
         message->cmd_sw_debug = cmd;
-        col_append_fstr(pinfo->cinfo, COL_INFO, " %s", val_to_str(cmd, cmd_sw_dbg_mnemonics, "Unknown Software Debug Command (0x%02x)"));
+        col_append_fstr(pinfo->cinfo, COL_INFO, " %s", val_to_str(pinfo->pool, cmd, cmd_sw_dbg_mnemonics, "Unknown Software Debug Command (0x%02x)"));
         offset += 1;
 
         /* TODO */
-        proto_tree_add_text_internal(tree, tvb, offset, tvb_captured_length_remaining(tvb, offset), NOT_IMPLEMENTED_STRING);
+        proto_tree_add_expert_remaining(tree, pinfo, &ei_xcp_not_implemented, tvb, offset);
         col_append_str(pinfo->cinfo, COL_INFO, "   *** NOT IMPLEMENTED YET ***");
         offset += tvb_captured_length_remaining(tvb, offset);
 
     } else {
 
         /* TODO */
-        proto_tree_add_text_internal(tree, tvb, offset, tvb_captured_length_remaining(tvb, offset), NOT_IMPLEMENTED_STRING);
+        proto_tree_add_expert_remaining(tree, pinfo, &ei_xcp_not_implemented, tvb, offset);
         col_append_str(pinfo->cinfo, COL_INFO, "   *** NOT IMPLEMENTED YET ***");
         offset += tvb_captured_length_remaining(tvb, offset);
     }
@@ -1783,7 +1782,7 @@ dissect_pod_cmd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t of
         uint32_t cmd;
         proto_tree_add_item_ret_uint(tree, hf_xcp_pod_command, tvb, offset, 2, stream->endianess, &cmd);
         message->cmd_pod = cmd;
-        col_append_fstr(pinfo->cinfo, COL_INFO, " %s", val_to_str(cmd, cmd_pod_mnemonics, "Unknown POD Command (0x%04x)"));
+        col_append_fstr(pinfo->cinfo, COL_INFO, " %s", val_to_str(pinfo->pool, cmd, cmd_pod_mnemonics, "Unknown POD Command (0x%04x)"));
         offset += 1;
 
         switch (message->cmd_pod) {
@@ -1812,7 +1811,7 @@ dissect_pod_cmd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t of
             break;
 
         default:
-            proto_tree_add_text_internal(tree, tvb, offset, tvb_captured_length_remaining(tvb, offset), NOT_IMPLEMENTED_STRING);
+            proto_tree_add_expert_remaining(tree, pinfo, &ei_xcp_not_implemented, tvb, offset);
             col_append_str(pinfo->cinfo, COL_INFO, "   *** NOT IMPLEMENTED YET ***");
             offset += tvb_captured_length_remaining(tvb, offset);
         }
@@ -1844,7 +1843,7 @@ dissect_pod_cmd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t of
         //    break;
 
         default:
-            proto_tree_add_text_internal(tree, tvb, offset, tvb_captured_length_remaining(tvb, offset), NOT_IMPLEMENTED_STRING);
+            proto_tree_add_expert_remaining(tree, pinfo, &ei_xcp_not_implemented, tvb, offset);
             col_append_str(pinfo->cinfo, COL_INFO, "   *** NOT IMPLEMENTED YET ***");
             offset += tvb_captured_length_remaining(tvb, offset);
         }
@@ -1875,7 +1874,7 @@ dissect_xcp_m2s(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t of
     offset += 1;
 
     if (cmd != XCP_CMD_2BYTE_FIRST_BYTE) {
-        col_add_fstr(pinfo->cinfo, COL_INFO, "XCP M->S: %s", val_to_str(cmd, cmd_code_mnemonics, "Unknown Command Code (0x%02x)"));
+        col_add_fstr(pinfo->cinfo, COL_INFO, "XCP M->S: %s", val_to_str(pinfo->pool, cmd, cmd_code_mnemonics, "Unknown Command Code (0x%02x)"));
     } else {
         proto_tree_add_item_ret_uint(xcp_tree, hf_xcp_cmd_code_level1, tvb, offset, 1, ENC_NA, &cmd_lvl1);
         offset += 1;
@@ -1883,7 +1882,7 @@ dissect_xcp_m2s(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t of
         if (cmd_lvl1 == XCP_CMD_2BYTE_XCP_POD_COMMANDS || cmd_lvl1 == XCP_CMD_2BYTE_XCP_SW_DEBUG) {
             col_set_str(pinfo->cinfo, COL_INFO, "XCP M->S:");
         } else {
-            col_add_fstr(pinfo->cinfo, COL_INFO, "XCP M->S: %s", val_to_str(cmd_lvl1, cmd_code_mnemonics_2bytes, "Unknown Command Code (0xC0 0x%02x)"));
+            col_add_fstr(pinfo->cinfo, COL_INFO, "XCP M->S: %s", val_to_str(pinfo->pool, cmd_lvl1, cmd_code_mnemonics_2bytes, "Unknown Command Code (0xC0 0x%02x)"));
         }
     }
 
@@ -2725,13 +2724,13 @@ dissect_xcp_m2s(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t of
             break;
 
         default:
-            proto_tree_add_text_internal(xcp_tree, tvb, offset, tvb_captured_length_remaining(tvb, offset), NOT_IMPLEMENTED_STRING);
+            proto_tree_add_expert_remaining(xcp_tree, pinfo, &ei_xcp_not_implemented, tvb, offset);
             col_append_str(pinfo->cinfo, COL_INFO, "   *** NOT IMPLEMENTED YET ***");
         }
         break;
 
     default:
-        proto_tree_add_text_internal(xcp_tree, tvb, offset, tvb_captured_length_remaining(tvb, offset), NOT_IMPLEMENTED_STRING);
+        proto_tree_add_expert_remaining(xcp_tree, pinfo, &ei_xcp_not_implemented, tvb, offset);
         col_append_str(pinfo->cinfo, COL_INFO, "   *** NOT IMPLEMENTED YET ***");
     }
 
@@ -2792,19 +2791,19 @@ dissect_xcp_s2m(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t of
             message->transport_layer_sub_cmd = message->peer_message->transport_layer_sub_cmd;
 
             if (message->cmd != XCP_CMD_2BYTE_FIRST_BYTE) {
-                col_append_fstr(pinfo->cinfo, COL_INFO, "XCP S->M: %s RES", val_to_str(message->cmd, cmd_code_mnemonics, "Unknown Command Code 0x%02x"));
+                col_append_fstr(pinfo->cinfo, COL_INFO, "XCP S->M: %s RES", val_to_str(pinfo->pool, message->cmd, cmd_code_mnemonics, "Unknown Command Code 0x%02x"));
             } else {
                 switch (message->cmd_lvl1) {
                 case XCP_CMD_2BYTE_XCP_SW_DEBUG:
-                    col_append_fstr(pinfo->cinfo, COL_INFO, "XCP S->M: %s RES", val_to_str(message->cmd_sw_debug, cmd_sw_dbg_mnemonics, "Unknown Command Code 0xC0 0xFC 0x%02x"));
+                    col_append_fstr(pinfo->cinfo, COL_INFO, "XCP S->M: %s RES", val_to_str(pinfo->pool, message->cmd_sw_debug, cmd_sw_dbg_mnemonics, "Unknown Command Code 0xC0 0xFC 0x%02x"));
                     break;
 
                 case XCP_CMD_2BYTE_XCP_POD_COMMANDS:
-                    col_append_fstr(pinfo->cinfo, COL_INFO, "XCP S->M: %s RES", val_to_str(message->cmd_pod, cmd_pod_mnemonics, "Unknown Command Code 0xC0 0xFD 0x%04x"));
+                    col_append_fstr(pinfo->cinfo, COL_INFO, "XCP S->M: %s RES", val_to_str(pinfo->pool, message->cmd_pod, cmd_pod_mnemonics, "Unknown Command Code 0xC0 0xFD 0x%04x"));
                     break;
 
                 default:
-                    col_append_fstr(pinfo->cinfo, COL_INFO, "XCP S->M: %s RES", val_to_str(message->cmd_lvl1, cmd_code_mnemonics_2bytes, "Unknown Command Code 0xC0 0x%02x"));
+                    col_append_fstr(pinfo->cinfo, COL_INFO, "XCP S->M: %s RES", val_to_str(pinfo->pool, message->cmd_lvl1, cmd_code_mnemonics_2bytes, "Unknown Command Code 0xC0 0x%02x"));
                     break;
                 }
             }
@@ -3214,7 +3213,7 @@ dissect_xcp_s2m(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t of
              * Maybe the standard means TIME_CORRELATION_PROPERTIES???
              */
             if (stream->timestamp_extended) {
-                proto_tree_add_text_internal(tree, tvb, offset, tvb_captured_length_remaining(tvb, offset), NOT_IMPLEMENTED_STRING);
+                proto_tree_add_expert_remaining(tree, pinfo, &ei_xcp_not_implemented, tvb, offset);
                 /* TODO */
             } else {
                 proto_tree_add_item(xcp_tree, hf_xcp_payload_timestamp_legacy, tvb, offset, 4, stream->endianess);
@@ -3490,14 +3489,14 @@ dissect_xcp_s2m(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t of
                 break;
 
             default:
-                proto_tree_add_text_internal(xcp_tree, tvb, offset, tvb_captured_length_remaining(tvb, offset), NOT_IMPLEMENTED_STRING);
+                proto_tree_add_expert_remaining(xcp_tree, pinfo, &ei_xcp_not_implemented, tvb, offset);
                 col_append_str(pinfo->cinfo, COL_INFO, "   *** NOT IMPLEMENTED YET ***");
             }
 
             break;
 
         default:
-            proto_tree_add_text_internal(xcp_tree, tvb, offset, tvb_captured_length_remaining(tvb, offset), NOT_IMPLEMENTED_STRING);
+            proto_tree_add_expert_remaining(xcp_tree, pinfo, &ei_xcp_not_implemented, tvb, offset);
             col_append_str(pinfo->cinfo, COL_INFO, "   *** NOT IMPLEMENTED YET ***");
         }
     } else if (stream->pid_map != NULL && wmem_map_contains(stream->pid_map, GUINT_TO_POINTER(pid))) {
@@ -3576,7 +3575,7 @@ dissect_xcp_s2m(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, uint32_t of
             }
         }
     } else {
-        col_append_fstr(pinfo->cinfo, COL_INFO, "XCP S->M: PID: %s", val_to_str(pid, pid_type_names_s2m, "Unknown PID 0x%02x"));
+        col_append_fstr(pinfo->cinfo, COL_INFO, "XCP S->M: PID: %s", val_to_str(pinfo->pool, pid, pid_type_names_s2m, "Unknown PID 0x%02x"));
     }
 
     int unparsed_length = tvb_captured_length_remaining(tvb, offset);
@@ -3600,7 +3599,7 @@ dissect_xcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, xcp_stream_t *s
     xcp_message_t *message_info;
 
     col_clear(pinfo->cinfo, COL_INFO);
-    col_set_str(pinfo->cinfo, COL_PROTOCOL, XCP_NAME);
+    col_set_str(pinfo->cinfo, COL_PROTOCOL, "XCP");
 
     message_info = (xcp_message_t *)p_get_proto_data(wmem_file_scope(), pinfo, proto_xcp, 0);
     if (!message_info) {
@@ -3830,6 +3829,7 @@ check_config(void) {
 void
 proto_register_xcp(void) {
     module_t *xcp_module = NULL;
+    expert_module_t* expert_module_xcp;
 
     /* UATs */
     uat_t *xcp_addresses_uat;
@@ -4147,13 +4147,20 @@ proto_register_xcp(void) {
         &ett_xcp_element,
     };
 
-    proto_xcp = proto_register_protocol(XCP_LONG_NAME, XCP_NAME, XCP_FILTER_NAME);
+    static ei_register_info ei[] = {
+        { &ei_xcp_not_implemented,{ "xcp.not_implemented", PI_UNDECODED, PI_WARN, "Not implemented yet. Please consider creating a ticket and attaching an example trace.", EXPFILL } },
+    };
+
+    proto_xcp = proto_register_protocol("Universal Measurement and Calibration Protocol (XCP)", "XCP", "xcp");
 
     xcp_handle_udp = register_dissector("xcp_udp", dissect_xcp_udp, proto_xcp);
     xcp_handle_tcp = register_dissector("xcp_tcp", dissect_xcp_tcp, proto_xcp);
 
     proto_register_field_array(proto_xcp, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
+    expert_module_xcp = expert_register_protocol(proto_xcp);
+    expert_register_field_array(expert_module_xcp, ei, array_length(ei));
+
     xcp_module = prefs_register_protocol(proto_xcp, &check_config);
 
     prefs_register_uint_preference(xcp_module, "address_granularity_default", "Address Granularity Default Value (0, 1, 2, 4)",

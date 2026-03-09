@@ -470,7 +470,7 @@ dissect_fcp_rsp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, prot
     status = tvb_get_uint8(tvb, offset+11);
 
     col_append_fstr(pinfo->cinfo, COL_INFO, ":%s",
-                         val_to_str(status, scsi_status_val, "0x%x"));
+                         val_to_str(pinfo->pool, status, scsi_status_val, "0x%x"));
 
     /* Save the response frame */
     if (request_data != NULL) {
@@ -539,7 +539,7 @@ dissect_fcp_rsp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, prot
     if (rsplen) {
         tvbuff_t *rspinfo_tvb;
 
-        rspinfo_tvb = tvb_new_subset_length_caplen(tvb, offset, MIN(rsplen, tvb_captured_length_remaining(tvb, offset)), rsplen);
+        rspinfo_tvb = tvb_new_subset_length(tvb, offset, rsplen);
         dissect_fcp_rspinfo(rspinfo_tvb, tree, 0);
 
         offset += rsplen;
@@ -549,7 +549,7 @@ dissect_fcp_rsp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, prot
     if (snslen) {
         tvbuff_t *sns_tvb;
 
-        sns_tvb = tvb_new_subset_length_caplen(tvb, offset, MIN(snslen, tvb_captured_length_remaining(tvb, offset)), snslen);
+        sns_tvb = tvb_new_subset_length(tvb, offset, snslen);
         dissect_scsi_snsinfo(sns_tvb, pinfo, parent_tree, 0,
                               snslen,
                               (request_data != NULL) ? request_data->itlq : &empty_itlq, &itl);
@@ -604,7 +604,7 @@ dissect_fcp_els(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, fc_hdr *fch
     uint8_t op;
 
     op = tvb_get_uint8(tvb, 0);
-    col_add_str(pinfo->cinfo, COL_INFO, val_to_str_ext(op, &fc_els_proto_val_ext, "0x%x"));
+    col_add_str(pinfo->cinfo, COL_INFO, val_to_str_ext(pinfo->pool, op, &fc_els_proto_val_ext, "0x%x"));
     proto_tree_add_item(tree, hf_fcp_els_op, tvb, 0, 1, ENC_NA);
 
     switch (op) {   /* XXX should switch based on conv for LS_ACC */
@@ -643,12 +643,12 @@ dissect_fcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
     r_ctl &= 0xF;
 
     col_add_str(pinfo->cinfo, COL_INFO,
-                     val_to_str(r_ctl, els ? fcp_els_iu_val : fcp_iu_val,
+                     val_to_str(pinfo->pool, r_ctl, els ? fcp_els_iu_val : fcp_iu_val,
                                  "0x%x"));
 
     ti = proto_tree_add_protocol_format(tree, proto_fcp, tvb, 0, -1,
                                             "FCP: %s",
-                                            val_to_str(r_ctl,
+                                            val_to_str(pinfo->pool, r_ctl,
                                             els ? fcp_els_iu_val :
                                             fcp_iu_val, "Unknown 0x%02x"));
     fcp_tree = proto_item_add_subtree(ti, ett_fcp);

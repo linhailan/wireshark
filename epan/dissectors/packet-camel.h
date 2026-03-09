@@ -1,7 +1,7 @@
 /* Do not modify this file. Changes will be overwritten.                      */
 /* Generated automatically by the ASN.1 to Wireshark dissector compiler       */
 /* packet-camel.h                                                             */
-/* asn2wrs.py -b -q -L -p camel -c ./camel.cnf -s ./packet-camel-template -D . -O ../.. CAP-object-identifiers.asn CAP-classes.asn CAP-datatypes.asn CAP-errorcodes.asn CAP-errortypes.asn CAP-operationcodes.asn CAP-GPRS-ReferenceNumber.asn CAP-gsmSCF-gsmSRF-ops-args.asn CAP-gsmSSF-gsmSCF-ops-args.asn CAP-gprsSSF-gsmSCF-ops-args.asn CAP-SMS-ops-args.asn CAP-U-ABORT-Data.asn CamelV2diff.asn ../ros/Remote-Operations-Information-Objects.asn ../ros/Remote-Operations-Generic-ROS-PDUs.asn */
+/* asn2wrs.py -b -N -q -L -p camel -c ./camel.cnf -s ./packet-camel-template -D . -O ../.. CAP-object-identifiers.asn CAP-classes.asn CAP-datatypes.asn CAP-errorcodes.asn CAP-errortypes.asn CAP-operationcodes.asn CAP-GPRS-ReferenceNumber.asn CAP-gsmSCF-gsmSRF-ops-args.asn CAP-gsmSSF-gsmSCF-ops-args.asn CAP-gprsSSF-gsmSCF-ops-args.asn CAP-SMS-ops-args.asn CAP-U-ABORT-Data.asn CamelV2diff.asn ../ros/Remote-Operations-Information-Objects.asn ../ros/Remote-Operations-Generic-ROS-PDUs.asn */
 
 /* packet-camel-template.h
  * Routines for Camel
@@ -27,9 +27,6 @@
 
 #include "ws_symbol_export.h"
 
-void proto_reg_handoff_camel(void);
-void proto_register_camel(void);
-
 /* Defines for the camel taps */
 #define	camel_MAX_NUM_OPR_CODES	256
 
@@ -54,8 +51,6 @@ WS_DLL_PUBLIC const value_string camel_opr_code_strings[];
 #define CAMELSRT_GPRS_REPORT 8
 
 #define CAMELSRT_SMS_INITIALDP 9
-
-WS_DLL_PUBLIC const value_string  camelSRTtype_naming[];
 
 /** If we have a request message and its response,
    (eg: ApplyCharging, ApplyChargingReport)
@@ -126,7 +121,5 @@ void camelsrt_call_matching(tvbuff_t *tvb,
 			    packet_info * pinfo _U_,
 			    proto_tree *tree,
 			    struct camelsrt_info_t * p_camel_info);
-
-WS_DLL_PUBLIC bool gcamel_StatSRT;
 
 #endif  /* PACKET_camel_H */

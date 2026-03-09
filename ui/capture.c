@@ -43,7 +43,7 @@
 #include "ui/simple_dialog.h"
 #include "ui/ws_ui_util.h"
 
-#include <wsutil/application_flavor.h>
+#include <app/application_flavor.h>
 #include <wsutil/file_util.h>
 #include <wsutil/filesystem.h>
 #include <wsutil/str_util.h>
@@ -165,7 +165,7 @@ capture_start(capture_options *capture_opts, GPtrArray *capture_comments,
     /* spawn/exec of the capture child, without waiting for any response from it */
     capture_callback_invoke(capture_cb_capture_prepared, cap_session);
 
-    wtap_rec_init(&cap_session->rec, 1514);
+    wtap_rec_init(&cap_session->rec, DEFAULT_INIT_BUFFER_SIZE_2048);
 
     cap_session->wtap = NULL;
 
@@ -314,7 +314,7 @@ capture_input_read_all(capture_session *cap_session, bool is_tempfile,
 }
 
 static const char *
-cf_open_error_message(int err, char *err_info)
+cf_open_error_message(const char* app_name, int err, char *err_info)
 {
     const char *errmsg;
     static char errmsg_errno[1024 + 1];
@@ -331,14 +331,14 @@ cf_open_error_message(int err, char *err_info)
             /* Seen only when opening a capture file for reading. */
             snprintf(errmsg_errno, sizeof(errmsg_errno),
                 "The file \"%%s\" isn't a capture file in a format %s understands.",
-                application_flavor_name_proper());
+                app_name);
             errmsg = errmsg_errno;
             break;
 
         case WTAP_ERR_UNSUPPORTED:
             snprintf(errmsg_errno, sizeof(errmsg_errno),
                 "The file \"%%s\" contains record data that %s doesn't support.\n"
-                "(%s)", application_flavor_name_proper(),
+                "(%s)", app_name,
                 err_info != NULL ? err_info : "no information supplied");
             g_free(err_info);
             errmsg = errmsg_errno;
@@ -347,7 +347,7 @@ cf_open_error_message(int err, char *err_info)
         case WTAP_ERR_ENCAP_PER_PACKET_UNSUPPORTED:
             snprintf(errmsg_errno, sizeof(errmsg_errno),
                 "The file \"%%s\" is a capture for a network type that %s doesn't support.",
-                application_flavor_name_proper());
+                app_name);
             errmsg = errmsg_errno;
             break;
 
@@ -388,6 +388,14 @@ cf_open_error_message(int err, char *err_info)
             snprintf(errmsg_errno, sizeof(errmsg_errno),
                        "The file \"%%s\" cannot be decompressed; it is compressed in a way that We don't support.\n"
                        "(%s)", err_info != NULL ? err_info : "no information supplied");
+            g_free(err_info);
+            errmsg = errmsg_errno;
+            break;
+
+        case WTAP_ERR_REC_MALFORMED:
+            snprintf(errmsg_errno, sizeof(errmsg_errno), "%%s contains a malformed record.\n"
+                "(%s)",
+                err_info != NULL ? err_info : "no information supplied");
             g_free(err_info);
             errmsg = errmsg_errno;
             break;
@@ -472,9 +480,9 @@ capture_input_new_file(capture_session *cap_session, char *new_file)
             wtap_close(cap_session->wtap);
         }
 
-        cap_session->wtap = wtap_open_offline(new_file, WTAP_TYPE_AUTO, &err, &err_info, false);
+        cap_session->wtap = wtap_open_offline(new_file, WTAP_TYPE_AUTO, &err, &err_info, false, application_configuration_environment_prefix());
         if (!cap_session->wtap) {
-            err_msg = ws_strdup_printf(cf_open_error_message(err, err_info),
+            err_msg = ws_strdup_printf(cf_open_error_message(application_flavor_name_proper(), err, err_info),
                                       new_file);
             ws_warning("capture_input_new_file: %d (%s)", err, err_msg);
             g_free(err_msg);
@@ -505,31 +513,34 @@ capture_info_new_packets(int to_read, wtap *wth, info_data_t* cap_info)
 
     /*ws_warning("new packets: %u", to_read);*/
 
-    wtap_rec_init(&rec, 1514);
+    wtap_rec_init(&rec, DEFAULT_INIT_BUFFER_SIZE_2048);
     while (to_read > 0) {
         wtap_cleareof(wth);
-        if (wtap_read(wth, &rec, &err, &err_info, &data_offset)) {
-            if (rec.rec_type == REC_TYPE_PACKET) {
-                capture_packet_info_t cpinfo;
-
-                /* Setup the capture packet structure */
-                cpinfo.counts = cap_info->counts.counts_hash;
-
-                cap_info->counts.total++;
-                if (!try_capture_dissector("wtap_encap",
-                                            rec.rec_header.packet_header.pkt_encap,
-                                            ws_buffer_start_ptr(&rec.data),
-                                            0,
-                                            rec.rec_header.packet_header.caplen,
-                                            &cpinfo,
-                                            &rec.rec_header.packet_header.pseudo_header))
-                    cap_info->counts.other++;
-
-                /*ws_warning("new packet");*/
-                to_read--;
-            }
-            wtap_rec_reset(&rec);
+        if (!wtap_read(wth, &rec, &err, &err_info, &data_offset)) {
+            /* Read failed. capture_input_new_packets should handle
+             * aborting the capture, etc. if necessary. */
+            break;
         }
+        if (rec.rec_type == REC_TYPE_PACKET) {
+            capture_packet_info_t cpinfo;
+
+            /* Setup the capture packet structure */
+            cpinfo.counts = cap_info->counts.counts_hash;
+
+            cap_info->counts.total++;
+            if (!try_capture_dissector("wtap_encap",
+                                        rec.rec_header.packet_header.pkt_encap,
+                                        ws_buffer_start_ptr(&rec.data),
+                                        0,
+                                        rec.rec_header.packet_header.caplen,
+                                        &cpinfo,
+                                        &rec.rec_header.packet_header.pseudo_header))
+                cap_info->counts.other++;
+
+            /*ws_warning("new packet");*/
+            to_read--;
+        }
+        wtap_rec_reset(&rec);
     }
     wtap_rec_cleanup(&rec);
 
@@ -908,7 +919,7 @@ capture_stat_start(capture_options *capture_opts)
      * mechanism, so opening all the devices and presenting packet
      * counts might not always be a good idea.
      */
-    if (sync_interface_stats_open(&stat_fd, &fork_child, NULL, &msg, NULL) == 0) {
+    if (sync_interface_stats_open(capture_opts->app_name, &stat_fd, &fork_child, NULL, &msg, NULL) == 0) {
         sc->stat_fd = stat_fd;
         sc->fork_child = fork_child;
 
@@ -930,7 +941,7 @@ capture_stat_start(capture_options *capture_opts)
 }
 
 if_stat_cache_t *
-capture_interface_stat_start(capture_options *capture_opts _U_, GList **if_list)
+capture_interface_stat_start(capture_options *capture_opts, GList **if_list)
 {
     int stat_fd;
     ws_process_id fork_child;
@@ -966,7 +977,7 @@ capture_interface_stat_start(capture_options *capture_opts _U_, GList **if_list)
      */
     int status;
     iface_mon_enable(false);
-    status = sync_interface_stats_open(&stat_fd, &fork_child, &data, &msg, NULL);
+    status = sync_interface_stats_open(capture_opts->app_name, &stat_fd, &fork_child, &data, &msg, NULL);
     iface_mon_enable(true);
     /* In order to initialize the stat cache (below), we need to have
      * filled in capture_opts->all_ifaces

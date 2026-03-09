@@ -19,7 +19,7 @@
 	RFC3376	Version 3
 
 	Size in bytes for each packet
-	type	RFC988	RFC1054	RFC2236 RFC3376  DVMRP  MRDISC  MSNIP  IGAP  RGMP
+	type	RFC988	RFC1054	RFC2236 RFC3376  DVMRP  MRD    MSNIP  IGAP  RGMP
 	        v0      v1      v2      v3       v1/v3
 	0x01      20
 	0x02      20
@@ -35,17 +35,20 @@
 	0x16                      8
 	0x17                      8
 	0x22                            >=8
-	0x23                                                    >=8b
-	0x24                                            >=8a    8b
-	0x25                                            4a      >=8b
+	0x23                                                   >=8b
+	0x24                                            >=8a   8b
+	0x25                                            4a     >=8b
 	0x26                                            4a
-	0x40                                                           ??c
-	0x41                                                           ??c
-	0x42                                                           ??c
-	0xfc                                                                  8
-	0xfd                                                                  8
-	0xfe                                                                  8
-	0xff                                                                  8
+	0x30                                            8a
+	0x31                                            4a
+	0x32                                            4a
+	0x40                                                          ??c
+	0x41                                                          ??c
+	0x42                                                          ??c
+	0xfc                                                                 8
+	0xfd                                                                 8
+	0xfe                                                                 8
+	0xff                                                                 8
 
    * Differs in second byte of protocol. Always 0 in V1
 
@@ -68,11 +71,16 @@
 	IGMP header.
 	If header[6]==0xff and header[7]==0x03 we have version 3.
 
-   a MRDISC Protocol  see packet-mrdisc.c
+   a MRD Protocol  see packet-mrd.c
 
-	MRDISC : IGMP Multicast Router DISCovery
+	MRD: IGMP Multicast Router Discovery
+	RFC 4296 (https://datatracker.ietf.org/doc/html/rfc4286)
+	0x30, 0x31, 0x32 are IANA assigned
 	draft-ietf-idmr-igmp-mrdisc-06.txt
-	TTL == 1 and IP.DST==224.0.0.2 for all packets
+	used 0x24, 0x25, 0x26 (note conflict with MSNIP)
+	TTL == 1 and IP.DST==224.0.0.2 for 0x31, 0x24, 0x25, 0x26
+	TTL == 1 and IP.DST==224.0.0.106 for 0x30, 0x32
+	(draft 08-10 used IP.DST==224.0.0.1 for 0x30, 0x32)
 
    b MSNIP Protocol  see packet-msnip.c
 
@@ -100,13 +108,14 @@
 #include <epan/expert.h>
 #include <epan/range.h>
 #include <epan/to_str.h>
-#include <epan/ipproto.h>
 #include <epan/in_cksum.h>
 #include <epan/tfs.h>
+#include <epan/iana-info.h>
 #include <wsutil/array.h>
 
 #include <wsutil/str_util.h>
 #include "packet-igmp.h"
+
 
 void proto_register_igmp(void);
 void proto_reg_handoff_igmp(void);
@@ -316,7 +325,7 @@ dissect_igmp_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int* of
 	igmp_tree = proto_item_add_subtree(ti, ett_igmp);
 
 	*type = tvb_get_uint8(tvb, 0);
-	col_add_str(pinfo->cinfo, COL_INFO, val_to_str(*type, commands, "Unknown Type:0x%02x"));
+	col_add_str(pinfo->cinfo, COL_INFO, val_to_str(pinfo->pool, *type, commands, "Unknown Type:0x%02x"));
 
 	/* version of IGMP protocol */
 	ti = proto_tree_add_uint(igmp_tree, hf_version, tvb, 0, 0, version);
@@ -338,7 +347,7 @@ dissect_igmp_unknown(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree)
 	proto_tree* tree;
 	int len;
 	int offset = 0;
-	unsigned char type;
+	uint32_t type;
 
 	col_set_str(pinfo->cinfo, COL_PROTOCOL, "IGMP");
 	col_clear(pinfo->cinfo, COL_INFO);
@@ -346,12 +355,10 @@ dissect_igmp_unknown(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree)
 	ti = proto_tree_add_item(parent_tree, proto_igmp, tvb, offset, -1, ENC_NA);
 	tree = proto_item_add_subtree(ti, ett_igmp);
 
-	type = tvb_get_uint8(tvb, offset);
-	col_add_str(pinfo->cinfo, COL_INFO,
-		val_to_str(type, commands, "Unknown Type:0x%02x"));
-
 	/* type of command */
-	proto_tree_add_uint(tree, hf_type, tvb, offset, 1, type);
+	proto_tree_add_item_ret_uint(tree, hf_type, tvb, offset, 1, ENC_NA, &type);
+	col_add_str(pinfo->cinfo, COL_INFO,
+		val_to_str(pinfo->pool, type, commands, "Unknown Type:0x%02x"));
 	offset += 1;
 
 	/* Just call the rest of it "data" */
@@ -433,18 +440,15 @@ dissect_v3_group_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		);
 
 	/* record type */
-	record_type = tvb_get_uint8(tvb, offset);
-	proto_tree_add_item(tree, hf_record_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+	proto_tree_add_item_ret_uint8(tree, hf_record_type, tvb, offset, 1, ENC_BIG_ENDIAN, &record_type);
 	offset += 1;
 
 	/* aux data len */
-	adl = tvb_get_uint8(tvb, offset);
-	proto_tree_add_uint(tree, hf_aux_data_len, tvb, offset, 1, adl);
+	proto_tree_add_item_ret_uint8(tree, hf_aux_data_len, tvb, offset, 1, ENC_BIG_ENDIAN, &adl);
 	offset += 1;
 
 	/*number of sources*/
-	num = tvb_get_ntohs(tvb, offset);
-	proto_tree_add_uint(tree, hf_num_src, tvb, offset, 2, num);
+	proto_tree_add_item_ret_uint16(tree, hf_num_src, tvb, offset, 2, ENC_BIG_ENDIAN, &num);
 	offset += 2;
 
 	/* multicast address */
@@ -1097,6 +1101,8 @@ proto_register_igmp(void)
 	expert_igmp = expert_register_protocol(proto_igmp);
 	expert_register_field_array(expert_igmp, ei, array_length(ei));
 
+	/* XXX - Due to conflict between some Internet-Drafts, perhaps this
+	 * table should support Decode As? */
 	subdissector_table = register_dissector_table("igmp.type", "IGMP commands", proto_igmp, FT_UINT32, BASE_HEX);
 
 	igmp_handle = register_dissector("igmp", dissect_igmp, proto_igmp);

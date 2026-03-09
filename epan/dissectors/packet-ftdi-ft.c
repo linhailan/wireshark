@@ -56,6 +56,10 @@ static int hf_setup_hindex_baud_high;
 static int hf_setup_hindex_baud_clock_divide;
 static int hf_setup_wlength;
 static int hf_response_lat_timer;
+static int hf_response_pin_states;
+static int hf_setup_lindex_eeprom_addr;
+static int hf_setup_value_eeprom_word;
+static int hf_response_eeprom_word;
 static int hf_modem_status;
 static int hf_modem_status_fs_max_packet;
 static int hf_modem_status_hs_max_packet;
@@ -188,6 +192,12 @@ typedef struct _ftdi_fragment_key {
 #define REQUEST_SET_LAT_TIMER   0x09
 #define REQUEST_GET_LAT_TIMER   0x0A
 #define REQUEST_SET_BITMODE     0x0B
+#define REQUEST_GET_PINS        0x0C
+// EEPROM requests start from 0x90
+#define REQUEST_READ_EEPROM     0x90
+#define REQUEST_WRITE_EEPROM    0x91
+#define REQUEST_ERASE_EEPROM    0x92
+
 
 static const value_string request_vals[] = {
     {REQUEST_RESET,           "Reset"},
@@ -201,6 +211,10 @@ static const value_string request_vals[] = {
     {REQUEST_SET_LAT_TIMER,   "SetLatTimer"},
     {REQUEST_GET_LAT_TIMER,   "GetLatTimer"},
     {REQUEST_SET_BITMODE,     "SetBitMode"},
+    {REQUEST_GET_PINS,        "GetPins"},
+    {REQUEST_READ_EEPROM,     "ReadEEPROM"},
+    {REQUEST_WRITE_EEPROM,    "WriteEEPROM"},
+    {REQUEST_ERASE_EEPROM,    "EraseEEPROM"},
     {0, NULL}
 };
 static value_string_ext request_vals_ext  = VALUE_STRING_EXT_INIT(request_vals);
@@ -690,6 +704,105 @@ dissect_request_set_bitmode(tvbuff_t *tvb, packet_info *pinfo _U_, int offset, p
 }
 
 static int
+dissect_request_get_pins(tvbuff_t *tvb, packet_info *pinfo _U_, int offset, proto_tree *tree)
+{
+    int offset_start = offset;
+
+    proto_tree_add_item(tree, hf_setup_lvalue, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    proto_tree_add_item(tree, hf_setup_hvalue, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    proto_tree_add_item(tree, hf_setup_lindex_port_abcd, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    proto_tree_add_item(tree, hf_setup_hindex, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    return offset - offset_start;
+}
+
+static int
+dissect_response_get_pins(tvbuff_t *tvb, packet_info *pinfo _U_, int offset, proto_tree *tree)
+{
+    int offset_start = offset;
+
+    proto_tree_add_bits_item(tree, hf_response_pin_states, tvb, offset * 8, 8, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    return offset - offset_start;
+}
+
+static int
+dissect_request_read_eeprom(tvbuff_t *tvb, packet_info *pinfo _U_, int offset, proto_tree *tree)
+{
+    int offset_start = offset;
+
+    proto_tree_add_item(tree, hf_setup_lvalue, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    proto_tree_add_item(tree, hf_setup_hvalue, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    proto_tree_add_item(tree, hf_setup_lindex_eeprom_addr, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    proto_tree_add_item(tree, hf_setup_hindex, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    return offset - offset_start;
+}
+
+static int
+dissect_response_read_eeprom(tvbuff_t *tvb, packet_info *pinfo _U_, int offset, proto_tree *tree)
+{
+    int offset_start = offset;
+
+    proto_tree_add_item(tree, hf_response_eeprom_word, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+
+    return offset - offset_start;
+}
+
+static int
+dissect_request_write_eeprom(tvbuff_t *tvb, packet_info *pinfo _U_, int offset, proto_tree *tree)
+{
+    int offset_start = offset;
+
+    proto_tree_add_item(tree, hf_setup_value_eeprom_word, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    offset += 2;
+
+    proto_tree_add_item(tree, hf_setup_lindex_eeprom_addr, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    proto_tree_add_item(tree, hf_setup_hindex, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    return offset - offset_start;
+}
+
+static int
+dissect_request_erase_eeprom(tvbuff_t *tvb, packet_info *pinfo _U_, int offset, proto_tree *tree)
+{
+    int offset_start = offset;
+
+    proto_tree_add_item(tree, hf_setup_lvalue, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    proto_tree_add_item(tree, hf_setup_hvalue, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    proto_tree_add_item(tree, hf_setup_lindex, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    proto_tree_add_item(tree, hf_setup_hindex, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset++;
+
+    return offset - offset_start;
+}
+
+static int
 dissect_modem_status_bytes(tvbuff_t *tvb, packet_info *pinfo _U_, int offset, proto_tree *tree, int *out_rx_len)
 {
     static int * const modem_status_bits[] = {
@@ -946,7 +1059,7 @@ dissect_serial_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, prot
         tvbuff_t *payload_tvb = NULL;
         uint32_t  reassembled_bytes = 0;
         uint8_t   bitmode;
-        uint8_t   curr_layer_num = pinfo->curr_layer_num;
+        fragment_head *fd_head = NULL;
 
         bitmode = get_recorded_interface_mode(pinfo, urb, interface);
 
@@ -957,7 +1070,6 @@ dissect_serial_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, prot
         desegment_data = get_recorded_desegment_data(pinfo, urb, interface, bitmode);
         if (desegment_data)
         {
-            fragment_head    *fd_head;
             desegment_data_t *next_desegment_data = NULL;
 
             if ((desegment_data->previous) && (desegment_data->first_frame == pinfo->num))
@@ -973,20 +1085,36 @@ dissect_serial_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, prot
                 /* Combine data reassembled so far with current tvb and check if this is last fragment or not */
                 fragment_item *item;
                 fd_head = fragment_get(&ftdi_reassembly_table, pinfo, desegment_data->first_frame, desegment_data);
-                DISSECTOR_ASSERT(fd_head && !(fd_head->flags & FD_DEFRAGMENTED) && fd_head->next);
-                payload_tvb = tvb_new_composite();
-                for (item = fd_head->next; item; item = item->next)
-                {
-                    DISSECTOR_ASSERT(reassembled_bytes == item->offset);
-                    tvb_composite_append(payload_tvb, item->tvb_data);
-                    reassembled_bytes += item->len;
+                DISSECTOR_ASSERT(fd_head && fd_head->next);
+                if (fd_head->flags & FD_DATALEN_SET) {
+                    /* If we already reassembled this, then even if we set
+                     * partial reassembly, this has the total length.
+                     */
+                    reassembled_bytes = fd_head->datalen;
+                } else {
+                    /* Given how we process this, this case should only be
+                     * when there's one fragment.
+                     */
+                    for (item = fd_head->next; item; item = item->next)
+                    {
+                        DISSECTOR_ASSERT(reassembled_bytes == item->offset);
+                        reassembled_bytes += item->len;
+                    }
                 }
-                tvb_composite_append(payload_tvb, tvb);
-                tvb_composite_finalize(payload_tvb);
+
+                /* Always assume there are no more frags on the first pass.
+                 * We can't know until we call the subdissector.
+                 */
+                fd_head = fragment_add(&ftdi_reassembly_table, tvb, 0, pinfo, desegment_data->first_frame, desegment_data, reassembled_bytes, bytes, false);
+                payload_tvb = tvb_new_chain(tvb, fd_head->tvb_data);
+                add_new_data_source(pinfo, payload_tvb, "Reassembled");
+                /* Since we don't know if this is really the last fragment
+                 * yet, wait and show the fragment tree only if it is.
+                 */
             }
             else
             {
-                fd_head = fragment_get_reassembled_id(&ftdi_reassembly_table, pinfo, desegment_data->first_frame);
+                fd_head = fragment_get(&ftdi_reassembly_table, pinfo, desegment_data->first_frame, desegment_data);
                 payload_tvb = process_reassembled_data(tvb, 0, pinfo, "Reassembled", fd_head,
                                                        &ftdi_frag_items, NULL, ftdi_tree);
             }
@@ -994,7 +1122,7 @@ dissect_serial_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, prot
             if (next_desegment_data)
             {
                 fragment_head *next_head;
-                next_head = fragment_get_reassembled_id(&ftdi_reassembly_table, pinfo, next_desegment_data->first_frame);
+                next_head = fragment_get(&ftdi_reassembly_table, pinfo, next_desegment_data->first_frame, next_desegment_data);
                 process_reassembled_data(tvb, 0, pinfo, "Reassembled", next_head, &ftdi_frag_items, NULL, ftdi_tree);
             }
 
@@ -1017,34 +1145,24 @@ dissect_serial_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, prot
              * the data to the next dissector. There is absolutely no metadata that could help with it as
              * FTDI FT is pretty much a direct replacement to UART (COM port) and is pretty much transparent
              * to the actual serial protocol used.
-             *
-             * Passing the data to next dissector results in curr_layer_num being increased if it dissected
-             * the data (when it is the last fragment). This would prevent the process_reassembled_data()
-             * (after the first pass) from returning the reassembled tvb in FTFI FT which in turn prevents
-             * the data from being passed to the next dissector.
-             *
-             * Override pinfo->curr_layer_num value when the fragments are being added to reassembly table.
-             * This is ugly hack. Is there any better approach?
-             *
-             * There doesn't seem to be a mechanism to "back-track" just added fragments to reassembly table,
-             * or any way to "shorten" the last added fragment. The most problematic case is when current
-             * packet is both last packet for previous reassembly and a first packet for next reassembly.
              */
-            uint8_t save_curr_layer_num = pinfo->curr_layer_num;
-            pinfo->curr_layer_num = curr_layer_num;
 
             if (!pinfo->desegment_len)
             {
                 if (desegment_data)
                 {
                     /* Current tvb is really the last fragment */
-                    fragment_add_check(&ftdi_reassembly_table, tvb, 0, pinfo, desegment_data->first_frame,
-                                       desegment_data, reassembled_bytes, bytes, false);
+                    proto_tree *frag_tree_item;
+                    show_fragment_tree(fd_head, &ftdi_frag_items, ftdi_tree, pinfo, payload_tvb, &frag_tree_item);
                     desegment_data->last_frame = pinfo->num;
                 }
             }
             else
             {
+                /* XXX - This probably works even if the subdissector does try
+                 * to set the desegment_len, this dissector will just ignore
+                 * it and treat it as DESEGMENT_ONE_MORE_SEGMENT anyway.
+                 */
                 DISSECTOR_ASSERT_HINT(pinfo->desegment_len == DESEGMENT_ONE_MORE_SEGMENT,
                                       "FTDI FT supports only DESEGMENT_ONE_MORE_SEGMENT");
                 if (!desegment_data)
@@ -1053,14 +1171,13 @@ dissect_serial_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, prot
                     int fragment_length = tvb_reported_length_remaining(tvb, pinfo->desegment_offset);
                     desegment_data = record_desegment_data(pinfo, urb, interface, bitmode);
                     desegment_data->first_frame_offset = pinfo->desegment_offset;
-                    fragment_add_check(&ftdi_reassembly_table, tvb, pinfo->desegment_offset, pinfo,
+                    fragment_add(&ftdi_reassembly_table, tvb, pinfo->desegment_offset, pinfo,
                                        desegment_data->first_frame, desegment_data, 0, fragment_length, true);
                 }
                 else if (pinfo->desegment_offset == 0)
                 {
                     /* Continue reassembling */
-                    fragment_add_check(&ftdi_reassembly_table, tvb, 0, pinfo, desegment_data->first_frame,
-                                       desegment_data, reassembled_bytes, bytes, true);
+                    fragment_set_partial_reassembly(&ftdi_reassembly_table, pinfo, desegment_data->first_frame, desegment_data);
                 }
                 else
                 {
@@ -1071,8 +1188,7 @@ dissect_serial_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, prot
                     /* This packet contains both an end from a previous reassembly and start of a new one */
                     DISSECTOR_ASSERT((uint32_t)pinfo->desegment_offset > reassembled_bytes);
                     previous_bytes = pinfo->desegment_offset - reassembled_bytes;
-                    fragment_add_check(&ftdi_reassembly_table, tvb, 0, pinfo, desegment_data->first_frame,
-                                       desegment_data, reassembled_bytes, previous_bytes, false);
+                    fragment_truncate(&ftdi_reassembly_table, pinfo, desegment_data->first_frame, desegment_data, pinfo->desegment_offset);
                     desegment_data->last_frame = pinfo->num;
 
                     previous_desegment_data = desegment_data;
@@ -1080,12 +1196,14 @@ dissect_serial_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, prot
                     desegment_data = record_desegment_data(pinfo, urb, interface, bitmode);
                     desegment_data->first_frame_offset = previous_bytes;
                     desegment_data->previous = previous_desegment_data;
-                    fragment_add_check(&ftdi_reassembly_table, tvb, previous_bytes, pinfo, desegment_data->first_frame,
+                    /* Note we assume that this isn't followed by another PDU;
+                     * i.e., that the subdissector would dissect as many PDUs
+                     * as possible. (Otherwise we'd have to loop here.)
+                     */
+                    fragment_add(&ftdi_reassembly_table, tvb, previous_bytes, pinfo, desegment_data->first_frame,
                                        desegment_data, 0, fragment_length, true);
                 }
             }
-
-            pinfo->curr_layer_num = save_curr_layer_num;
         }
     }
 
@@ -1198,6 +1316,18 @@ dissect_ftdi_ft(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
             case REQUEST_SET_BITMODE:
                 bytes_dissected = dissect_request_set_bitmode(tvb, pinfo, offset, main_tree);
                 break;
+            case REQUEST_GET_PINS:
+                bytes_dissected = dissect_request_get_pins(tvb, pinfo, offset, main_tree);
+                break;
+            case REQUEST_READ_EEPROM:
+                bytes_dissected = dissect_request_read_eeprom(tvb, pinfo, offset, main_tree);
+                break;
+            case REQUEST_WRITE_EEPROM:
+                bytes_dissected = dissect_request_write_eeprom(tvb, pinfo, offset, main_tree);
+                break;
+            case REQUEST_ERASE_EEPROM:
+                bytes_dissected = dissect_request_erase_eeprom(tvb, pinfo, offset, main_tree);
+                break;
             default:
                 bytes_dissected = 0;
                 break;
@@ -1239,6 +1369,12 @@ dissect_ftdi_ft(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
                 case REQUEST_GET_LAT_TIMER:
                     offset += dissect_response_get_lat_timer(tvb, pinfo, offset, main_tree);
                     break;
+                case REQUEST_GET_PINS:
+                    offset += dissect_response_get_pins(tvb, pinfo, offset, main_tree);
+                    break;
+                case REQUEST_READ_EEPROM:
+                    offset += dissect_response_read_eeprom(tvb, pinfo, offset, main_tree);
+                    break;
                 case REQUEST_SET_BITMODE:
                     /* TODO: Record interface mode only if the control request has succeeded */
                     record_interface_mode(pinfo, urb, lindex_to_interface(request_data->lindex), request_data->hvalue);
@@ -1255,7 +1391,7 @@ dissect_ftdi_ft(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
             /* Report any potentially undissected response data */
             if (tvb_reported_length_remaining(tvb, offset) > 0)
             {
-                proto_tree_add_expert(main_tree, pinfo, &ei_undecoded, tvb, offset, -1);
+                proto_tree_add_expert_remaining(main_tree, pinfo, &ei_undecoded, tvb, offset);
             }
         }
     }
@@ -1535,6 +1671,26 @@ proto_register_ftdi_ft(void)
             FT_UINT8, BASE_DEC, NULL, 0x0,
             "Latency time in milliseconds", HFILL }
         },
+        { &hf_response_pin_states,
+          { "Pin States", "ftdi-ft.pin_states",
+            FT_UINT8, BASE_HEX, NULL, 0x0,
+            "GPIO pin states", HFILL }
+        },
+        { &hf_setup_lindex_eeprom_addr,
+          { "EEPROM Address", "ftdi-ft.eeprom_addr",
+            FT_UINT8, BASE_HEX, NULL, 0x0,
+            "EEPROM word address", HFILL }
+        },
+        { &hf_setup_value_eeprom_word,
+          { "EEPROM Word Value", "ftdi-ft.eeprom_word_value",
+            FT_UINT16, BASE_HEX, NULL, 0x0,
+            "EEPROM word value to write", HFILL }
+        },
+        { &hf_response_eeprom_word,
+          { "EEPROM Word", "ftdi-ft.eeprom_word",
+            FT_UINT16, BASE_HEX, NULL, 0x0,
+            "EEPROM word value", HFILL }
+        },
         { &hf_modem_status,
           { "Modem Status", "ftdi-ft.modem_status",
             FT_UINT8, BASE_HEX, NULL, 0x0,
@@ -1733,8 +1889,7 @@ proto_register_ftdi_ft(void)
 void
 proto_reg_handoff_ftdi_ft(void)
 {
-    /* TODO: Add configuration option to specify VID and PID.
-     * The values below denote default VID/PID of FT converters (as of 2019)
+    /* The values below denote default VID/PID of FT converters (as of 2019)
      * The VID and PID can be changed by hardware vendor.
      */
     dissector_add_uint("usb.product", (0x0403 << 16) | 0x6001, ftdi_ft_handle);
@@ -1752,6 +1907,7 @@ proto_reg_handoff_ftdi_ft(void)
     dissector_add_uint("usb.product", (0x1d50 << 16) | 0x607c, ftdi_ft_handle); /* OpenVizsla USB sniffer/analyzer */
 
     dissector_add_for_decode_as("usb.device", ftdi_ft_handle);
+    dissector_add_for_decode_as_with_preference("usb.product", ftdi_ft_handle);
 
     ftdi_mpsse_handle = find_dissector_add_dependency("ftdi-mpsse", proto_ftdi_ft);
 }

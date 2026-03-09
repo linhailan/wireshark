@@ -232,7 +232,7 @@ dissect_gfp_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, proto_t
     upi = tvb_get_uint8(tvb, *offset+1);
     p_add_proto_data(pinfo->pool, pinfo, proto_gfp, 0, GUINT_TO_POINTER(upi));
 
-    col_add_str(pinfo->cinfo, COL_INFO, val_to_str(pti, gfp_pti_vals, "Reserved PTI (%d)"));
+    col_add_str(pinfo->cinfo, COL_INFO, val_to_str(pinfo->pool, pti, gfp_pti_vals, "Reserved PTI (%d)"));
     if (pti == GFP_USER_DATA ||
         pti == GFP_MANAGEMENT_COMMUNICATIONS) {
         /* G.7041 Table 6-3 - GFP_MANAGEMENT_COMMUNICATIONS
@@ -240,12 +240,12 @@ dissect_gfp_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, proto_t
          * "not all of these UPI types are applicable" in that case. */
         type_ti = proto_tree_add_bitmask_with_flags(gfp_tree, tvb, *offset, hf_gfp_type,
             ett_gfp_type, gfp_type_data_fields, ENC_BIG_ENDIAN, BMT_NO_FLAGS);
-        col_append_sep_str(pinfo->cinfo, COL_INFO, ": ", rval_to_str(upi, gfp_upi_data_rvals, "Unknown 0x%02x"));
+        col_append_sep_str(pinfo->cinfo, COL_INFO, ": ", rval_to_str_wmem(pinfo->pool, upi, gfp_upi_data_rvals, "Unknown 0x%02x"));
     } else if (pti == GFP_CLIENT_MANAGEMENT) {
         /* G.7041 Table 6-4 */
         type_ti = proto_tree_add_bitmask_with_flags(gfp_tree, tvb, *offset, hf_gfp_type,
             ett_gfp_type, gfp_type_management_fields, ENC_BIG_ENDIAN, BMT_NO_FLAGS);
-        col_append_sep_str(pinfo->cinfo, COL_INFO, ": ", rval_to_str(upi, gfp_upi_management_rvals, "Unknown 0x%02x"));
+        col_append_sep_str(pinfo->cinfo, COL_INFO, ": ", rval_to_str_wmem(pinfo->pool, upi, gfp_upi_management_rvals, "Unknown 0x%02x"));
     }
 
     /* G.7041 6.1.2.1.2 Type HEC (tHEC) - mandatory 2 bytes */
@@ -550,7 +550,7 @@ proto_register_gfp(void)
     static build_valid_func gfp_da_build_value[1] = {gfp_value};
     static decode_as_value_t gfp_da_values = {gfp_prompt, 1, gfp_da_build_value};
     static decode_as_t gfp_da = {"gfp", "gfp.upi", 1, 0, &gfp_da_values, NULL, NULL,
-                                 decode_as_default_populate_list, decode_as_default_reset, decode_as_default_change, NULL};
+                                 decode_as_default_populate_list, decode_as_default_reset, decode_as_default_change, NULL, NULL, NULL };
 
     /* module_t        *gfp_module; */
     expert_module_t *expert_gfp;

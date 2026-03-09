@@ -155,7 +155,7 @@ dissect_soupbintcp_common(
     pkt_type = tvb_get_uint8(tvb, 2);
 
     /* Since we use the packet name a few times, get and save that value */
-    pkt_name = val_to_str(pkt_type, pkt_type_val, "Unknown (%u)");
+    pkt_name = val_to_str(pinfo->pool, pkt_type, pkt_type_val, "Unknown (%u)");
 
     /* Set the protocol name in the summary display */
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "SoupBinTCP");
@@ -192,7 +192,7 @@ dissect_soupbintcp_common(
 
     /* If first dissection of Login Accept, save sequence number */
     if (pkt_type == 'A' && !PINFO_FD_VISITED(pinfo)) {
-        ws_strtou32(tvb_get_string_enc(pinfo->pool, tvb, 13, 20, ENC_ASCII),
+        ws_strtou32((char*)tvb_get_string_enc(pinfo->pool, tvb, 13, 20, ENC_ASCII),
             NULL, &next_seq);
 
         /* Create new conversation for this session */
@@ -262,7 +262,7 @@ dissect_soupbintcp_common(
         /* Type */
         proto_tree_add_item(soupbintcp_tree,
                             hf_soupbintcp_packet_type,
-                            tvb, offset, 1, ENC_ASCII|ENC_NA);
+                            tvb, offset, 1, ENC_ASCII);
         offset += 1;
 
         switch (pkt_type) {
@@ -278,7 +278,7 @@ dissect_soupbintcp_common(
                                 tvb, offset, 10, ENC_ASCII);
             offset += 10;
 
-            seq_num_valid = ws_strtoi32(tvb_get_string_enc(pinfo->pool,
+            seq_num_valid = ws_strtoi32((char*)tvb_get_string_enc(pinfo->pool,
                 tvb, offset, 20, ENC_ASCII), NULL, &seq_num);
             pi = proto_tree_add_string_format_value(soupbintcp_tree,
                                                hf_soupbintcp_next_seq_num,
@@ -292,7 +292,7 @@ dissect_soupbintcp_common(
         case 'J': /* Login Reject */
             proto_tree_add_item(soupbintcp_tree,
                                 hf_soupbintcp_reject_code,
-                                tvb, offset, 1, ENC_ASCII|ENC_NA);
+                                tvb, offset, 1, ENC_ASCII);
             break;
 
         case 'U': /* Unsequenced Data */
@@ -327,7 +327,7 @@ dissect_soupbintcp_common(
                                 tvb, offset, 10, ENC_ASCII);
             offset += 10;
 
-            seq_num_valid = ws_strtoi32(tvb_get_string_enc(pinfo->pool,
+            seq_num_valid = ws_strtoi32((char*)tvb_get_string_enc(pinfo->pool,
                 tvb, offset, 20, ENC_ASCII), NULL, &seq_num);
             pi = proto_tree_add_string_format_value(soupbintcp_tree,
                                                hf_soupbintcp_req_seq_num,

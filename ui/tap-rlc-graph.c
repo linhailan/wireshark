@@ -123,7 +123,7 @@ rlc_3gpp_tap_info* select_rlc_lte_session(capture_file *cf,
     fdata = cf->current_frame;
 
     /* Dissect the data from the current frame. */
-    wtap_rec_init(&rec, 1514);
+    wtap_rec_init(&rec, DEFAULT_INIT_BUFFER_SIZE_2048);
     if (!cf_read_current_record(cf)) {
         dfilter_free(sfcode);
         wtap_rec_cleanup(&rec);
@@ -137,7 +137,7 @@ rlc_3gpp_tap_info* select_rlc_lte_session(capture_file *cf,
                 error_string->str);
         g_string_free(error_string, TRUE);
         dfilter_free(sfcode);
-        exit(1);   /* XXX: fix this */
+        return NULL;
     }
 
     epan_dissect_init(&edt, cf->epan, true, false);
@@ -160,7 +160,7 @@ rlc_3gpp_tap_info* select_rlc_lte_session(capture_file *cf,
     if (th.num_hdrs>1){
         /* Can only handle a single RLC channel yet */
         wtap_rec_cleanup(&rec);
-        *err_msg = g_strdup("The selected packet has more than one LTE RLC channel in it.");
+        *err_msg = g_strdup("The selected packet has traffic from more than one RLC bearer.");
         return NULL;
     }
 
@@ -295,7 +295,7 @@ bool rlc_graph_segment_list_get(capture_file *cf, struct rlc_graph *g, bool stre
         fprintf(stderr, "wireshark: Couldn't register rlc_graph tap: %s\n",
                 error_string->str);
         g_string_free(error_string, TRUE);
-        exit(1);   /* XXX: fix this */
+        return false;
     }
     cf_retap_packets(cf);
     remove_tap_listener(g);

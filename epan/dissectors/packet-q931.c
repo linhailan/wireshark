@@ -17,15 +17,15 @@
 #include <epan/tfs.h>
 #include <epan/unit_strings.h>
 #include <epan/tap.h>
-#include <epan/nlpid.h>
 #include "packet-q931.h"
 #include "packet-e164.h"
 #include <epan/prefs.h>
 #include <epan/expert.h>
 #include <epan/reassemble.h>
-#include <epan/sctpppids.h>
-#include <epan/lapd_sapi.h>
+#include "packet-lapd.h"
 #include "packet-tpkt.h"
+#include "packet-osi.h"
+#include "packet-sctp.h"
 
 
 /* Q.931 references:
@@ -264,7 +264,7 @@ static heur_dissector_list_t q931_user_heur_subdissector_list;
 
 static void
 dissect_q931_IEs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *root_tree,
-    proto_tree *q931_tree, bool is_over_ip, int offset, int initial_codeset,
+    proto_tree *q931_tree, bool is_over_ip, unsigned offset, int initial_codeset,
     q931_packet_info *q931_pi);
 
 const value_string q931_message_type_vals[] = {
@@ -604,7 +604,7 @@ static const value_string q931_repeat_indication_vals[] = {
  * Dissect a Segmented message information element.
  */
 static void
-dissect_q931_segmented_message_ie(tvbuff_t *tvb, packet_info *pinfo, int offset, int len,
+dissect_q931_segmented_message_ie(tvbuff_t *tvb, packet_info *pinfo, unsigned offset, unsigned len,
     proto_tree *tree, proto_item* item)
 {
     uint8_t octet;
@@ -792,7 +792,7 @@ static const value_string q931_uil3_vals[] = {
 };
 
 static void
-dissect_q931_protocol_discriminator(tvbuff_t *tvb, int offset, proto_tree *tree)
+dissect_q931_protocol_discriminator(tvbuff_t *tvb, unsigned offset, proto_tree *tree)
 {
     unsigned int discriminator = tvb_get_uint8(tvb, offset);
 
@@ -861,7 +861,7 @@ static const true_false_string tfs_in_out_band                        = { "in-ba
 static const true_false_string tfs_protocol_negotiation               = { "Full protocol negotiation", "LLI = 256 only" };
 
 void
-dissect_q931_bearer_capability_ie(tvbuff_t *tvb, int offset, int len,
+dissect_q931_bearer_capability_ie(tvbuff_t *tvb, unsigned offset, unsigned len,
     proto_tree *tree)
 {
     uint8_t octet;
@@ -1272,17 +1272,17 @@ static const value_string q931_rejection_reason_vals[] = {
     { 0x00, NULL }
 };
 
-static const char *get_message_name(uint8_t prot_discr, uint8_t message_type) {
+static const char *get_message_name(wmem_allocator_t* scope, uint8_t prot_discr, uint8_t message_type) {
     if (prot_discr == NLPID_DMS)
-        return val_to_str(message_type, dms_message_type_vals, "Unknown (0x%02X)");
+        return val_to_str(scope, message_type, dms_message_type_vals, "Unknown (0x%02X)");
     else
-        return val_to_str_ext(message_type, &q931_message_type_vals_ext, "Unknown (0x%02X)");
+        return val_to_str_ext(scope, message_type, &q931_message_type_vals_ext, "Unknown (0x%02X)");
 }
 
 static const true_false_string tfs_abnormal_normal = { "Abnormal", "Normal" };
 
 static void
-dissect_q931_cause_ie_with_info(tvbuff_t *tvb, int offset, int len,
+dissect_q931_cause_ie_with_info(tvbuff_t *tvb, packet_info* pinfo, unsigned offset, unsigned len,
     proto_tree *tree, int hf_cause_value, uint8_t *cause_value, const value_string *ie_vals,
     q931_packet_info *q931_pi)
 {
@@ -1363,13 +1363,13 @@ dissect_q931_cause_ie_with_info(tvbuff_t *tvb, int offset, int len,
 
         case Q931_REJ_IE_MISSING:
             proto_tree_add_uint_format_value(tree, hf_q931_missing_info_element, tvb, offset, 1,
-                 tvb_get_uint8(tvb, offset), "%s", val_to_str(tvb_get_uint8(tvb, offset), ie_vals,
+                 tvb_get_uint8(tvb, offset), "%s", val_to_str(pinfo->pool,tvb_get_uint8(tvb, offset), ie_vals,
                   "Unknown (0x%02X)"));
             break;
 
         case Q931_REJ_IE_INSUFFICIENT:
             proto_tree_add_uint_format_value(tree, hf_q931_insufficient_info_element, tvb, offset, 1,
-                tvb_get_uint8(tvb, offset), "%s", val_to_str(tvb_get_uint8(tvb, offset), ie_vals,
+                tvb_get_uint8(tvb, offset), "%s", val_to_str(pinfo->pool,tvb_get_uint8(tvb, offset), ie_vals,
                   "Unknown (0x%02X)"));
             break;
 
@@ -1386,7 +1386,7 @@ dissect_q931_cause_ie_with_info(tvbuff_t *tvb, int offset, int len,
     case Q931_CAUSE_INVALID_IE_CONTENTS:
         do {
             proto_tree_add_uint_format_value(tree, hf_q931_information_element, tvb, offset, 1,
-                tvb_get_uint8(tvb, offset), "%s", val_to_str(tvb_get_uint8(tvb, offset), ie_vals,
+                tvb_get_uint8(tvb, offset), "%s", val_to_str(pinfo->pool,tvb_get_uint8(tvb, offset), ie_vals,
                   "Unknown (0x%02X)"));
             offset += 1;
             len -= 1;
@@ -1401,7 +1401,7 @@ dissect_q931_cause_ie_with_info(tvbuff_t *tvb, int offset, int len,
     case Q931_CAUSE_REC_TIMER_EXP:
         if (len < 3)
             return;
-        proto_tree_add_item(tree, hf_q931_cause_call_rec_timer, tvb, offset, 3, ENC_NA|ENC_ASCII);
+        proto_tree_add_item(tree, hf_q931_cause_call_rec_timer, tvb, offset, 3, ENC_ASCII);
         break;
 
     default:
@@ -1410,11 +1410,11 @@ dissect_q931_cause_ie_with_info(tvbuff_t *tvb, int offset, int len,
 }
 
 void
-dissect_q931_cause_ie(tvbuff_t *tvb, int offset, int len,
+dissect_q931_cause_ie(tvbuff_t *tvb, packet_info* pinfo, unsigned offset, unsigned len,
               proto_tree *tree, int hf_cause_value, uint8_t *cause_value, const value_string *ie_vals)
 {
     /* External dissectors have no use for "q931_packet_info". */
-    dissect_q931_cause_ie_with_info(tvb, offset, len, tree, hf_cause_value, cause_value, ie_vals, NULL);
+    dissect_q931_cause_ie_with_info(tvb, pinfo, offset, len, tree, hf_cause_value, cause_value, ie_vals, NULL);
 }
 
 /*
@@ -1434,7 +1434,7 @@ static const value_string q931_new_status_vals[] = {
 };
 
 static void
-dissect_q931_change_status_ie(tvbuff_t *tvb, int offset, int len _U_, proto_tree *tree)
+dissect_q931_change_status_ie(tvbuff_t *tvb, unsigned offset, unsigned len _U_, proto_tree *tree)
 {
     if (len == 0)
         return;
@@ -1472,7 +1472,7 @@ static const value_string q931_call_state_vals[] = {
 value_string_ext q931_call_state_vals_ext = VALUE_STRING_EXT_INIT(q931_call_state_vals);
 
 static void
-dissect_q931_call_state_ie(tvbuff_t *tvb, int offset, int len,
+dissect_q931_call_state_ie(tvbuff_t *tvb, unsigned offset, unsigned len,
     proto_tree *tree)
 {
     uint8_t octet;
@@ -1526,7 +1526,7 @@ static const value_string q931_element_type_vals[] = {
 };
 
 static void
-dissect_q931_channel_identification_ie(tvbuff_t *tvb, int offset, int len,
+dissect_q931_channel_identification_ie(tvbuff_t *tvb, unsigned offset, unsigned len,
     proto_tree *tree)
 {
     uint8_t octet;
@@ -1632,7 +1632,7 @@ static const value_string q931_progress_description_vals[] = {
 value_string_ext q931_progress_description_vals_ext = VALUE_STRING_EXT_INIT(q931_progress_description_vals);
 
 void
-dissect_q931_progress_indicator_ie(tvbuff_t *tvb, int offset, int len,
+dissect_q931_progress_indicator_ie(tvbuff_t *tvb, unsigned offset, unsigned len,
     proto_tree *tree)
 {
     uint8_t octet;
@@ -1680,11 +1680,11 @@ static const value_string q931_netid_plan_vals[] = {
 };
 
 static void
-dissect_q931_ns_facilities_ie(tvbuff_t *tvb, int offset, int len,
+dissect_q931_ns_facilities_ie(tvbuff_t *tvb, unsigned offset, unsigned len,
     proto_tree *tree)
 {
     uint8_t octet;
-    int netid_len;
+    unsigned netid_len;
 
     if (len == 0)
         return;
@@ -1707,7 +1707,7 @@ dissect_q931_ns_facilities_ie(tvbuff_t *tvb, int offset, int len,
         if (netid_len > len)
             netid_len = len;
         if (netid_len != 0) {
-            proto_tree_add_item(tree, hf_q931_netid, tvb, offset, netid_len, ENC_NA|ENC_ASCII);
+            proto_tree_add_item(tree, hf_q931_netid, tvb, offset, netid_len, ENC_ASCII);
             offset += netid_len;
             len -= netid_len;
         }
@@ -1733,7 +1733,7 @@ static const value_string q931_notification_description_vals[] = {
 };
 
 static void
-dissect_q931_notification_indicator_ie(tvbuff_t *tvb, int offset, int len,
+dissect_q931_notification_indicator_ie(tvbuff_t *tvb, unsigned offset, unsigned len,
     proto_tree *tree)
 {
     if (len == 0)
@@ -1746,7 +1746,7 @@ dissect_q931_notification_indicator_ie(tvbuff_t *tvb, int offset, int len,
  * Dissect a Date/time information element.
  */
 static void
-dissect_q931_date_time_ie(tvbuff_t *tvb, packet_info* pinfo, int offset, int len,
+dissect_q931_date_time_ie(tvbuff_t *tvb, packet_info* pinfo, unsigned offset, unsigned len,
     proto_tree *tree)
 {
     if (len == 6) {
@@ -1795,7 +1795,7 @@ static const value_string q931_signal_vals[] = {
 static value_string_ext q931_signal_vals_ext = VALUE_STRING_EXT_INIT(q931_signal_vals);
 
 static void
-dissect_q931_signal_ie(tvbuff_t *tvb, packet_info *pinfo, int offset, int len,
+dissect_q931_signal_ie(tvbuff_t *tvb, packet_info *pinfo, unsigned offset, unsigned len,
     proto_tree *tree, proto_item* item)
 {
     if (len != 1) {
@@ -1826,7 +1826,7 @@ static const value_string q931_throughput_class_vals[] = {
 static value_string_ext q931_throughput_class_vals_ext = VALUE_STRING_EXT_INIT(q931_throughput_class_vals);
 
 static void
-dissect_q931_information_rate_ie(tvbuff_t *tvb, packet_info *pinfo, int offset, int len,
+dissect_q931_information_rate_ie(tvbuff_t *tvb, packet_info *pinfo, unsigned offset, unsigned len,
     proto_tree *tree, proto_item* item)
 {
     if (len != 4) {
@@ -1841,7 +1841,7 @@ dissect_q931_information_rate_ie(tvbuff_t *tvb, packet_info *pinfo, int offset, 
 }
 
 static int
-dissect_q931_uint16_value(tvbuff_t *tvb, packet_info *pinfo, int offset, int len,
+dissect_q931_uint16_value(tvbuff_t *tvb, packet_info *pinfo, unsigned offset, unsigned len,
     proto_tree *tree, proto_item* item, int hf_value)
 {
     uint8_t octet;
@@ -1916,7 +1916,7 @@ bad_length:
  * Dissect an End-to-end transit delay information element.
  */
 static void
-dissect_q931_e2e_transit_delay_ie(tvbuff_t *tvb, packet_info *pinfo, int offset, int len,
+dissect_q931_e2e_transit_delay_ie(tvbuff_t *tvb, packet_info *pinfo, unsigned offset, unsigned len,
     proto_tree *tree, proto_item* item)
 {
     int value_len;
@@ -1946,7 +1946,7 @@ dissect_q931_e2e_transit_delay_ie(tvbuff_t *tvb, packet_info *pinfo, int offset,
  * Dissect a Transit delay selection and indication information element.
  */
 static void
-dissect_q931_td_selection_and_int_ie(tvbuff_t *tvb, packet_info *pinfo, int offset, int len,
+dissect_q931_td_selection_and_int_ie(tvbuff_t *tvb, packet_info *pinfo, unsigned offset, unsigned len,
     proto_tree *tree, proto_item* item)
 {
     if (len == 0)
@@ -1970,7 +1970,7 @@ static const true_false_string tfs_pl_request = { "No request/request denied", "
 static const true_false_string tfs_pl_modulus = { "8 sequencing", "128 sequencing" };
 
 static void
-dissect_q931_pl_binary_parameters_ie(tvbuff_t *tvb, int offset, int len,
+dissect_q931_pl_binary_parameters_ie(tvbuff_t *tvb, unsigned offset, unsigned len,
     proto_tree *tree)
 {
     static int * const fields[] = {
@@ -1991,7 +1991,7 @@ dissect_q931_pl_binary_parameters_ie(tvbuff_t *tvb, int offset, int len,
  * Dissect a Packet layer window size information element.
  */
 static void
-dissect_q931_pl_window_size_ie(tvbuff_t *tvb, int offset, int len,
+dissect_q931_pl_window_size_ie(tvbuff_t *tvb, unsigned offset, unsigned len,
     proto_tree *tree)
 {
     if (len == 0)
@@ -2009,7 +2009,7 @@ dissect_q931_pl_window_size_ie(tvbuff_t *tvb, int offset, int len,
  * Dissect a Packet size information element.
  */
 static void
-dissect_q931_packet_size_ie(tvbuff_t *tvb, int offset, int len,
+dissect_q931_packet_size_ie(tvbuff_t *tvb, unsigned offset, unsigned len,
     proto_tree *tree)
 {
     if (len == 0)
@@ -2033,7 +2033,7 @@ static const value_string q931_cug_indication_vals[] = {
 };
 
 static void
-dissect_q931_cug_ie(tvbuff_t *tvb, int offset, int len, proto_tree *tree)
+dissect_q931_cug_ie(tvbuff_t *tvb, unsigned offset, unsigned len, proto_tree *tree)
 {
     if (len == 0)
         return;
@@ -2043,7 +2043,7 @@ dissect_q931_cug_ie(tvbuff_t *tvb, int offset, int len, proto_tree *tree)
 
     if (len == 0)
         return;
-    proto_tree_add_item(tree, hf_q931_cug_index_code, tvb, offset, len, ENC_NA|ENC_ASCII);
+    proto_tree_add_item(tree, hf_q931_cug_index_code, tvb, offset, len, ENC_ASCII);
 }
 
 /*
@@ -2055,7 +2055,7 @@ static const value_string q931_reverse_charging_indication_vals[] = {
 };
 
 static void
-dissect_q931_reverse_charge_ind_ie(tvbuff_t *tvb, int offset, int len,
+dissect_q931_reverse_charge_ind_ie(tvbuff_t *tvb, unsigned offset, unsigned len,
     proto_tree *tree)
 {
     if (len == 0)
@@ -2113,7 +2113,7 @@ static const value_string q931_redirection_reason_vals[] = {
 };
 
 static void
-dissect_q931_number_ie(packet_info *pinfo, tvbuff_t *tvb, int offset, int len,
+dissect_q931_number_ie(packet_info *pinfo, tvbuff_t *tvb, unsigned offset, unsigned len,
     proto_tree *tree, int hfindex, e164_info_t e164_info, q931_packet_info *q931_pi)
 {
     uint8_t octet;
@@ -2161,7 +2161,7 @@ dissect_q931_number_ie(packet_info *pinfo, tvbuff_t *tvb, int offset, int len,
     if ( number_plan == 1 ) {
         if ( e164_info.e164_number_type != NONE ){
 
-            e164_info.E164_number_str = tvb_get_string_enc(pinfo->pool, tvb, offset, len, ENC_ASCII|ENC_NA);
+            e164_info.E164_number_str = (char*)tvb_get_string_enc(pinfo->pool, tvb, offset, len, ENC_ASCII|ENC_NA);
             e164_info.E164_number_length = len;
             dissect_e164_number(tvb, tree, offset, len, e164_info);
         }
@@ -2169,9 +2169,9 @@ dissect_q931_number_ie(packet_info *pinfo, tvbuff_t *tvb, int offset, int len,
 
     /* Collect q931_packet_info */
     if ( e164_info.e164_number_type == CALLING_PARTY_NUMBER && q931_pi)
-        q931_pi->calling_number = tvb_get_string_enc(pinfo->pool, tvb, offset, len, ENC_ASCII|ENC_NA);
+        q931_pi->calling_number = (char*)tvb_get_string_enc(pinfo->pool, tvb, offset, len, ENC_ASCII|ENC_NA);
     if ( e164_info.e164_number_type == CALLED_PARTY_NUMBER && q931_pi)
-        q931_pi->called_number = tvb_get_string_enc(pinfo->pool, tvb, offset, len, ENC_ASCII|ENC_NA);
+        q931_pi->called_number = (char*)tvb_get_string_enc(pinfo->pool, tvb, offset, len, ENC_ASCII|ENC_NA);
 }
 
 /*
@@ -2190,7 +2190,7 @@ static const value_string q931_odd_even_indicator_vals[] = {
 };
 
 static void
-dissect_q931_party_subaddr_ie(tvbuff_t *tvb, int offset, int len,
+dissect_q931_party_subaddr_ie(tvbuff_t *tvb, unsigned offset, unsigned len,
     proto_tree *tree)
 {
     if (len == 0)
@@ -2217,7 +2217,7 @@ static const value_string q931_restart_indicator_class_vals[] = {
 };
 
 static void
-dissect_q931_restart_indicator_ie(tvbuff_t *tvb, packet_info *pinfo, int offset, int len,
+dissect_q931_restart_indicator_ie(tvbuff_t *tvb, packet_info *pinfo, unsigned offset, unsigned len,
     proto_tree *tree, proto_item* item)
 {
     if (len != 1) {
@@ -2303,7 +2303,7 @@ static const value_string q931_pres_meth_prot_prof_vals[] = {
 #define Q931_HIGH_LAYER_PROTOCOL_PROFILE 0x01
 
 void
-dissect_q931_high_layer_compat_ie(tvbuff_t *tvb, int offset, int len,
+dissect_q931_high_layer_compat_ie(tvbuff_t *tvb, unsigned offset, unsigned len,
     proto_tree *tree)
 {
     uint8_t octet;
@@ -2383,7 +2383,7 @@ static const value_string q931_protocol_discriminator_vals[] = {
 value_string_ext q931_protocol_discriminator_vals_ext = VALUE_STRING_EXT_INIT(q931_protocol_discriminator_vals);
 
 void
-dissect_q931_user_user_ie(tvbuff_t *tvb, packet_info *pinfo, int offset, int len,
+dissect_q931_user_user_ie(tvbuff_t *tvb, packet_info *pinfo, unsigned offset, unsigned len,
     proto_tree *tree)
 {
     uint8_t octet;
@@ -2410,7 +2410,7 @@ dissect_q931_user_user_ie(tvbuff_t *tvb, packet_info *pinfo, int offset, int len
         break;
 
     case Q931_PROTOCOL_DISCRIMINATOR_IA5:
-        proto_tree_add_item(tree, hf_q931_user_information_str, tvb, offset, len, ENC_NA|ENC_ASCII);
+        proto_tree_add_item(tree, hf_q931_user_information_str, tvb, offset, len, ENC_ASCII);
         break;
 
     default:
@@ -2428,7 +2428,7 @@ static const value_string q931_party_category_vals[] = {
 };
 
 static void
-dissect_q931_party_category_ie(tvbuff_t *tvb, int offset, int len,
+dissect_q931_party_category_ie(tvbuff_t *tvb, unsigned offset, unsigned len,
     proto_tree *tree)
 {
     if (len == 0)
@@ -2447,7 +2447,7 @@ dissect_q931_party_category_ie(tvbuff_t *tvb, int offset, int len,
  * Dissect information elements consisting of ASCII^H^H^H^H^HIA5 text.
  */
 static void
-dissect_q931_ia5_ie(tvbuff_t *tvb, int offset, int len, packet_info *pinfo, proto_tree *tree,
+dissect_q931_ia5_ie(tvbuff_t *tvb, unsigned offset, unsigned len, packet_info *pinfo, proto_tree *tree,
     int hf_value)
 {
     if (len != 0) {
@@ -2521,7 +2521,7 @@ dissect_q931_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     }
     message_type = tvb_get_uint8(tvb, offset);
     q931_pi->message_type = message_type;
-    col_add_str(pinfo->cinfo, COL_INFO, get_message_name(prot_discr, message_type));
+    col_add_str(pinfo->cinfo, COL_INFO, get_message_name(pinfo->pool, prot_discr, message_type));
 
     if (prot_discr == NLPID_DMS)
         proto_tree_add_item(q931_tree, hf_q931_maintenance_message_type, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -2546,16 +2546,16 @@ dissect_q931_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     }
     /* Segmented message IE */
     ie_tree = proto_tree_add_subtree(q931_tree, tvb, offset, 1+1+info_element_len, ett_q931_ie[info_element], NULL,
-                    val_to_str(info_element, q931_info_element_vals[0], "Unknown information element (0x%02X)"));
+                    val_to_str(pinfo->pool,info_element, q931_info_element_vals[0], "Unknown information element (0x%02X)"));
     proto_tree_add_uint_format_value(ie_tree, hf_q931_information_element, tvb, offset, 1, info_element,
-                            "%s", val_to_str(info_element, q931_info_element_vals[0], "Unknown (0x%02X)"));
-    proto_tree_add_item(ie_tree, hf_q931_information_element_len, tvb, offset + 1, 1, ENC_NA);
+                            "%s", val_to_str(pinfo->pool,info_element, q931_info_element_vals[0], "Unknown (0x%02X)"));
+    proto_tree_add_item(ie_tree, hf_q931_information_element_len, tvb, offset + 1, 1, ENC_BIG_ENDIAN);
     dissect_q931_segmented_message_ie(tvb, pinfo, offset + 2, info_element_len, ie_tree, ti);
     first_frag = (tvb_get_uint8(tvb, offset + 2) & 0x80) != 0;
     more_frags = (tvb_get_uint8(tvb, offset + 2) & 0x7F) != 0;
     segmented_message_type = tvb_get_uint8(tvb, offset + 3);
     col_append_fstr(pinfo->cinfo, COL_INFO, " of %s",
-            val_to_str_ext(segmented_message_type, &q931_message_type_vals_ext, "Unknown message type (0x%02X)"));
+            val_to_str_ext(pinfo->pool, segmented_message_type, &q931_message_type_vals_ext, "Unknown message type (0x%02X)"));
 
     offset += 1 + 1 + info_element_len;
     /* Reassembly */
@@ -2582,7 +2582,7 @@ dissect_q931_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
             }
 
             col_add_fstr(pinfo->cinfo, COL_INFO, "%s [reassembled]",
-                    val_to_str_ext(segmented_message_type, &q931_message_type_vals_ext, "Unknown message type (0x%02X)"));
+                    val_to_str_ext(pinfo->pool, segmented_message_type, &q931_message_type_vals_ext, "Unknown message type (0x%02X)"));
 
         } else {
             if (tree) proto_tree_add_uint(q931_tree, hf_q931_reassembled_in, tvb, offset, frag_len, fd_head->reassembled_in);
@@ -2603,7 +2603,7 @@ static const value_string q931_codeset_vals[] = {
 
 static void
 dissect_q931_IEs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *root_tree,
-    proto_tree *q931_tree, bool is_over_ip, int offset, int initial_codeset,
+    proto_tree *q931_tree, bool is_over_ip, unsigned offset, int initial_codeset,
     q931_packet_info *q931_pi)
 {
     proto_item  *ti;
@@ -2636,7 +2636,7 @@ dissect_q931_IEs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *root_tree,
                 proto_tree_add_uint_format(q931_tree, hf_q931_locking_codeset, tvb, offset, 1,
                     codeset, "%s shift to codeset %u: %s",
                     (non_locking_shift ? "Non-locking" : "Locking"),
-                    codeset, val_to_str(codeset, q931_codeset_vals,
+                    codeset, val_to_str(pinfo->pool,codeset, q931_codeset_vals,
                       "Unknown (0x%02X)"));
             }
             offset += 1;
@@ -2718,10 +2718,10 @@ dissect_q931_IEs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *root_tree,
             if (q931_tree != NULL) {
                 ie_tree = proto_tree_add_subtree(q931_tree, tvb, offset,
                     1+2+info_element_len, ett_q931_ie[info_element], NULL,
-                    val_to_str(info_element,
+                    val_to_str(pinfo->pool,info_element,
                       q931_info_element_vals[codeset],
                       "Unknown information element (0x%02X)"));
-                proto_tree_add_uint_format_value(ie_tree, hf_q931_information_element, tvb, offset, 1, info_element, "%s", val_to_str(info_element,
+                proto_tree_add_uint_format_value(ie_tree, hf_q931_information_element, tvb, offset, 1, info_element, "%s", val_to_str(pinfo->pool,info_element,
                       q931_info_element_vals[codeset], "Unknown (0x%02X)"));
                 proto_tree_add_item(ie_tree, hf_q931_information_element_len, tvb, offset + 1, 2, ENC_BIG_ENDIAN);
                 proto_tree_add_item(ie_tree, hf_q931_user_protocol_discriminator, tvb, offset + 3, 1, ENC_NA);
@@ -2763,7 +2763,7 @@ dissect_q931_IEs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *root_tree,
             info_element_len = tvb_get_uint8(tvb, offset + 1);
 
             if (first_segment && (tvb_reported_length_remaining(tvb, offset + 2) < info_element_len)) {  /* incomplete IE at the end of the 1st segment */
-                proto_tree_add_expert(q931_tree, pinfo, &ei_q931_incomplete_ie, tvb, offset, -1);
+                proto_tree_add_expert_remaining(q931_tree, pinfo, &ei_q931_incomplete_ie, tvb, offset);
                 break;
             }
 
@@ -2783,15 +2783,15 @@ dissect_q931_IEs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *root_tree,
             }
 
             ie_tree = proto_tree_add_subtree(q931_tree, tvb, offset, 1+1+info_element_len, ett_q931_ie[info_element], &ti,
-                    val_to_str(info_element, q931_info_element_vals[codeset], "Unknown information element (0x%02X)"));
+                    val_to_str(pinfo->pool,info_element, q931_info_element_vals[codeset], "Unknown information element (0x%02X)"));
             proto_tree_add_uint_format_value(ie_tree, hf_q931_information_element, tvb, offset, 1, info_element, "%s",
-                    val_to_str(info_element, q931_info_element_vals[codeset], "Unknown (0x%02X)"));
+                    val_to_str(pinfo->pool,info_element, q931_info_element_vals[codeset], "Unknown (0x%02X)"));
             proto_tree_add_uint(ie_tree, hf_q931_information_element_len, tvb, offset + 1, 1, info_element_len);
 
             if (((codeset << 8) | info_element) == (CS0 | Q931_IE_SEGMENTED_MESSAGE)) {
                 dissect_q931_segmented_message_ie(tvb, pinfo, offset + 2, info_element_len, ie_tree, ti);
                 col_append_fstr(pinfo->cinfo, COL_INFO, " of %s",
-                        val_to_str_ext(tvb_get_uint8(tvb, offset + 3), &q931_message_type_vals_ext, "Unknown message type (0x%02X)"));
+                        val_to_str_ext(pinfo->pool, tvb_get_uint8(tvb, offset + 3), &q931_message_type_vals_ext, "Unknown message type (0x%02X)"));
 
                 if (tvb_get_uint8(tvb, offset + 2) & 0x80) {  /* the 1st segment */
                     first_segment = true;
@@ -2820,7 +2820,7 @@ dissect_q931_IEs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *root_tree,
                     break;
 
                 case CS0 | Q931_IE_CAUSE:
-                    dissect_q931_cause_ie_with_info(tvb,
+                    dissect_q931_cause_ie_with_info(tvb, pinfo,
                         offset + 2, info_element_len,
                         ie_tree,
                         hf_q931_cause_value, &dummy, q931_info_element_vals0, q931_pi);
@@ -3060,7 +3060,6 @@ dissect_q931_IEs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *root_tree,
 static bool
 dissect_q931_tpkt_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
-    int lv_tpkt_len;
 
     /*
      * Check whether this looks like a TPKT-encapsulated
@@ -3071,8 +3070,7 @@ dissect_q931_tpkt_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
      * 1 for the call_reference length,
      * and one for the message type.
      */
-    lv_tpkt_len = is_tpkt(tvb, 3);
-    if (lv_tpkt_len == -1) {
+    if (is_tpkt(tvb, 3, NULL)) {
         /*
          * It's not a TPKT packet; reject it.
          */
@@ -3090,8 +3088,7 @@ dissect_q931_tpkt_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
          * It is - call the "dissect TPKT over a TCP stream"
          * routine.
          */
-        dissect_tpkt_encap(tvb, pinfo, tree, q931_desegment,
-            q931_tpkt_pdu_handle);
+        dissect_tpkt_encap(tvb, pinfo, tree, q931_desegment, q931_tpkt_pdu_handle);
         return true;
     }
 
@@ -3121,8 +3118,7 @@ dissect_q931_tpkt_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
      * OK, it looks like Q.931-over-TPKT.
      * Call the "dissect TPKT over a TCP stream" routine.
      */
-    dissect_tpkt_encap(tvb, pinfo, tree, q931_desegment,
-        q931_tpkt_pdu_handle);
+    dissect_tpkt_encap(tvb, pinfo, tree, q931_desegment, q931_tpkt_pdu_handle);
 
     return true;
 }
@@ -3965,6 +3961,9 @@ proto_register_q931(void)
         &g931_iso_iec_cause);
     /* Register for tapping */
     q931_tap = register_tap("q931");
+
+    register_external_value_string_ext("q931_cause_code_vals_ext", &q931_cause_code_vals_ext);
+    register_external_value_string("q931_message_type_vals", q931_message_type_vals);
 }
 
 void

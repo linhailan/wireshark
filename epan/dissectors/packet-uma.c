@@ -845,12 +845,12 @@ static const value_string suti_vals[] = {
 	/* Code to actually dissect the packets */
 
 static int
-dissect_uma_IE(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
+dissect_uma_IE(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, unsigned offset)
 {
 	tvbuff_t	*l3_tvb;
 	tvbuff_t	*llc_tvb;
 	tvbuff_t	*new_tvb;
-	int		ie_offset;
+	unsigned	ie_offset;
 	uint8_t		ie_value;
 	uint16_t		ie_len = 0;
 	uint8_t		octet;
@@ -866,7 +866,7 @@ dissect_uma_IE(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
 
 	ie_value = tvb_get_uint8(tvb,offset);
 	urr_ie_tree = proto_tree_add_subtree(tree,tvb,offset,-1, ett_urr_ie, &urr_ie_item,
-		val_to_str_ext(ie_value, &uma_urr_IE_type_vals_ext, "Unknown IE (%u)"));
+		val_to_str_ext(pinfo->pool, ie_value, &uma_urr_IE_type_vals_ext, "Unknown IE (%u)"));
 
 	proto_tree_add_item(urr_ie_tree, hf_uma_urr_IE, tvb, offset, 1, ENC_BIG_ENDIAN);
 	offset++;
@@ -1603,9 +1603,9 @@ dissect_uma_IE(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
 static int
 dissect_uma(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
-	int		offset = 0;
+	unsigned offset = 0;
 	uint8_t	octet, pd;
-	uint16_t msg_len;
+	unsigned msg_len;
 	proto_item* pd_item;
 
 /* Set up structures needed to add the protocol subtree and manage it */
@@ -1627,7 +1627,7 @@ dissect_uma(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 	pd = octet & 0x0f;
 	proto_tree_add_item(uma_tree, hf_uma_skip_ind, tvb, offset, 1, ENC_BIG_ENDIAN);
 	if ((octet & 0xf0) != 0 ){
-		proto_tree_add_expert(uma_tree, pinfo, &ei_uma_skip_this_message, tvb, offset, -1);
+		proto_tree_add_expert_remaining(uma_tree, pinfo, &ei_uma_skip_this_message, tvb, offset);
 		return tvb_reported_length(tvb);
 	}
 
@@ -1638,7 +1638,7 @@ dissect_uma(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 		offset++;
 		octet = tvb_get_uint8(tvb,offset);
 		proto_tree_add_item(uma_tree, hf_uma_urr_msg_type, tvb, offset, 1, ENC_BIG_ENDIAN);
-		col_add_str(pinfo->cinfo, COL_INFO, val_to_str_ext(octet, &uma_urr_msg_type_vals_ext, "Unknown URR (%u)"));
+		col_add_str(pinfo->cinfo, COL_INFO, val_to_str_ext(pinfo->pool, octet, &uma_urr_msg_type_vals_ext, "Unknown URR (%u)"));
 		while ((msg_len + 1) > offset ){
 			offset++;
 			offset = dissect_uma_IE(tvb, pinfo, uma_tree, offset);
@@ -1648,7 +1648,7 @@ dissect_uma(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 		offset++;
 		octet = tvb_get_uint8(tvb,offset);
 		proto_tree_add_item(uma_tree, hf_uma_urlc_msg_type, tvb, offset, 1, ENC_BIG_ENDIAN);
-		col_add_str(pinfo->cinfo, COL_INFO, val_to_str_ext(octet, &uma_urlc_msg_type_vals_ext, "Unknown URLC (%u)"));
+		col_add_str(pinfo->cinfo, COL_INFO, val_to_str_ext(pinfo->pool, octet, &uma_urlc_msg_type_vals_ext, "Unknown URLC (%u)"));
 		col_set_fence(pinfo->cinfo,COL_INFO);
 		offset++;
 		proto_tree_add_item(uma_tree, hf_uma_urlc_TLLI, tvb, offset, 4, ENC_NA);
@@ -1685,7 +1685,7 @@ static int
 dissect_uma_urlc_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
 
-	int		offset = 0;
+	unsigned offset = 0;
 	uint8_t	octet;
 	uint16_t msg_len;
 	proto_item* msg_item;
@@ -1703,7 +1703,7 @@ dissect_uma_urlc_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *
 
 	octet = tvb_get_uint8(tvb,offset);
 	msg_item = proto_tree_add_item(uma_tree, hf_uma_urlc_msg_type, tvb, offset, 1, ENC_BIG_ENDIAN);
-	col_add_fstr(pinfo->cinfo, COL_INFO, "%s ",val_to_str_ext(octet, &uma_urlc_msg_type_vals_ext, "Unknown URLC (%u)"));
+	col_add_fstr(pinfo->cinfo, COL_INFO, "%s ",val_to_str_ext(pinfo->pool, octet, &uma_urlc_msg_type_vals_ext, "Unknown URLC (%u)"));
 	col_set_fence(pinfo->cinfo,COL_INFO);
 	msg_len = tvb_reported_length_remaining(tvb,offset) - 1;
 
@@ -2222,22 +2222,22 @@ proto_register_uma(void)
 		},
 		{ &hf_uma_urr_GPRS_port,
 			{ "UDP Port for GPRS user data transport","uma.urr.gprs_port",
-			FT_UINT16,BASE_DEC,  NULL, 0x0,
+			FT_UINT16,BASE_PT_UDP,  NULL, 0x0,
 			NULL, HFILL }
 		},
 		{ &hf_uma_urr_UNC_tcp_port,
 			{ "UNC TCP port","uma.urr.tcp_port",
-			FT_UINT16,BASE_DEC,  NULL, 0x0,
-			"UDP Port for GPRS user data transport", HFILL }
+			FT_UINT16,BASE_PT_TCP,  NULL, 0x0,
+			"TCP Port for GPRS user data transport", HFILL }
 		},
 		{ &hf_uma_urr_RTP_port,
 			{ "RTP UDP port","uma.urr.rtp_port",
-			FT_UINT16,BASE_DEC,  NULL, 0x0,
+			FT_UINT16,BASE_PT_UDP,  NULL, 0x0,
 			NULL, HFILL }
 		},
 		{ &hf_uma_urr_RTCP_port,
 			{ "RTCP UDP port","uma.urr.rtcp_port",
-			FT_UINT16,BASE_DEC,  NULL, 0x0,
+			FT_UINT16,BASE_PT_UDP,  NULL, 0x0,
 			NULL, HFILL }
 		},
 		{ &hf_uma_urr_RXLEV_NCELL,

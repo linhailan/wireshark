@@ -1,4 +1,4 @@
-/* software_update.h
+/* software_update.c
  * Wrappers and routines to check for software updates.
  *
  * Wireshark - Network traffic analyzer
@@ -13,7 +13,7 @@
 #include "software_update.h"
 #include "language.h"
 #include "epan/prefs.h"
-#include "wsutil/application_flavor.h"
+#include "wsutil/filesystem.h"  /* Added for get_progfile_dir() */
 
 /*
  * Version 0 of the update URI path has the following elements:
@@ -63,15 +63,9 @@
 #error HAVE_SOFTWARE_UPDATE can only be defined for x86-64 or x86 or arm64.
 #endif
 
-static char *get_appcast_update_url(software_update_channel_e chan) {
+static char *get_appcast_update_url(software_update_channel_e chan, const char* su_application, const char* su_version) {
     GString *update_url_str = g_string_new("");
     const char *chan_name;
-    const char *su_application = application_flavor_name_proper();
-    const char *su_version = VERSION;
-
-    if (application_flavor_is_stratoshark()) {
-        su_version = STRATOSHARK_VERSION;
-    }
 
     switch (chan) {
         case UPDATE_CHANNEL_DEVELOPMENT:
@@ -93,11 +87,53 @@ static char *get_appcast_update_url(software_update_channel_e chan) {
 }
 
 #ifdef _WIN32
+
+/* Check whether Wireshark is being run from a PortableApps directory layout.
+ *
+ * PortableApps installs applications in a structure where the application
+ * directory sits inside an "App" folder, with an "AppInfo" directory alongside.
+ * For Wireshark, the layout is:
+ *   PortableApps/Wireshark/App/Wireshark/ (where wireshark.exe resides)
+ *   PortableApps/Wireshark/AppInfo/ (exists alongside the App folder)
+ *
+ * This function checks for the existence of the AppInfo directory to identify
+ * a PortableApps installation.
+ *
+ * Returns true if running from a PortableApps layout, false otherwise.
+ */
+static bool is_portableapp(void)
+{
+    const char *progdir;
+    char *parent_dir;
+    char *appinfo_dir;
+    bool is_portable;
+
+    progdir = get_progfile_dir();
+    if (progdir == NULL) {
+        return false;
+    }
+
+    parent_dir = g_path_get_dirname(progdir);
+    appinfo_dir = g_build_filename(parent_dir, "AppInfo", NULL);
+
+    is_portable = g_file_test(appinfo_dir, G_FILE_TEST_IS_DIR);
+
+    g_free(parent_dir);
+    g_free(appinfo_dir);
+
+    return is_portable;
+}
+
 /** Initialize software updates.
  */
 void
-software_update_init(void) {
-    const char *update_url = get_appcast_update_url(prefs.gui_update_channel);
+software_update_init(const char* su_application, const char* su_version) {
+    const char *update_url = get_appcast_update_url(prefs.gui_update_channel, su_application, su_version);
+
+    /* Disable automatic updates for PortableApps installations */
+    if (is_portableapp()) {
+        return;
+    }
 
     /*
      * According to the WinSparkle 0.5 documentation these must be called
@@ -110,8 +146,9 @@ software_update_init(void) {
     win_sparkle_set_update_check_interval(prefs.gui_update_interval);
     win_sparkle_set_can_shutdown_callback(software_update_can_shutdown_callback);
     win_sparkle_set_shutdown_request_callback(software_update_shutdown_request_callback);
-    if ((language != NULL) && (strcmp(language, "system") != 0)) {
-        win_sparkle_set_lang(language);
+    const char* ws_language = get_language_used();
+    if ((ws_language != NULL) && (strcmp(ws_language, USE_SYSTEM_LANGUAGE) != 0)) {
+        win_sparkle_set_lang(ws_language);
     }
     win_sparkle_init();
 }
@@ -120,6 +157,10 @@ software_update_init(void) {
  */
 void
 software_update_check(void) {
+    /* Skip update check for PortableApps installations */
+    if (is_portableapp()) {
+        return;
+    }
     win_sparkle_check_update_with_ui();
 }
 
@@ -139,8 +180,8 @@ const char *software_update_info(void) {
 /** Initialize software updates.
  */
 void
-software_update_init(void) {
-    char *update_url = get_appcast_update_url(prefs.gui_update_channel);
+software_update_init(const char* su_application, const char* su_version) {
+    char *update_url = get_appcast_update_url(prefs.gui_update_channel, su_application, su_version);
 
     sparkle_software_update_init(update_url, prefs.gui_update_enabled, prefs.gui_update_interval);
 
@@ -169,7 +210,7 @@ const char *software_update_info(void) {
 /** Initialize software updates.
  */
 void
-software_update_init(void) {
+software_update_init(const char* su_application _U_, const char* su_version _U_) {
 }
 
 /** Force a software update check.

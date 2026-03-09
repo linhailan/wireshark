@@ -19,7 +19,9 @@
 #include <epan/packet.h>
 #include <epan/conversation.h>
 #include <epan/tfs.h>
+
 #include <wsutil/array.h>
+#include <wsutil/ws_padding_to.h>
 
 void proto_register_pana(void);
 void proto_reg_handoff_pana(void);
@@ -327,19 +329,19 @@ dissect_avps(tvbuff_t *tvb, packet_info *pinfo, proto_tree *avp_tree)
 
 
                 /* Check padding */
-                padding = (4 - (avp_length % 4)) % 4;
+                padding = WS_PADDING_TO_4(avp_length);
 
                 single_avp_tree = proto_tree_add_subtree_format(avp_tree, tvb, offset, avp_length + padding,
                                                                 ett_pana_avp_info, NULL, "%s (%s) length: %d bytes (%d padded bytes)",
-                                                                val_to_str(avp_code, avp_code_names, "Unknown (%d)"),
-                                                                val_to_str(avp_type, avp_type_names, "Unknown (%d)"),
+                                                                val_to_str(pinfo->pool, avp_code, avp_code_names, "Unknown (%d)"),
+                                                                val_to_str(pinfo->pool, avp_type, avp_type_names, "Unknown (%d)"),
                                                                 avp_length,
                                                                 avp_length + padding);
 
                 /* AVP Code */
                 proto_tree_add_uint_format_value(single_avp_tree, hf_pana_avp_code, tvb,
                                                  offset, 2, avp_code, "%s (%u)",
-                                                 val_to_str(avp_code, avp_code_names, "Unknown (%d)"),
+                                                 val_to_str(pinfo->pool, avp_code, avp_code_names, "Unknown (%d)"),
                                                  avp_code);
                 offset += 2;
 
@@ -368,9 +370,7 @@ dissect_avps(tvbuff_t *tvb, packet_info *pinfo, proto_tree *avp_tree)
                                         avp_group_tree = proto_tree_add_subtree(single_avp_tree,
                                                                                 tvb, offset, avp_data_length,
                                                                                 ett_pana_avp, NULL, "Grouped AVP");
-                                        group_tvb = tvb_new_subset_length_caplen(tvb, offset,
-                                                                   MIN(avp_data_length, tvb_reported_length(tvb)-offset),
-                                                                   avp_data_length);
+                                        group_tvb = tvb_new_subset_length(tvb, offset, avp_data_length);
                                         // We recurse here, but we'll run out of packet before we run out of stack.
                                         dissect_avps(group_tvb, pinfo, avp_group_tree);
                                         break;
@@ -415,7 +415,7 @@ dissect_avps(tvbuff_t *tvb, packet_info *pinfo, proto_tree *avp_tree)
                                         proto_tree_add_uint_format(single_avp_tree, hf_pana_avp_code, tvb, offset, avp_data_length,
                                                                    result_code, "Value: %d (%s)",
                                                                    result_code,
-                                                                   val_to_str(result_code, avp_code_names, "Unknown (%d)"));
+                                                                   val_to_str(pinfo->pool, result_code, avp_code_names, "Unknown (%d)"));
                                         break;
                                 }
                                 case PANA_EAP: {
@@ -477,8 +477,8 @@ dissect_pana_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         avp_length = msg_length - 16;
 
         col_add_fstr(pinfo->cinfo, COL_INFO, "Type %s-%s",
-                     val_to_str(msg_type, msg_type_names, "Unknown (%d)"),
-                     val_to_str(flags & PANA_FLAG_R, msg_subtype_names, "Unknown (%d)"));
+                     val_to_str(pinfo->pool, msg_type, msg_type_names, "Unknown (%d)"),
+                     val_to_str(pinfo->pool, flags & PANA_FLAG_R, msg_subtype_names, "Unknown (%d)"));
 
         /* Make the protocol tree */
         if (tree) {
@@ -573,8 +573,8 @@ dissect_pana_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         /* Message Type */
         proto_tree_add_uint_format_value(pana_tree, hf_pana_msg_type, tvb,
                                          offset, 2, msg_type, "%s-%s (%d)",
-                                         val_to_str(msg_type, msg_type_names, "Unknown (%d)"),
-                                         val_to_str(flags & PANA_FLAG_R, msg_subtype_names, "Unknown (%d)"),
+                                         val_to_str(pinfo->pool, msg_type, msg_type_names, "Unknown (%d)"),
+                                         val_to_str(pinfo->pool, flags & PANA_FLAG_R, msg_subtype_names, "Unknown (%d)"),
                                          msg_type);
         offset += 2;
 
@@ -601,8 +601,10 @@ dissect_pana_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 /*
  * Function for the PANA dissector.
+ *
+ * Called directly as a non-heuristic dissecotr or called by the heuristic
+ * dissector.
  */
-/* Called either as a "new-style" or a heuristic dissector */
 static int
 dissect_pana(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {

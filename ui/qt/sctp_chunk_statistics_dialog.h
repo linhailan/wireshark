@@ -16,10 +16,9 @@
 #include <wsutil/file_util.h>
 #include <epan/dissectors/packet-sctp.h>
 #include "epan/packet.h"
-#include "epan/value_string.h"
+#include <wsutil/value_string.h>
 #include <epan/prefs.h>
-#include <epan/uat-int.h>
-#include <epan/prefs-int.h>
+#include <epan/uat.h>
 #include <wsutil/filesystem.h>
 #include "wireshark_application.h"
 

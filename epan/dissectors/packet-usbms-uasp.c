@@ -300,7 +300,7 @@ dissect_uasp_iu(tvbuff_t *tvb, packet_info *pinfo,
     uint16_t           tag;
     uint16_t           lun;
     uasp_itlq_nexus_t *uitlq = NULL;
-    int                rlen, len;
+    int                rlen;
     tvbuff_t          *cdb_tvb;
 
     /* an IU header is 4 bytes */
@@ -311,7 +311,7 @@ dissect_uasp_iu(tvbuff_t *tvb, packet_info *pinfo,
     tag = tvb_get_ntohs(tvb, 2);
 
     col_add_str(pinfo->cinfo, COL_INFO,
-                val_to_str(iu_id, uasp_iu_id_vals, "Unknown IU [0x%02x]"));
+                val_to_str(pinfo->pool, iu_id, uasp_iu_id_vals, "Unknown IU [0x%02x]"));
 
     proto_tree_add_item(uasp_tree, hf_uas_iu_id, tvb, 0, 1, ENC_NA);
     proto_tree_add_item(uasp_tree, hf_uas_tag, tvb, 2, 2, ENC_BIG_ENDIAN);
@@ -327,13 +327,8 @@ dissect_uasp_iu(tvbuff_t *tvb, packet_info *pinfo,
         uitlq = create_itlq_nexus(pinfo, uasp_conv_info, lun, tag);
 
         rlen = 16 + tvb_get_uint8(tvb, 6);
-        len = rlen;
-
-        if (len > tvb_captured_length_remaining(tvb, 16))
-            len = tvb_captured_length_remaining(tvb, 16);
-
-        if (len) {
-            cdb_tvb = tvb_new_subset_length_caplen(tvb, 16, len, rlen);
+        if (rlen) {
+            cdb_tvb = tvb_new_subset_length(tvb, 16, rlen);
             dissect_scsi_cdb(cdb_tvb, pinfo, parent_tree, SCSI_DEV_UNKNOWN,
                              &uitlq->itlq, uitlq->itl);
         }

@@ -14,7 +14,7 @@
 
 typedef struct _sip_info_value_t
 {
-    const uint8_t   *request_method;
+    const char *request_method;
     unsigned  response_code;
     bool      resend;
     uint32_t  setup_time;
@@ -38,11 +38,9 @@ typedef struct _sip_reason_code_info_t
     unsigned                   cause_value;
 } sip_reason_code_info_t;
 
-WS_DLL_PUBLIC const value_string sip_response_code_vals[];
-
 extern void dfilter_store_sip_from_addr(tvbuff_t *tvb, proto_tree *tree,
     unsigned parameter_offset, unsigned parameter_len);
 
-extern void dissect_sip_p_access_network_info_header(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int start_offset, int line_end_offset);
+extern void dissect_sip_p_access_network_info_header(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, unsigned start_offset, unsigned line_end_offset);
 
 #endif

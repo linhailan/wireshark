@@ -22,8 +22,8 @@ Specs:
 
 #include <epan/packet.h>
 #include <epan/to_str.h>
-#include <epan/ipproto.h>
 #include <epan/expert.h>
+#include <epan/iana-info.h>
 #include "packet-ip.h"
 
 void proto_reg_handoff_tapa(void);
@@ -75,9 +75,6 @@ static int hf_tapa_tunnel_remaining;
 static expert_field ei_tapa_length_too_short;
 
 static dissector_handle_t tapa_handle;
-
-#define PROTO_SHORT_NAME "TAPA"
-#define PROTO_LONG_NAME "Trapeze Access Point Access Protocol"
 
 #define PORT_TAPA	5000 /* Not IANA registered */
 
@@ -181,7 +178,7 @@ dissect_tapa_discover_req(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tapa_di
 
 	while (remaining > 0) {
 		item_type = tvb_get_uint8(tvb, offset);
-		item_type_text = val_to_str(item_type, tapa_discover_request_vals, "%d");
+		item_type_text = val_to_str(pinfo->pool, item_type, tapa_discover_request_vals, "%d");
 		item_length = tvb_get_ntohs(tvb, offset + 2);
 		item_text = tvb_format_text(pinfo->pool, tvb, offset + 4, item_length);
 
@@ -225,7 +222,7 @@ dissect_tapa_discover_unknown_new_tlv(tvbuff_t *tvb, packet_info *pinfo, proto_t
 
 	while (remaining > 3) {  /* type(1) + flags(1) + length(2) */
 		item_type = tvb_get_uint8(tvb, offset);
-		/*item_type_text = val_to_str(item_type, tapa_discover_unknown_vals, "%d");*/
+		/*item_type_text = val_to_str(pinfo->pool, item_type, tapa_discover_unknown_vals, "%d");*/
 		item_length = tvb_get_ntohs(tvb, offset + 2) - 4;
 
 		tapa_discover_item_tree = proto_tree_add_subtree_format(tapa_discover_tree, tvb, offset, 4 + item_length,
@@ -283,9 +280,9 @@ dissect_tapa_discover(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	packet_type = tvb_get_uint8(tvb, 0);
 	remaining = tvb_get_ntohs(tvb, 2) - 4;
 
-	col_set_str(pinfo->cinfo, COL_PROTOCOL, PROTO_SHORT_NAME);
+	col_set_str(pinfo->cinfo, COL_PROTOCOL, "TAPA");
 	col_add_fstr(pinfo->cinfo, COL_INFO, "Discover - %s",
-			val_to_str(packet_type, tapa_discover_type_vals, "Unknown (%d)"));
+			val_to_str(pinfo->pool, packet_type, tapa_discover_type_vals, "Unknown (%d)"));
 
 	if (tree) {
 		ti = proto_tree_add_item(tree, proto_tapa, tvb, offset, -1,
@@ -346,9 +343,9 @@ dissect_tapa_tunnel(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	type = tvb_get_uint8(tvb, 1);
 	remaining = tvb_reported_length(tvb);
 
-	col_set_str(pinfo->cinfo, COL_PROTOCOL, PROTO_SHORT_NAME);
+	col_set_str(pinfo->cinfo, COL_PROTOCOL, "TAPA");
 	col_add_fstr(pinfo->cinfo, COL_INFO, "Tunnel - V=%d, T=%s", version >> 4,
-			val_to_str(type, tapa_tunnel_type_vals, "Unknown (%d)"));
+			val_to_str(pinfo->pool, type, tapa_tunnel_type_vals, "Unknown (%d)"));
 
 	if (tree) {
 		ti = proto_tree_add_item(tree, proto_tapa, tvb, offset, -1,
@@ -467,7 +464,7 @@ static bool
 dissect_tapa_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *iph)
 {
 	/* The TAPA protocol also uses IP protocol number 4 but it isn't really IPIP */
-	if ((ws_ip_protocol(iph) == IP_PROTO_IPIP) && ((tvb_get_uint8(tvb, 0) & 0xF0) != 0x40) &&
+	if ((ws_ip_protocol(iph) == IP_PROTO_IPV4) && ((tvb_get_uint8(tvb, 0) & 0xF0) != 0x40) &&
 	    (tvb_get_ntohs(tvb, 2)) < 20) {
 		dissect_tapa_static(tvb, pinfo, tree, iph);
 		return true;
@@ -618,7 +615,7 @@ proto_register_tapa(void)
 	            "Length is too short (<= 4)", EXPFILL }}
 	};
 
-	proto_tapa = proto_register_protocol(PROTO_LONG_NAME, PROTO_SHORT_NAME, "tapa");
+	proto_tapa = proto_register_protocol("Trapeze Access Point Access Protocol", "TAPA", "tapa");
 	proto_register_field_array(proto_tapa, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
 	expert_tapa = expert_register_protocol(proto_tapa);

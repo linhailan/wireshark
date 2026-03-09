@@ -1204,7 +1204,7 @@ static void dissect_homeplug_unknown(ptvcursor_t * cursor)
 static void dissect_homeplug_mme(ptvcursor_t * cursor, packet_info * pinfo)
 {
   col_append_sep_str(pinfo->cinfo, COL_INFO, ", ",
-        val_to_str(homeplug_metype, homeplug_metype_vals, "Unknown 0x%x"));
+        val_to_str(pinfo->pool, homeplug_metype, homeplug_metype_vals, "Unknown 0x%x"));
 
   switch(homeplug_metype) {
     case HOMEPLUG_MME_RCE:
@@ -1276,7 +1276,7 @@ static void dissect_homeplug_mme(ptvcursor_t * cursor, packet_info * pinfo)
 #define TVB_LEN_GREATEST  1
 #define TVB_LEN_UNDEF     0
 #define TVB_LEN_SHORTEST -1
-static int check_tvb_length(ptvcursor_t *cursor, const int length)
+static int check_tvb_length(ptvcursor_t *cursor, const unsigned length)
 {
   if (!cursor)
     return TVB_LEN_UNDEF;

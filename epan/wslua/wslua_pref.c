@@ -26,11 +26,13 @@
  * Definition of a UAT string container structure.
  *
  * "field_data" is the pointer array to the fields values
+ * "field_data_length" is the length of the data in that field
  * "uat_filename" is the file name of currently ussed uat
  */
 
 typedef struct {
-    char *field_data[MAXIMUM_ALLOWED_UAT_FIELD_COUNT];
+    uint8_t *field_data[MAXIMUM_ALLOWED_UAT_FIELD_COUNT];
+    unsigned field_data_length[MAXIMUM_ALLOWED_UAT_FIELD_COUNT];
     char *uat_filename;
 } uat_container_t;
 
@@ -49,7 +51,7 @@ static bool uat_update_cb(void *r, char **err)
     lua_State *L = luaL_newstate();
     luaL_openlibs(L);
     char *full_path = g_strjoin(G_DIR_SEPARATOR_S,
-        get_persconffile_path("", false),
+        get_persconffile_path("", false, lua_app_env_var_prefix),
         "plugins", "preferences_uat_callbacks.lua", NULL);
     /* if checker file not exist we will accept all walues! */
     if (!file_exists(full_path)) {
@@ -69,7 +71,7 @@ static bool uat_update_cb(void *r, char **err)
     lua_newtable(L);
     for (int i = 0; i < MAXIMUM_ALLOWED_UAT_FIELD_COUNT; i++) {
         lua_pushinteger(L, i);
-        lua_pushstring(L, record->field_data[i]);
+        lua_pushlstring(L, (char*)record->field_data[i], record->field_data_length[i]);
         lua_settable(L, -3);
     }
     /* second parameter uat filename */
@@ -105,8 +107,7 @@ static void txtmod_string_set_cb(
     const uint8_t * index = (const uint8_t *)u1;
     char * uat_file_name = (char *)u2;
     uat_container_t * record = (uat_container_t*)rec;
-    unsigned field_data_length;
-    char* new_val = uat_unesc(buf,len,&field_data_length);
+    uint8_t* new_val = uat_unesc(buf,len,&record->field_data_length[*index]);
     g_free((record->field_data[*index]));
     record->field_data[*index] = new_val;
     record->uat_filename = uat_file_name;
@@ -122,7 +123,7 @@ const void* UNUSED_PARAMETER(u2))
     const uint8_t * index = (const uint8_t *)u1;
     uat_container_t * record = (uat_container_t*)rec;
     if (record->field_data[*index]) {
-        *out_ptr = uat_esc(record->field_data[*index], (unsigned)strlen(record->field_data[*index]));
+        *out_ptr = uat_esc(record->field_data[*index], (unsigned)record->field_data_length[*index]);
         *out_len = (unsigned)strlen(*out_ptr);
     } else {
         *out_ptr = g_strdup("");
@@ -157,27 +158,39 @@ static enum_val_t* get_enum(lua_State *L, int idx)
 
         luaL_checktype(L, -1, LUA_TTABLE);
         lua_pushnil(L);
-        lua_next(L, -2);
+        if (! lua_next(L, -2)) {
+            luaL_argerror(L,idx,"An enum table entry must have a first value, the name");
+            g_array_free(es,true);
+            return NULL;
+        }
         if (! lua_isstring(L,-1)) {
-            luaL_argerror(L,idx,"First value of an enum table must be string");
+            luaL_argerror(L,idx,"The first value of an enum table entry, the name, must be a string");
             g_array_free(es,true);
             return NULL;
         }
         str1 = lua_tostring(L, -1);
 
         lua_pop(L, 1);
-        lua_next(L, -2);
+        if (! lua_next(L, -2)) {
+            luaL_argerror(L,idx,"An enum table entry must have a second value, the description");
+            g_array_free(es,true);
+            return NULL;
+        }
         if (! lua_isstring(L,-1)) {
-            luaL_argerror(L,idx,"Second value of an enum table must be string");
+            luaL_argerror(L,idx,"The second value of an enum table entry, the description, must be a string");
             g_array_free(es,true);
             return NULL;
         }
         str2 = lua_tostring(L, -1);
 
         lua_pop(L, 1);
-        lua_next(L, -2);
+        if (! lua_next(L, -2)) {
+            luaL_argerror(L,idx,"An enum table entry must be have a third value, the value");
+            g_array_free(es,true);
+            return NULL;
+        }
         if (! lua_isnumber(L,-1)) {
-            luaL_argerror(L,idx,"Third value of an enum table must be an integer");
+            luaL_argerror(L,idx,"The third value of an enum table entry, the value, must be an integer");
             g_array_free(es,true);
             return NULL;
         }
@@ -216,18 +229,26 @@ static uat_field_t* get_uat_flds_array(lua_State *L, int idx, char * uat_filenam
         /* field title */
         luaL_checktype(L, -1, LUA_TTABLE);
         lua_pushnil(L);
-        lua_next(L, -2);
+        if (! lua_next(L, -2)) {
+            luaL_argerror(L,idx,"A UAT table config must have a first value, the title");
+            g_array_free(fs,true);
+            return NULL;
+        }
         if (! lua_isstring(L,-1)) {
-            luaL_argerror(L,idx,"First value of an UAT table config must be string");
+            luaL_argerror(L,idx,"The first value of a UAT table config, the title, must be a string");
             g_array_free(fs,true);
             return NULL;
         }
         str1 = lua_tostring(L, -1);
         /* field description */
         lua_pop(L, 1);
-        lua_next(L, -2);
+        if (! lua_next(L, -2)) {
+            luaL_argerror(L,idx,"A UAT table config must have a second value, the description");
+            g_array_free(fs,true);
+            return NULL;
+        }
         if (! lua_isstring(L,-1)) {
-            luaL_argerror(L,idx,"Second value of an UAT table config must be string");
+            luaL_argerror(L,idx,"The second value of a UAT table config, the description, must be a string");
             g_array_free(fs,true);
             return NULL;
         }
@@ -256,7 +277,7 @@ static uat_field_t* get_uat_flds_array(lua_State *L, int idx, char * uat_filenam
     return ret;
 }
 
-static int new_pref(lua_State* L, pref_type_t type) {
+static int new_pref(lua_State* L, pref_type_e type) {
     const char* label = luaL_optstring(L,1,NULL);
     const char* descr = luaL_optstring(L,3,"");
 
@@ -283,7 +304,7 @@ static int new_pref(lua_State* L, pref_type_t type) {
              * prefs_register_string_preference() assumes that the
              * variable for the preference points to a static
              * string that is the initial (default) value of the
-             * preference.  It makes a g_strdup()ed copy of that
+             * preference.  It makes a wmem_strdup()ed copy of that
              * string, and assigns a pointer to that string to
              * the variable.
              *
@@ -325,12 +346,17 @@ static int new_pref(lua_State* L, pref_type_t type) {
             break;
         }
         case PREF_UAT: {
-            /* get filename */
-            const char* uat_file_name = luaL_optstring(L,4,"");
-            pref->value.s = g_strdup(uat_file_name);
-            /* process fields */
-            uat_field_t *flds_array = get_uat_flds_array(L,2, pref->value.s);
-            pref->info.uat_field_list_info.uat_field_list = flds_array;
+            /* if second argument is not a ttable the pref is only for existend uat reading */
+            if (lua_type(L, 2) == LUA_TTABLE ) {
+                /* get filename */
+                const char* uat_file_name = luaL_optstring(L,4,"");
+                pref->value.s = g_strdup(uat_file_name);
+                /* process fields */
+                uat_field_t *flds_array = get_uat_flds_array(L,2, pref->value.s);
+                pref->info.uat_field_list_info.uat_field_list = flds_array;
+            } else {
+                pref->info.uat_field_list_info.uat_field_list = NULL;
+            }
             break;
         }
         default:
@@ -448,7 +474,8 @@ WSLUA_CONSTRUCTOR Pref_statictext(lua_State* L) {
 
 WSLUA_CONSTRUCTOR Pref_uat(lua_State* L) {
     /*
-    Creates an uat preference to be added to a <<lua_class_attrib_proto_prefs,`Proto.prefs`>> Lua table.
+    Creates an uat preference to be added to a <<lua_class_attrib_proto_prefs,`Proto.prefs`>> Lua table, or
+    read an existent uat table content, and returns in a table, all returned cell conent is in string format.
 
     ===== Example:
 
@@ -483,11 +510,25 @@ WSLUA_CONSTRUCTOR Pref_uat(lua_State* L) {
         -- return check result as boolean and errstring if needed
         return result, errstring
     end
+
+    -- Reading existent uat:
+
+    proto_foo.prefs.preference_existent_uat_name = Pref.uat("Protobuf Search Paths")
+    for i, row in ipairs(proto_foo.prefs.preference_existent_uat_name) do
+        local row_str = ""
+        for j, value in ipairs(row) do
+            row_str = row_str .. value .. "\t"
+        end
+        print(row_str)
+    end
+
     ----
     */
-#define WSLUA_ARG_Pref_uat_FIELD_CONFIG 2 /* Fields names and description table. */
-#define WSLUA_ARG_Pref_uat_DESCRIPTION 3 /* A description of what this preference is. */
-#define WSLUA_ARG_Pref_uat_FILE_NAME 4 /* The name of the uat file. */
+#define WSLUA_ARG_Pref_uat_LABEL 1 /* The Label for this preference.
+    In case of existent uat table reading, this argument contains the uat name, and all other argument is omitted. */
+#define WSLUA_OPTARG_Pref_uat_FIELD_CONFIG 2 /* Fields names and description table. */
+#define WSLUA_OPTARG_Pref_uat_DESCRIPTION 3 /* A description of what this preference is. */
+#define WSLUA_OPTARG_Pref_uat_FILE_NAME 4 /* The name of the uat file. */
     return new_pref(L,PREF_UAT);
 }
 
@@ -524,9 +565,6 @@ static int Pref__gc(lua_State* L) {
         return 0;
     }
 
-    g_free(pref->name);
-    g_free(pref->label);
-    g_free(pref->desc);
     switch (pref->type) {
         case PREF_STRING:
             /*
@@ -551,25 +589,34 @@ static int Pref__gc(lua_State* L) {
         }
         case PREF_UAT: {
             /*
-            * Free the uat values allocated in get_uat_flds_array().
+            * Free the uat values if allocated in get_uat_flds_array().
             */
-            const uat_field_t *field_valp = pref->info.uat_field_list_info.uat_field_list;
-            while (field_valp->name) {
-                g_free((char *)field_valp->title);
-                g_free((char *)field_valp->desc);
-                g_free((uint8_t *)field_valp->cbdata.chk);
-                g_free((uint8_t *)field_valp->cbdata.set);
-                g_free((uint8_t *)field_valp->cbdata.tostr);
-                g_free((char *)field_valp->fld_data);
-                field_valp++;
+            if (pref->info.uat_field_list_info.uat_field_list != NULL) {
+                uat = uat_get_table_by_name(pref->name);
+                if (uat != NULL) {
+                    uat_destroy(uat);
+                }
+                const uat_field_t *field_valp = pref->info.uat_field_list_info.uat_field_list;
+                while (field_valp->name) {
+                    g_free((char *)field_valp->title);
+                    g_free((char *)field_valp->desc);
+                    g_free((uint8_t *)field_valp->cbdata.chk);
+                    g_free((uint8_t *)field_valp->cbdata.set);
+                    g_free((uint8_t *)field_valp->cbdata.tostr);
+                    g_free((char *)field_valp->fld_data);
+                    field_valp++;
+                }
+                g_free((uat_field_t *)pref->info.uat_field_list_info.uat_field_list);
+                g_free(pref->value.s);
             }
-            g_free((uat_field_t *)pref->info.uat_field_list_info.uat_field_list);
-            g_free(pref->value.s);
             break;
         }
         default:
             break;
     }
+    g_free(pref->name);
+    g_free(pref->label);
+    g_free(pref->desc);
     g_free(pref);
 
     return 0;
@@ -716,9 +763,9 @@ WSLUA_METAMETHOD Prefs__newindex(lua_State* L) {
                                                      pref->desc);
                     break;
                 case PREF_UAT:
-                    /* Create a UAT for preferences */
-                    {
-                        uat = uat_new(pref->label,
+                    /* Create a UAT for preferences, if not existent reading. */
+                    if (pref->info.uat_field_list_info.uat_field_list != NULL) {
+                        uat = uat_new(pref->name,
                             sizeof(uat_container_t),                            /* record size */
                             pref->value.s,                                      /* filename */
                             true,                                               /* from_profile */
@@ -732,7 +779,7 @@ WSLUA_METAMETHOD Prefs__newindex(lua_State* L) {
                             NULL,                                               /* post update callback */
                             NULL,                                               /* reset callback */
                             pref->info.uat_field_list_info.uat_field_list);     /* UAT field definitions */
-                        prefs_register_uat_preference(prefs_p->proto->prefs_module, pref->value.s,
+                        prefs_register_uat_preference(prefs_p->proto->prefs_module, pref->name,
                             pref->label,
                             pref->desc,
                             uat);
@@ -792,6 +839,37 @@ WSLUA_METAMETHOD Prefs__index(lua_State* L) {
                     char *push_str = range_convert_range(NULL, prefs_p->value.r);
                     lua_pushstring(L, push_str);
                     wmem_free(NULL, push_str);
+                    }
+                    break;
+                case PREF_UAT:
+                    {
+                        uat_load_all(lua_app_env_var_prefix);
+                        uat_t* get_uat = NULL;
+                        if (prefs_p->info.uat_field_list_info.uat_field_list == NULL) {
+                            // get uat by pref label in case of existent uat reading.
+                            get_uat = uat_get_table_by_name(prefs_p->label);
+                        }
+                        else {
+                            // get uat by pref name in case of Lua created uat.
+                            get_uat = uat_get_table_by_name(prefs_p->name);
+                        }
+                        if (get_uat != NULL) {
+                            lua_newtable(L);
+                            for (unsigned int idx = 0; idx < get_uat->user_data->len; idx++) {
+                                lua_pushinteger(L, idx + 1);
+                                lua_newtable(L);
+                                void *rec = UAT_INDEX_PTR(get_uat, idx);
+                                unsigned int colnum;
+                                for(colnum = 0; colnum < get_uat->ncols; colnum++) {
+                                    lua_pushinteger(L, colnum + 1);
+                                    char *str = uat_fld_tostr(rec, &(get_uat->fields[colnum]));
+                                    lua_pushstring(L, str);
+                                    lua_settable(L, -3);
+                                }
+                                lua_settable(L, -3);
+                            }
+                            WSLUA_RETURN(1);
+                        }
                     }
                     break;
                 default: WSLUA_ERROR(Prefs__index,"Unknown Pref type"); return 0;
